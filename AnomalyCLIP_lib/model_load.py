@@ -4,8 +4,10 @@ import urllib
 import warnings
 from typing import Union, List
 from pkg_resources import packaging
+import math
 
 import torch
+import torch.nn.functional as F
 from PIL import Image
 from torchvision.transforms import Compose, Resize, ToTensor, Normalize
 from tqdm import tqdm
@@ -20,7 +22,9 @@ if packaging.version.parse(torch.__version__) < packaging.version.parse("1.7.1")
 
 
 __all__ = ["available_models", "load", 
-           "get_similarity_map",  "compute_similarity"]
+           "get_similarity_map", "compute_similarity",
+           "compute_normality_entailment", "compute_normality_image_logits",
+           "feature_to_poincare", "poincare_distance"]
 _tokenizer = _Tokenizer()
 
 _MODELS = {
@@ -34,8 +38,7 @@ def _download(
 ):
 
     if not cache_dir:
-        # cache_dir = os.path.expanduser("~/.cache/clip")
-        cache_dir = os.path.expanduser("/remote-home/iot_zhouqihang/root/.cache/clip")
+        cache_dir = os.environ.get("CLIP_CACHE_DIR") or os.path.expanduser("~/.cache/clip")
     os.makedirs(cache_dir, exist_ok=True)
     filename = os.path.basename(url)
 
@@ -141,8 +144,10 @@ def load(name: str, device: Union[str, torch.device] = "cuda" if torch.cuda.is_a
     """
     print("name", name)
     if name in _MODELS:
-        # model_path = _download(_MODELS[name], download_root or os.path.expanduser("~/.cache/clip"))
-        model_path = _download(_MODELS[name], download_root or os.path.expanduser("/remote-home/iot_zhouqihang/root/.cache/clip"))
+        model_path = _download(
+            _MODELS[name],
+            download_root or os.environ.get("CLIP_CACHE_DIR") or os.path.expanduser("~/.cache/clip"),
+        )
     elif os.path.isfile(name):
         model_path = name
     else:
@@ -233,3 +238,206 @@ def compute_similarity(image_features, text_features, t=2):
     feats = image_features.reshape(b, n_i, 1, c) * text_features.reshape(1, 1, n_t, c)
     similarity = feats.sum(-1)
     return (similarity/0.07).softmax(-1), prob_1
+
+
+def _as_curvature(curvature, reference, eps=1e-8):
+    return torch.as_tensor(curvature, dtype=reference.dtype, device=reference.device).clamp_min(eps)
+
+
+def _artanh(x, eps=1e-5):
+    x = x.clamp(min=-1 + eps, max=1 - eps)
+    return 0.5 * (torch.log1p(x) - torch.log1p(-x))
+
+
+def _project_to_ball(x, curvature, eps=1e-5):
+    c = _as_curvature(curvature, x, eps)
+    sqrt_c = torch.sqrt(c)
+    max_norm = (1.0 - eps) / sqrt_c
+    norm = x.norm(dim=-1, keepdim=True).clamp_min(eps)
+    scale = torch.clamp(max_norm / norm, max=1.0)
+    return x * scale
+
+
+def _mobius_add(x, y, curvature, eps=1e-5):
+    c = _as_curvature(curvature, x, eps)
+    x2 = (x * x).sum(dim=-1, keepdim=True)
+    y2 = (y * y).sum(dim=-1, keepdim=True)
+    xy = (x * y).sum(dim=-1, keepdim=True)
+    numerator = (1 + 2 * c * xy + c * y2) * x + (1 - c * x2) * y
+    denominator = (1 + 2 * c * xy + c * c * x2 * y2).clamp_min(eps)
+    return _project_to_ball(numerator / denominator, c, eps)
+
+
+def feature_to_poincare(features, curvature=1.0, radius_scale=0.1, eps=1e-5):
+    """Lift raw CLIP features to the Poincare ball while preserving bounded norm information."""
+    features = features.float()
+    c = _as_curvature(curvature, features, eps)
+    sqrt_c = torch.sqrt(c)
+    norm = features.norm(dim=-1, keepdim=True)
+    direction = features / norm.clamp_min(eps)
+    tangent = direction * torch.log1p(norm).mul(radius_scale)
+    tangent_norm = tangent.norm(dim=-1, keepdim=True).clamp_min(eps)
+    scale = torch.tanh(sqrt_c * tangent_norm) / (sqrt_c * tangent_norm)
+    return _project_to_ball(scale * tangent, c, eps)
+
+
+def poincare_distance(x, y, curvature=1.0, eps=1e-5):
+    c = _as_curvature(curvature, x, eps)
+    sqrt_c = torch.sqrt(c)
+    delta = _mobius_add(-x, y, c, eps)
+    delta_norm = delta.norm(dim=-1).clamp_min(eps)
+    return 2.0 / sqrt_c * _artanh(sqrt_c * delta_norm, eps)
+
+
+def _poincare_radius(x, curvature=1.0, eps=1e-5):
+    c = _as_curvature(curvature, x, eps)
+    sqrt_c = torch.sqrt(c)
+    norm = x.norm(dim=-1).clamp_min(eps)
+    return 2.0 / sqrt_c * _artanh(sqrt_c * norm, eps)
+
+
+def _logmap(x, y, curvature=1.0, eps=1e-5):
+    c = _as_curvature(curvature, x, eps)
+    sqrt_c = torch.sqrt(c)
+    delta = _mobius_add(-x, y, c, eps)
+    delta_norm = delta.norm(dim=-1, keepdim=True).clamp_min(eps)
+    lambda_x = 2.0 / (1.0 - c * (x * x).sum(dim=-1, keepdim=True)).clamp_min(eps)
+    scale = 2.0 / (sqrt_c * lambda_x) * _artanh(sqrt_c * delta_norm, eps) / delta_norm
+    return scale * delta
+
+
+def _cone_violation(parent, child, curvature=1.0, cone_aperture=0.1, eps=1e-5):
+    c = _as_curvature(curvature, parent, eps)
+    sqrt_c = torch.sqrt(c)
+    origin = torch.zeros_like(parent)
+    outward_axis = -_logmap(parent, origin, c, eps)
+    child_direction = _logmap(parent, child, c, eps)
+    dot = (outward_axis * child_direction).sum(dim=-1)
+    axis_norm = outward_axis.norm(dim=-1).clamp_min(eps)
+    child_norm = child_direction.norm(dim=-1).clamp_min(eps)
+    angle = torch.acos((dot / (axis_norm * child_norm)).clamp(-1 + eps, 1 - eps))
+
+    parent_norm = parent.norm(dim=-1).clamp_min(eps)
+    aperture_arg = cone_aperture * (1.0 - c * parent_norm.pow(2)) / (sqrt_c * parent_norm)
+    aperture = torch.asin(aperture_arg.clamp(0.0, 1.0 - eps))
+    return F.relu(angle - aperture) / math.pi
+
+
+def _energy_to_logits(energy, margin=0.2, temperature=1.0):
+    logits = torch.stack([margin - energy, energy - margin], dim=-1)
+    return logits / temperature
+
+
+def _text_pair(text_features):
+    if text_features.dim() == 3:
+        text_features = text_features[0]
+    return text_features[0], text_features[1]
+
+
+def compute_normality_image_logits(
+        image_features,
+        text_features,
+        curvature=1.0,
+        temperature=1.0,
+        radius_scale=0.1,
+        cone_aperture=0.1,
+        context_weight=0.5,
+        radial_weight=0.25,
+        order_weight=0.5,
+        margin=0.2,
+        entailment_mode="normal_only",
+        eps=1e-5,
+):
+    normal_text, anomaly_text = _text_pair(text_features)
+    image_point = feature_to_poincare(image_features, curvature, radius_scale, eps)
+    normal_point = feature_to_poincare(normal_text, curvature, radius_scale, eps).view(1, -1)
+
+    cone_energy = _cone_violation(normal_point, image_point, curvature, cone_aperture, eps)
+    radial_excess = F.relu(
+        _poincare_radius(image_point, curvature, eps) -
+        _poincare_radius(normal_point, curvature, eps)
+    )
+    energy = cone_energy + radial_weight * radial_excess
+    if entailment_mode == "contrastive":
+        anomaly_point = feature_to_poincare(anomaly_text, curvature, radius_scale, eps).view(1, -1)
+        anomaly_cone = _cone_violation(anomaly_point, image_point, curvature, cone_aperture, eps)
+        anomaly_radial = F.relu(
+            _poincare_radius(image_point, curvature, eps) -
+            _poincare_radius(anomaly_point, curvature, eps)
+        )
+        anomaly_energy = anomaly_cone + radial_weight * anomaly_radial
+        logits = torch.stack([-energy, -anomaly_energy], dim=-1) / temperature
+        return logits, energy - anomaly_energy
+    if entailment_mode != "normal_only":
+        raise ValueError(f"unknown entailment_mode: {entailment_mode}")
+    return _energy_to_logits(energy, margin, temperature), energy
+
+
+def compute_normality_entailment(
+        patch_features,
+        text_features,
+        image_features=None,
+        parent_patch_features=None,
+        curvature=1.0,
+        temperature=1.0,
+        radius_scale=0.1,
+        cone_aperture=0.1,
+        context_weight=0.5,
+        radial_weight=0.25,
+        order_weight=0.5,
+        margin=0.2,
+        entailment_mode="normal_only",
+        eps=1e-5,
+):
+    """Score patch anomalies as violations of normality entailment in hyperbolic space."""
+    normal_text, anomaly_text = _text_pair(text_features)
+    patch_point = feature_to_poincare(patch_features, curvature, radius_scale, eps)
+    normal_point = feature_to_poincare(normal_text, curvature, radius_scale, eps).view(1, 1, -1)
+
+    normal_cone = _cone_violation(normal_point, patch_point, curvature, cone_aperture, eps)
+    energy = normal_cone
+    components = {"normal_cone": normal_cone}
+
+    radial_parent = normal_point
+    if image_features is not None and context_weight > 0:
+        context_point = feature_to_poincare(image_features, curvature, radius_scale, eps).unsqueeze(1)
+        context_cone = _cone_violation(context_point, patch_point, curvature, cone_aperture, eps)
+        energy = energy + context_weight * context_cone
+        radial_parent = context_point
+        components["context_cone"] = context_cone
+
+    radial_excess = F.relu(
+        _poincare_radius(patch_point, curvature, eps) -
+        _poincare_radius(radial_parent, curvature, eps)
+    )
+    energy = energy + radial_weight * radial_excess
+    components["radial_excess"] = radial_excess
+
+    if parent_patch_features is not None and parent_patch_features.shape[:2] == patch_features.shape[:2] and order_weight > 0:
+        parent_point = feature_to_poincare(parent_patch_features, curvature, radius_scale, eps)
+        order_cone = _cone_violation(parent_point, patch_point, curvature, cone_aperture, eps)
+        order_radial = F.relu(
+            _poincare_radius(patch_point, curvature, eps) -
+            _poincare_radius(parent_point, curvature, eps)
+        )
+        order_rupture = order_cone + radial_weight * order_radial
+        energy = energy + order_weight * order_rupture
+        components["order_rupture"] = order_rupture
+
+    if entailment_mode == "contrastive":
+        anomaly_point = feature_to_poincare(anomaly_text, curvature, radius_scale, eps).view(1, 1, -1)
+        anomaly_cone = _cone_violation(anomaly_point, patch_point, curvature, cone_aperture, eps)
+        anomaly_radial = F.relu(
+            _poincare_radius(patch_point, curvature, eps) -
+            _poincare_radius(anomaly_point, curvature, eps)
+        )
+        anomaly_energy = anomaly_cone + radial_weight * anomaly_radial
+        components["anomaly_cone"] = anomaly_cone
+        components["anomaly_radial_excess"] = anomaly_radial
+        logits = torch.stack([-energy, -anomaly_energy], dim=-1) / temperature
+        return logits.softmax(dim=-1), energy - anomaly_energy, components
+    if entailment_mode != "normal_only":
+        raise ValueError(f"unknown entailment_mode: {entailment_mode}")
+
+    logits = _energy_to_logits(energy, margin, temperature)
+    return logits.softmax(dim=-1), energy, components

@@ -5,7 +5,9 @@ from skimage import measure
 def cal_pro_score(masks, amaps, max_step=200, expect_fpr=0.3):
     # ref: https://github.com/gudovskiy/cflow-ad/blob/master/train.py
     binary_amaps = np.zeros_like(amaps, dtype=bool)
-    min_th, max_th = amaps.min(), amaps.max()
+    min_th, max_th = np.nanmin(amaps), np.nanmax(amaps)
+    if not np.isfinite(min_th) or not np.isfinite(max_th) or max_th <= min_th:
+        return 0.0
     delta = (max_th - min_th) / max_step
     pros, fprs, ths = [], [], []
     for th in np.arange(min_th, max_th, delta):
@@ -23,8 +25,13 @@ def cal_pro_score(masks, amaps, max_step=200, expect_fpr=0.3):
         ths.append(th)
     pros, fprs, ths = np.array(pros), np.array(fprs), np.array(ths)
     idxes = fprs < expect_fpr
+    if idxes.sum() < 2:
+        return 0.0
     fprs = fprs[idxes]
-    fprs = (fprs - fprs.min()) / (fprs.max() - fprs.min())
+    fpr_range = fprs.max() - fprs.min()
+    if fpr_range <= 0:
+        return 0.0
+    fprs = (fprs - fprs.min()) / fpr_range
     pro_auc = auc(fprs, pros[idxes])
     return pro_auc
 
@@ -57,4 +64,3 @@ def pixel_level_metrics(results, obj, metric):
             pr = pr.squeeze(1)
         performance = cal_pro_score(gt, pr)
     return performance
-    
