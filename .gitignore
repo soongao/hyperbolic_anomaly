@@ -1,0 +1,40 @@
+# Python/runtime caches
+__pycache__/
+*.py[cod]
+*$py.class
+.pytest_cache/
+.mypy_cache/
+.ruff_cache/
+.pycache_check/
+.matplotlib-cache/
+
+# Local environments
+.venv/
+venv/
+env/
+
+# OS/editor files
+.DS_Store
+.idea/
+.vscode/
+
+# Logs and generated outputs
+*.log
+results/
+runs/
+outputs/
+wandb/
+tensorboard/
+
+# Model/data artifacts
+checkpoints/
+*.pth
+*.pt
+*.ckpt
+*.onnx
+data/
+datasets/
+
+# Local credentials/config
+.env
+.env.*
