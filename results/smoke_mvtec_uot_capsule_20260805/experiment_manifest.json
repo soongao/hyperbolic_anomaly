@@ -1,0 +1,25 @@
+{
+  "experiment": "mechanism_causal_experiment",
+  "claim_tested": "If anomaly scoring captures local normality violation, controlled defect severity should monotonically increase anomaly scores and normal/anomaly energy gaps.",
+  "dataset": "mvtec",
+  "data_path": "/Users/bytedance/Downloads/mvtec_anomaly_detection",
+  "checkpoint_path": "checkpoints/9_12_4_multiscale/epoch_15.pth",
+  "classes": [
+    "capsule"
+  ],
+  "variants": [
+    "cosine",
+    "uot_hyperbolic_cone"
+  ],
+  "defect_types": [
+    "scratch"
+  ],
+  "severity_levels": [
+    0.5,
+    1.0
+  ],
+  "include_clean_baseline": true,
+  "include_real_repairs": false,
+  "synthetic_rows": 6,
+  "repair_rows": 0
+}
