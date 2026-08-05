@@ -1,0 +1,13 @@
+class,defect_type,metric,n,p_value,spearman_rho_vs_severity,variant
+toothbrush,noise_patch,mask_mean,2,nan,nan,cosine
+toothbrush,noise_patch,region_gap,2,nan,nan,cosine
+toothbrush,noise_patch,pixel_auc,2,nan,nan,cosine
+toothbrush,noise_patch,normal_energy_region_gap,0,nan,nan,cosine
+toothbrush,noise_patch,energy_gap_region_gap,0,nan,nan,cosine
+toothbrush,noise_patch,score_energy_region_gap,0,nan,nan,cosine
+toothbrush,noise_patch,mask_mean,2,nan,nan,cone_contrastive
+toothbrush,noise_patch,region_gap,2,nan,nan,cone_contrastive
+toothbrush,noise_patch,pixel_auc,2,nan,nan,cone_contrastive
+toothbrush,noise_patch,normal_energy_region_gap,2,nan,nan,cone_contrastive
+toothbrush,noise_patch,energy_gap_region_gap,2,nan,nan,cone_contrastive
+toothbrush,noise_patch,score_energy_region_gap,2,nan,nan,cone_contrastive

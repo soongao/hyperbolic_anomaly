@@ -24,6 +24,8 @@ if packaging.version.parse(torch.__version__) < packaging.version.parse("1.7.1")
 __all__ = ["available_models", "load", 
            "get_similarity_map", "compute_similarity",
            "compute_normality_entailment", "compute_normality_image_logits",
+           "compute_euclidean_energy", "compute_euclidean_image_logits",
+           "compute_hyperbolic_distance", "compute_hyperbolic_distance_image_logits",
            "feature_to_poincare", "poincare_distance"]
 _tokenizer = _Tokenizer()
 
@@ -328,10 +330,121 @@ def _energy_to_logits(energy, margin=0.2, temperature=1.0):
     return logits / temperature
 
 
+def _inverse_energy_to_logits(energy, margin=0.2, temperature=1.0):
+    logits = torch.stack([energy - margin, margin - energy], dim=-1)
+    return logits / temperature
+
+
 def _text_pair(text_features):
     if text_features.dim() == 3:
         text_features = text_features[0]
     return text_features[0], text_features[1]
+
+
+def _energy_scores(normal_energy, anomaly_energy, mode, margin=0.2, temperature=1.0):
+    if mode == "contrastive":
+        logits = torch.stack([-normal_energy, -anomaly_energy], dim=-1) / temperature
+        return logits.softmax(dim=-1), normal_energy - anomaly_energy
+    if mode == "normal_only":
+        return _energy_to_logits(normal_energy, margin, temperature).softmax(dim=-1), normal_energy
+    if mode == "anomaly_only":
+        return _inverse_energy_to_logits(anomaly_energy, margin, temperature).softmax(dim=-1), -anomaly_energy
+    raise ValueError(f"unknown entailment_mode: {mode}")
+
+
+def _energy_image_logits(normal_energy, anomaly_energy, mode, margin=0.2, temperature=1.0):
+    if mode == "contrastive":
+        logits = torch.stack([-normal_energy, -anomaly_energy], dim=-1) / temperature
+        return logits, normal_energy - anomaly_energy
+    if mode == "normal_only":
+        return _energy_to_logits(normal_energy, margin, temperature), normal_energy
+    if mode == "anomaly_only":
+        return _inverse_energy_to_logits(anomaly_energy, margin, temperature), -anomaly_energy
+    raise ValueError(f"unknown entailment_mode: {mode}")
+
+
+def _pairwise_euclidean_energy(features, text_features, squared=True, eps=1e-5):
+    normal_text, anomaly_text = _text_pair(text_features)
+    features = features.float()
+    normal_point = F.normalize(normal_text.float(), dim=-1, eps=eps).view(*([1] * (features.dim() - 1)), -1)
+    anomaly_point = F.normalize(anomaly_text.float(), dim=-1, eps=eps).view(*([1] * (features.dim() - 1)), -1)
+    feature_point = F.normalize(features, dim=-1, eps=eps)
+    normal_energy = (feature_point - normal_point).norm(dim=-1)
+    anomaly_energy = (feature_point - anomaly_point).norm(dim=-1)
+    if squared:
+        normal_energy = normal_energy.pow(2)
+        anomaly_energy = anomaly_energy.pow(2)
+    return normal_energy, anomaly_energy
+
+
+def compute_euclidean_energy(
+        features,
+        text_features,
+        temperature=1.0,
+        margin=0.2,
+        entailment_mode="contrastive",
+        squared=True,
+        eps=1e-5,
+):
+    """Ablation scorer: Euclidean text-anchor energy without hyperbolic geometry."""
+    normal_energy, anomaly_energy = _pairwise_euclidean_energy(features, text_features, squared, eps)
+    return _energy_scores(normal_energy, anomaly_energy, entailment_mode, margin, temperature)
+
+
+def compute_euclidean_image_logits(
+        image_features,
+        text_features,
+        temperature=1.0,
+        margin=0.2,
+        entailment_mode="contrastive",
+        squared=True,
+        eps=1e-5,
+):
+    normal_energy, anomaly_energy = _pairwise_euclidean_energy(image_features, text_features, squared, eps)
+    return _energy_image_logits(normal_energy, anomaly_energy, entailment_mode, margin, temperature)
+
+
+def _pairwise_hyperbolic_distance(features, text_features, curvature=1.0, radius_scale=0.1, eps=1e-5):
+    normal_text, anomaly_text = _text_pair(text_features)
+    feature_point = feature_to_poincare(features, curvature, radius_scale, eps)
+    normal_point = feature_to_poincare(normal_text, curvature, radius_scale, eps).view(*([1] * (features.dim() - 1)), -1)
+    anomaly_point = feature_to_poincare(anomaly_text, curvature, radius_scale, eps).view(*([1] * (features.dim() - 1)), -1)
+    normal_energy = poincare_distance(feature_point, normal_point, curvature, eps)
+    anomaly_energy = poincare_distance(feature_point, anomaly_point, curvature, eps)
+    return normal_energy, anomaly_energy
+
+
+def compute_hyperbolic_distance(
+        features,
+        text_features,
+        curvature=1.0,
+        temperature=1.0,
+        radius_scale=0.1,
+        margin=0.2,
+        entailment_mode="contrastive",
+        eps=1e-5,
+):
+    """Ablation scorer: Poincare distance to text anchors without entailment cones."""
+    normal_energy, anomaly_energy = _pairwise_hyperbolic_distance(
+        features, text_features, curvature, radius_scale, eps
+    )
+    return _energy_scores(normal_energy, anomaly_energy, entailment_mode, margin, temperature)
+
+
+def compute_hyperbolic_distance_image_logits(
+        image_features,
+        text_features,
+        curvature=1.0,
+        temperature=1.0,
+        radius_scale=0.1,
+        margin=0.2,
+        entailment_mode="contrastive",
+        eps=1e-5,
+):
+    normal_energy, anomaly_energy = _pairwise_hyperbolic_distance(
+        image_features, text_features, curvature, radius_scale, eps
+    )
+    return _energy_image_logits(normal_energy, anomaly_energy, entailment_mode, margin, temperature)
 
 
 def compute_normality_image_logits(
@@ -358,7 +471,7 @@ def compute_normality_image_logits(
         _poincare_radius(normal_point, curvature, eps)
     )
     energy = cone_energy + radial_weight * radial_excess
-    if entailment_mode == "contrastive":
+    if entailment_mode in {"contrastive", "anomaly_only"}:
         anomaly_point = feature_to_poincare(anomaly_text, curvature, radius_scale, eps).view(1, -1)
         anomaly_cone = _cone_violation(anomaly_point, image_point, curvature, cone_aperture, eps)
         anomaly_radial = F.relu(
@@ -366,11 +479,8 @@ def compute_normality_image_logits(
             _poincare_radius(anomaly_point, curvature, eps)
         )
         anomaly_energy = anomaly_cone + radial_weight * anomaly_radial
-        logits = torch.stack([-energy, -anomaly_energy], dim=-1) / temperature
-        return logits, energy - anomaly_energy
-    if entailment_mode != "normal_only":
-        raise ValueError(f"unknown entailment_mode: {entailment_mode}")
-    return _energy_to_logits(energy, margin, temperature), energy
+        return _energy_image_logits(energy, anomaly_energy, entailment_mode, margin, temperature)
+    return _energy_image_logits(energy, energy, entailment_mode, margin, temperature)
 
 
 def compute_normality_entailment(
@@ -424,7 +534,8 @@ def compute_normality_entailment(
         energy = energy + order_weight * order_rupture
         components["order_rupture"] = order_rupture
 
-    if entailment_mode == "contrastive":
+    components["normal_energy"] = energy
+    if entailment_mode in {"contrastive", "anomaly_only"}:
         anomaly_point = feature_to_poincare(anomaly_text, curvature, radius_scale, eps).view(1, 1, -1)
         anomaly_cone = _cone_violation(anomaly_point, patch_point, curvature, cone_aperture, eps)
         anomaly_radial = F.relu(
@@ -434,10 +545,10 @@ def compute_normality_entailment(
         anomaly_energy = anomaly_cone + radial_weight * anomaly_radial
         components["anomaly_cone"] = anomaly_cone
         components["anomaly_radial_excess"] = anomaly_radial
-        logits = torch.stack([-energy, -anomaly_energy], dim=-1) / temperature
-        return logits.softmax(dim=-1), energy - anomaly_energy, components
-    if entailment_mode != "normal_only":
-        raise ValueError(f"unknown entailment_mode: {entailment_mode}")
+        components["anomaly_energy"] = anomaly_energy
+        components["energy_gap"] = energy - anomaly_energy
+        similarity, score_energy = _energy_scores(energy, anomaly_energy, entailment_mode, margin, temperature)
+        return similarity, score_energy, components
 
-    logits = _energy_to_logits(energy, margin, temperature)
-    return logits.softmax(dim=-1), energy, components
+    similarity, score_energy = _energy_scores(energy, energy, entailment_mode, margin, temperature)
+    return similarity, score_energy, components

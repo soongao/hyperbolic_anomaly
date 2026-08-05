@@ -20,7 +20,7 @@ env/
 
 # Logs and generated outputs
 *.log
-results/
+# results/
 runs/
 outputs/
 wandb/

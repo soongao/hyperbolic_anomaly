@@ -192,3 +192,42 @@ P_anom(p) = exp(-E_a(p)) / (exp(-E_n(p)) + exp(-E_a(p)))
 - 不要说双曲空间天然优于欧式空间，应强调“与正常语义蕴含建模相匹配”。
 - 不要说 anomaly prompt 只是辅助分类器，应强调它是 contrastive entailment 中的异常解释锚点。
 
+## 13. 与已有工作的边界
+
+后续写作不能把 novelty 放在“首次使用双曲空间”上。已有工作已经覆盖了几个相邻方向：
+
+- `Hyperbolic Anomaly Detection` 已将工业异常检测特征映射到双曲空间并使用双曲距离。
+- `HPL-CLIP` 已提出 hyperbolic prompt learning for zero-shot anomaly detection，并学习 normality/abnormality generic states。
+- `HySAC` 已在 CLIP/VLM 中用 hyperbolic entailment hierarchy 建模 safe/unsafe 内容。
+- `Compositional Entailment Learning` 已在 hyperbolic VLM 中使用 compositional entailment objective。
+
+因此本文需要收窄为：
+
+**已有方法主要把双曲空间作为表征空间、距离度量或 prompt alignment 空间；本文把它用作 patch-level anomaly decision rule，即通过 normality cone violation 与 anomaly cone explanation 的相对能量来判别局部异常。**
+
+最需要补齐的证据不是更多模块，而是证明这个 decision rule 的必要性：
+
+1. 与 cosine、Euclidean energy、hyperbolic distance-only、normal-only cone 对比。
+2. 展示 normal-only 在复杂正常局部结构上的误报，以及 contrastive cone 的修正。
+3. 对 HPL-CLIP 做 explicit related-work/baseline 边界说明。
+
+详细 novelty 检索和 gap 清单见 `paper_storyline/novelty_gap_audit.md`。
+
+## 14. 当前补齐状态
+
+代码层面已经把机制对照补成可运行配置：
+
+- `--score_mode cosine`：原始 flat prompt baseline。
+- `--score_mode euclidean_energy`：验证是否只是 energy softmax 带来收益。
+- `--score_mode hyperbolic_distance`：验证是否只是 Poincare distance 带来收益。
+- `--score_mode normality_entailment --entailment_mode normal_only`：验证 normality violation 的单独效果和误报。
+- `--score_mode normality_entailment --entailment_mode anomaly_only`：验证 anomaly prompt 单独解释是否不足。
+- `--score_mode normality_entailment --entailment_mode contrastive`：最终 normal/anomaly cone 相对解释机制。
+
+弱类 ablation 可用：
+
+```bash
+scripts/run_gap_ablation_mvtec.sh <mvtec_data_path> <checkpoint_path> [save_root]
+```
+
+论文里应该把这组 ablation 写成机制验证，而不是参数搜索：如果最终方法优于 Euclidean energy、hyperbolic distance-only、normal-only 和 anomaly-only，才能支撑“contrastive normality entailment 是关键 decision rule”的主张。

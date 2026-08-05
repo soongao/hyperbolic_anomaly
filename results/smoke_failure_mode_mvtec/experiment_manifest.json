@@ -1,0 +1,15 @@
+{
+  "experiment": "failure_mode_benchmark",
+  "claim_tested": "Flat prompt scoring and normal-only entailment should show higher false positives on complex normal structures than contrastive normality entailment.",
+  "dataset": "mvtec",
+  "data_path": "/Users/bytedance/Downloads/mvtec_anomaly_detection",
+  "checkpoint_path": "checkpoints/9_12_4_multiscale/epoch_15.pth",
+  "classes": [
+    "toothbrush"
+  ],
+  "variants": [
+    "cosine",
+    "cone_contrastive"
+  ],
+  "target_anomaly_tpr": 0.8
+}

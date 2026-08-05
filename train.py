@@ -101,6 +101,26 @@ def train(args):
                     **normality_kwargs(args),
                 )
                 image_loss = F.cross_entropy(text_probs, label.long().to(device))
+            elif args.score_mode == "euclidean_energy":
+                text_probs, _ = AnomalyCLIP_lib.compute_euclidean_image_logits(
+                    image_features_raw.float(),
+                    text_features_raw[0],
+                    temperature=args.hyperbolic_temperature,
+                    margin=args.entailment_margin,
+                    entailment_mode=args.entailment_mode,
+                )
+                image_loss = F.cross_entropy(text_probs, label.long().to(device))
+            elif args.score_mode == "hyperbolic_distance":
+                text_probs, _ = AnomalyCLIP_lib.compute_hyperbolic_distance_image_logits(
+                    image_features_raw.float(),
+                    text_features_raw[0],
+                    curvature=args.hyperbolic_curvature,
+                    temperature=args.hyperbolic_temperature,
+                    radius_scale=args.hyperbolic_radius_scale,
+                    margin=args.entailment_margin,
+                    entailment_mode=args.entailment_mode,
+                )
+                image_loss = F.cross_entropy(text_probs, label.long().to(device))
             else:
                 text_probs = image_features.unsqueeze(1) @ text_features.permute(0, 2, 1)
                 text_probs = text_probs[:, 0, ...]/0.07
@@ -120,6 +140,24 @@ def train(args):
                             image_features=image_features_raw.float(),
                             parent_patch_features=parent_patch_feature,
                             **normality_kwargs(args),
+                        )
+                    elif args.score_mode == "euclidean_energy":
+                        similarity, _ = AnomalyCLIP_lib.compute_euclidean_energy(
+                            patch_feature_raw,
+                            text_features_raw[0],
+                            temperature=args.hyperbolic_temperature,
+                            margin=args.entailment_margin,
+                            entailment_mode=args.entailment_mode,
+                        )
+                    elif args.score_mode == "hyperbolic_distance":
+                        similarity, _ = AnomalyCLIP_lib.compute_hyperbolic_distance(
+                            patch_feature_raw,
+                            text_features_raw[0],
+                            curvature=args.hyperbolic_curvature,
+                            temperature=args.hyperbolic_temperature,
+                            radius_scale=args.hyperbolic_radius_scale,
+                            margin=args.entailment_margin,
+                            entailment_mode=args.entailment_mode,
                         )
                     else:
                         patch_feature = patch_feature/ patch_feature.norm(dim = -1, keepdim = True)
@@ -166,13 +204,13 @@ if __name__ == '__main__':
     parser.add_argument("--learning_rate", type=float, default=0.001, help="learning rate")
     parser.add_argument("--batch_size", type=int, default=8, help="batch size")
     parser.add_argument("--image_size", type=int, default=518, help="image size")
-    parser.add_argument("--score_mode", type=str, default="normality_entailment", choices=["normality_entailment", "cosine"], help="anomaly scoring mechanism")
+    parser.add_argument("--score_mode", type=str, default="normality_entailment", choices=["normality_entailment", "euclidean_energy", "hyperbolic_distance", "cosine"], help="anomaly scoring mechanism")
     parser.add_argument("--hyperbolic_curvature", type=float, default=1.0, help="Poincare ball curvature")
     parser.add_argument("--hyperbolic_temperature", type=float, default=1.0, help="normality entailment logit temperature")
     parser.add_argument("--hyperbolic_radius_scale", type=float, default=0.1, help="scale used to preserve raw feature norm before the exponential map")
     parser.add_argument("--cone_aperture", type=float, default=0.1, help="minimum aperture constant for normality cones")
     parser.add_argument("--entailment_margin", type=float, default=0.2, help="energy margin separating normal and anomaly logits")
-    parser.add_argument("--entailment_mode", type=str, default="normal_only", choices=["normal_only", "contrastive"], help="normal-only or normal-vs-anomaly hyperbolic entailment")
+    parser.add_argument("--entailment_mode", type=str, default="normal_only", choices=["normal_only", "anomaly_only", "contrastive"], help="normal-only, anomaly-only, or normal-vs-anomaly scoring")
     parser.add_argument("--context_weight", type=float, default=0.5, help="weight for global-context cone violation")
     parser.add_argument("--radial_weight", type=float, default=0.25, help="weight for radial severity excess")
     parser.add_argument("--order_weight", type=float, default=0.5, help="weight for multi-scale parent-child order rupture")
