@@ -213,7 +213,55 @@ transistor
 
 6. Compare pixel AUROC, AUPRO, image AUROC, and unmatched-mass visualization.
 
-## 11. Claim Boundary
+## 11. Code Entry Points
+
+Implemented score mode:
+
+```text
+--score_mode hyperbolic_uot
+```
+
+Implemented OT controls:
+
+```text
+--ot_mode balanced|partial|unbalanced
+--ot_cost cosine|euclidean|hyperbolic_distance|hyperbolic_cone
+--ot_anchor_mode normal|anomaly|both|normal_anomaly
+--ot_score unmatched|cost|combined
+--ot_epsilon
+--ot_tau_patch
+--ot_tau_anchor
+--ot_partial_mass
+--ot_iterations
+--ot_alpha
+--ot_beta
+```
+
+Run weak-class UOT ablations:
+
+```bash
+bash scripts/run_uot_ablation_mvtec.sh <mvtec_data_path> <checkpoint_path> [save_root]
+```
+
+Run UOT failure-mode benchmark:
+
+```bash
+bash scripts/run_uot_failure_mode_mvtec.sh <mvtec_data_path> <checkpoint_path> [save_root]
+```
+
+Run UOT synthetic causal mechanism benchmark:
+
+```bash
+bash scripts/run_uot_mechanism_causal_mvtec.sh <mvtec_data_path> <checkpoint_path> [save_root]
+```
+
+Run UOT anchor-mode ablation:
+
+```bash
+bash scripts/run_uot_anchor_ablation_mvtec.sh <mvtec_data_path> <checkpoint_path> [save_root]
+```
+
+## 12. Claim Boundary
 
 Do not claim:
 
@@ -224,4 +272,3 @@ Do not claim:
 Safer claim:
 
 > We use unbalanced optimal transport as a rejectable semantic matching rule for CLIP-based ZSAD, and instantiate its cost with hyperbolic normality geometry so that anomalous patches can emerge as unmatched or high-cost mass rather than being forced into flat prompt classes.
-

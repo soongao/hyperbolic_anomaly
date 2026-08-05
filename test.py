@@ -38,6 +38,27 @@ def normality_kwargs(args):
     }
 
 
+def transport_kwargs(args):
+    return {
+        "ot_mode": args.ot_mode,
+        "ot_cost": args.ot_cost,
+        "ot_anchor_mode": args.ot_anchor_mode,
+        "ot_epsilon": args.ot_epsilon,
+        "ot_tau_patch": args.ot_tau_patch,
+        "ot_tau_anchor": args.ot_tau_anchor,
+        "ot_partial_mass": args.ot_partial_mass,
+        "ot_iterations": args.ot_iterations,
+        "ot_score": args.ot_score,
+        "ot_alpha": args.ot_alpha,
+        "ot_beta": args.ot_beta,
+        "curvature": args.hyperbolic_curvature,
+        "temperature": args.hyperbolic_temperature,
+        "radius_scale": args.hyperbolic_radius_scale,
+        "cone_aperture": args.cone_aperture,
+        "margin": args.entailment_margin,
+    }
+
+
 def apply_class_filter(dataset, class_filter):
     if not class_filter:
         return dataset.obj_list
@@ -146,6 +167,8 @@ def test(args):
                     entailment_mode=args.entailment_mode,
                 )
                 text_probs = image_logits.softmax(dim=-1)[:, 1]
+            elif args.score_mode == "hyperbolic_uot":
+                text_probs = None
             else:
                 text_probs = image_features @ text_features.permute(0, 2, 1)
                 text_probs = (text_probs/0.07).softmax(-1)
@@ -181,6 +204,12 @@ def test(args):
                             margin=args.entailment_margin,
                             entailment_mode=args.entailment_mode,
                         )
+                    elif args.score_mode == "hyperbolic_uot":
+                        similarity, energy, _ = AnomalyCLIP_lib.compute_transport_anomaly(
+                            patch_feature_raw,
+                            text_features_raw[0],
+                            **transport_kwargs(args),
+                        )
                     if args.score_mode != "cosine":
                         if args.patch_score_space == "energy":
                             anomaly_map = AnomalyCLIP_lib.get_similarity_map(
@@ -203,6 +232,8 @@ def test(args):
             anomaly_map = torch.stack(anomaly_map_list)
             
             anomaly_map = anomaly_map.sum(dim = 0)
+            if text_probs is None:
+                text_probs = anomaly_map.flatten(1).max(dim=1).values
             results[cls_name[0]]['pr_sp'].extend(text_probs.detach().cpu())
             anomaly_map = torch.stack([torch.from_numpy(gaussian_filter(i, sigma = args.sigma)) for i in anomaly_map.detach().cpu()], dim = 0 )
             results[cls_name[0]]['anomaly_maps'].append(anomaly_map)
@@ -285,7 +316,7 @@ if __name__ == '__main__':
     parser.add_argument("--feature_map_layer", type=int,  nargs="+", default=[0, 1, 2, 3], help="zero shot")
     parser.add_argument("--class_filter", type=str, nargs="+", default=None, help="optional class names to evaluate")
     parser.add_argument("--metrics", type=str, default='image-pixel-level')
-    parser.add_argument("--score_mode", type=str, default="normality_entailment", choices=["normality_entailment", "euclidean_energy", "hyperbolic_distance", "cosine"], help="anomaly scoring mechanism")
+    parser.add_argument("--score_mode", type=str, default="normality_entailment", choices=["normality_entailment", "euclidean_energy", "hyperbolic_distance", "hyperbolic_uot", "cosine"], help="anomaly scoring mechanism")
     parser.add_argument("--patch_score_space", type=str, default="prob", choices=["prob", "energy"], help="normality patch map scoring space")
     parser.add_argument("--hyperbolic_curvature", type=float, default=1.0, help="Poincare ball curvature")
     parser.add_argument("--hyperbolic_temperature", type=float, default=1.0, help="normality entailment logit temperature")
@@ -296,6 +327,17 @@ if __name__ == '__main__':
     parser.add_argument("--context_weight", type=float, default=0.5, help="weight for global-context cone violation")
     parser.add_argument("--radial_weight", type=float, default=0.25, help="weight for radial severity excess")
     parser.add_argument("--order_weight", type=float, default=0.5, help="weight for multi-scale parent-child order rupture")
+    parser.add_argument("--ot_mode", type=str, default="unbalanced", choices=["balanced", "partial", "unbalanced"], help="transport solver for hyperbolic_uot")
+    parser.add_argument("--ot_cost", type=str, default="hyperbolic_cone", choices=["cosine", "euclidean", "hyperbolic_distance", "hyperbolic_cone"], help="patch-to-anchor transport cost")
+    parser.add_argument("--ot_anchor_mode", type=str, default="normal", choices=["normal", "anomaly", "both", "normal_anomaly"], help="text anchors used by transport")
+    parser.add_argument("--ot_epsilon", type=float, default=0.05, help="entropy regularization for transport")
+    parser.add_argument("--ot_tau_patch", type=float, default=0.5, help="patch-side mass relaxation for unbalanced OT")
+    parser.add_argument("--ot_tau_anchor", type=float, default=0.5, help="anchor-side mass relaxation for unbalanced OT")
+    parser.add_argument("--ot_partial_mass", type=float, default=0.9, help="transported mass ratio for partial OT")
+    parser.add_argument("--ot_iterations", type=int, default=50, help="Sinkhorn iterations")
+    parser.add_argument("--ot_score", type=str, default="combined", choices=["unmatched", "cost", "combined"], help="UOT anomaly score component")
+    parser.add_argument("--ot_alpha", type=float, default=1.0, help="weight for unmatched mass ratio")
+    parser.add_argument("--ot_beta", type=float, default=1.0, help="weight for matched transport cost")
     parser.add_argument("--seed", type=int, default=111, help="random seed")
     parser.add_argument("--sigma", type=int, default=4, help="zero shot")
     

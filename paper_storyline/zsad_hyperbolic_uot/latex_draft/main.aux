@@ -1,0 +1,52 @@
+\relax 
+\providecommand\hyper@newdestlabel[2]{}
+\providecommand\HyField@AuxAddToFields[1]{}
+\providecommand\HyField@AuxAddToCoFields[2]{}
+\@writefile{toc}{\contentsline {section}{\numberline {1}Introduction}{1}{section.1}\protected@file@percent }
+\@writefile{lof}{\contentsline {figure}{\numberline {1}{\ignorespaces Motivation. Flat prompt scoring compares each patch with normal and abnormal prompts. Balanced transport still forces all patch mass to be matched. Unbalanced semantic transport allows anomalous regions to appear as unmatched or high-cost mass.}}{2}{figure.1}\protected@file@percent }
+\newlabel{fig:motivation}{{1}{2}{Motivation. Flat prompt scoring compares each patch with normal and abnormal prompts. Balanced transport still forces all patch mass to be matched. Unbalanced semantic transport allows anomalous regions to appear as unmatched or high-cost mass}{figure.1}{}}
+\@writefile{toc}{\contentsline {section}{\numberline {2}Related Work}{2}{section.2}\protected@file@percent }
+\@writefile{toc}{\contentsline {subsection}{\numberline {2.1}CLIP-based zero-shot anomaly localization}{2}{subsection.2.1}\protected@file@percent }
+\@writefile{toc}{\contentsline {subsection}{\numberline {2.2}Hyperbolic representation and visual-language structure}{3}{subsection.2.2}\protected@file@percent }
+\@writefile{toc}{\contentsline {subsection}{\numberline {2.3}Optimal transport, unbalanced transport, and rejection}{3}{subsection.2.3}\protected@file@percent }
+\@writefile{toc}{\contentsline {subsection}{\numberline {2.4}One-class and open-set anomaly detection}{3}{subsection.2.4}\protected@file@percent }
+\@writefile{toc}{\contentsline {section}{\numberline {3}Method}{3}{section.3}\protected@file@percent }
+\@writefile{toc}{\contentsline {subsection}{\numberline {3.1}Problem setup}{3}{subsection.3.1}\protected@file@percent }
+\@writefile{toc}{\contentsline {subsection}{\numberline {3.2}Normality anchors}{4}{subsection.3.2}\protected@file@percent }
+\@writefile{toc}{\contentsline {subsection}{\numberline {3.3}Hyperbolic normality cost}{4}{subsection.3.3}\protected@file@percent }
+\@writefile{toc}{\contentsline {subsection}{\numberline {3.4}Unbalanced semantic transport}{4}{subsection.3.4}\protected@file@percent }
+\newlabel{eq:uot}{{7}{4}{Unbalanced semantic transport}{equation.7}{}}
+\@writefile{toc}{\contentsline {subsection}{\numberline {3.5}Anomaly score}{4}{subsection.3.5}\protected@file@percent }
+\@writefile{lof}{\contentsline {figure}{\numberline {2}{\ignorespaces Method overview. The image encoder produces patch features, the text encoder produces normality anchors, a hyperbolic cost matrix is built, UOT produces a transport plan, and unmatched mass plus matched cost form the anomaly map.}}{5}{figure.2}\protected@file@percent }
+\newlabel{fig:method}{{2}{5}{Method overview. The image encoder produces patch features, the text encoder produces normality anchors, a hyperbolic cost matrix is built, UOT produces a transport plan, and unmatched mass plus matched cost form the anomaly map}{figure.2}{}}
+\@writefile{toc}{\contentsline {subsection}{\numberline {3.6}Inference and complexity}{5}{subsection.3.6}\protected@file@percent }
+\@writefile{toc}{\contentsline {section}{\numberline {4}Experiments}{5}{section.4}\protected@file@percent }
+\@writefile{toc}{\contentsline {subsection}{\numberline {4.1}Experimental questions}{5}{subsection.4.1}\protected@file@percent }
+\@writefile{lot}{\contentsline {table}{\numberline {1}{\ignorespaces Main zero-shot anomaly localization comparison. Fill all entries after final evaluation.}}{6}{table.1}\protected@file@percent }
+\newlabel{tab:main}{{1}{6}{Main zero-shot anomaly localization comparison. Fill all entries after final evaluation}{table.1}{}}
+\@writefile{lot}{\contentsline {table}{\numberline {2}{\ignorespaces Transport mode ablation. The key mechanism columns are unmatched-mass gap and over-match rate.}}{6}{table.2}\protected@file@percent }
+\newlabel{tab:transport}{{2}{6}{Transport mode ablation. The key mechanism columns are unmatched-mass gap and over-match rate}{table.2}{}}
+\@writefile{toc}{\contentsline {subsection}{\numberline {4.2}Datasets, protocols, and metrics}{6}{subsection.4.2}\protected@file@percent }
+\@writefile{toc}{\contentsline {subsection}{\numberline {4.3}Main comparison}{6}{subsection.4.3}\protected@file@percent }
+\@writefile{toc}{\contentsline {subsection}{\numberline {4.4}Transport mode ablation}{6}{subsection.4.4}\protected@file@percent }
+\@writefile{toc}{\contentsline {subsection}{\numberline {4.5}Cost type ablation}{6}{subsection.4.5}\protected@file@percent }
+\@writefile{toc}{\contentsline {subsection}{\numberline {4.6}Anomaly signal decomposition}{6}{subsection.4.6}\protected@file@percent }
+\@writefile{lot}{\contentsline {table}{\numberline {3}{\ignorespaces Cost type ablation under identical UOT settings.}}{7}{table.3}\protected@file@percent }
+\newlabel{tab:cost}{{3}{7}{Cost type ablation under identical UOT settings}{table.3}{}}
+\@writefile{lot}{\contentsline {table}{\numberline {4}{\ignorespaces Anomaly signal decomposition.}}{7}{table.4}\protected@file@percent }
+\newlabel{tab:score}{{4}{7}{Anomaly signal decomposition}{table.4}{}}
+\@writefile{toc}{\contentsline {subsection}{\numberline {4.7}Anchor controls}{7}{subsection.4.7}\protected@file@percent }
+\@writefile{toc}{\contentsline {subsection}{\numberline {4.8}Failure-mode visualization}{7}{subsection.4.8}\protected@file@percent }
+\@writefile{toc}{\contentsline {subsection}{\numberline {4.9}Sensitivity and runtime}{7}{subsection.4.9}\protected@file@percent }
+\@writefile{toc}{\contentsline {section}{\numberline {5}Discussion}{7}{section.5}\protected@file@percent }
+\@writefile{lot}{\contentsline {table}{\numberline {5}{\ignorespaces Normality anchor ablation and negative controls.}}{8}{table.5}\protected@file@percent }
+\newlabel{tab:anchors}{{5}{8}{Normality anchor ablation and negative controls}{table.5}{}}
+\@writefile{lof}{\contentsline {figure}{\numberline {3}{\ignorespaces Mechanism visualization. Show original image, ground-truth mask, transport mass, unmatched mass, matched cost, and final score.}}{8}{figure.3}\protected@file@percent }
+\newlabel{fig:mechanism}{{3}{8}{Mechanism visualization. Show original image, ground-truth mask, transport mass, unmatched mass, matched cost, and final score}{figure.3}{}}
+\@writefile{toc}{\contentsline {section}{\numberline {6}Limitations}{8}{section.6}\protected@file@percent }
+\@writefile{toc}{\contentsline {section}{\numberline {7}Conclusion}{8}{section.7}\protected@file@percent }
+\@writefile{lof}{\contentsline {figure}{\numberline {4}{\ignorespaces Failure-mode visualization. Compare cosine scoring, hyperbolic cone scoring without OT, balanced OT, and UOT on normal complex structures and defect cases.}}{9}{figure.4}\protected@file@percent }
+\newlabel{fig:failure}{{4}{9}{Failure-mode visualization. Compare cosine scoring, hyperbolic cone scoring without OT, balanced OT, and UOT on normal complex structures and defect cases}{figure.4}{}}
+\@writefile{lot}{\contentsline {table}{\numberline {6}{\ignorespaces Runtime and sensitivity summary.}}{9}{table.6}\protected@file@percent }
+\newlabel{tab:runtime}{{6}{9}{Runtime and sensitivity summary}{table.6}{}}
+\gdef \@abspage@last{9}

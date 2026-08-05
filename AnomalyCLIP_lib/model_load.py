@@ -26,6 +26,7 @@ __all__ = ["available_models", "load",
            "compute_normality_entailment", "compute_normality_image_logits",
            "compute_euclidean_energy", "compute_euclidean_image_logits",
            "compute_hyperbolic_distance", "compute_hyperbolic_distance_image_logits",
+           "compute_transport_anomaly",
            "feature_to_poincare", "poincare_distance"]
 _tokenizer = _Tokenizer()
 
@@ -552,3 +553,215 @@ def compute_normality_entailment(
 
     similarity, score_energy = _energy_scores(energy, energy, entailment_mode, margin, temperature)
     return similarity, score_energy, components
+
+
+def _transport_anchors(text_features, anchor_mode="normal"):
+    if text_features.dim() == 3:
+        text_features = text_features[0]
+    if anchor_mode == "normal":
+        return text_features[:1]
+    if anchor_mode in {"both", "normal_anomaly"}:
+        return text_features[:2]
+    if anchor_mode == "anomaly":
+        return text_features[1:2]
+    raise ValueError(f"unknown ot_anchor_mode: {anchor_mode}")
+
+
+def _transport_cost_matrix(
+        patch_features,
+        text_features,
+        cost_type="hyperbolic_cone",
+        anchor_mode="normal",
+        curvature=1.0,
+        radius_scale=0.1,
+        cone_aperture=0.1,
+        eps=1e-5,
+):
+    anchors = _transport_anchors(text_features, anchor_mode).float()
+    patches = patch_features.float()
+
+    if cost_type == "cosine":
+        patch_point = F.normalize(patches, dim=-1, eps=eps)
+        anchor_point = F.normalize(anchors, dim=-1, eps=eps)
+        return 1.0 - torch.einsum("bnd,md->bnm", patch_point, anchor_point)
+
+    if cost_type == "euclidean":
+        patch_point = F.normalize(patches, dim=-1, eps=eps)
+        anchor_point = F.normalize(anchors, dim=-1, eps=eps)
+        return (patch_point.unsqueeze(2) - anchor_point.view(1, 1, -1, patch_point.shape[-1])).norm(dim=-1)
+
+    patch_point = feature_to_poincare(patches, curvature, radius_scale, eps)
+    anchor_point = feature_to_poincare(anchors, curvature, radius_scale, eps)
+    if cost_type == "hyperbolic_distance":
+        return poincare_distance(
+            patch_point.unsqueeze(2),
+            anchor_point.view(1, 1, -1, patch_point.shape[-1]),
+            curvature,
+            eps,
+        )
+    if cost_type == "hyperbolic_cone":
+        return _cone_violation(
+            anchor_point.view(1, 1, -1, patch_point.shape[-1]),
+            patch_point.unsqueeze(2),
+            curvature,
+            cone_aperture,
+            eps,
+        )
+    raise ValueError(f"unknown ot_cost: {cost_type}")
+
+
+def _balanced_sinkhorn(cost, a, b, epsilon=0.05, iterations=50, eps=1e-8):
+    kernel = torch.exp(-cost / max(float(epsilon), eps)).clamp_min(eps)
+    u = torch.ones_like(a)
+    v = torch.ones_like(b)
+    for _ in range(iterations):
+        kv = torch.matmul(kernel, v.unsqueeze(-1)).squeeze(-1).clamp_min(eps)
+        u = a / kv
+        ktu = torch.matmul(kernel.transpose(1, 2), u.unsqueeze(-1)).squeeze(-1).clamp_min(eps)
+        v = b / ktu
+    return u.unsqueeze(-1) * kernel * v.unsqueeze(1)
+
+
+def _unbalanced_sinkhorn(
+        cost,
+        a,
+        b,
+        epsilon=0.05,
+        tau_patch=0.5,
+        tau_anchor=0.5,
+        iterations=50,
+        eps=1e-8,
+):
+    kernel = torch.exp(-cost / max(float(epsilon), eps)).clamp_min(eps)
+    u = torch.ones_like(a)
+    v = torch.ones_like(b)
+    patch_power = float(tau_patch) / (float(tau_patch) + float(epsilon) + eps)
+    anchor_power = float(tau_anchor) / (float(tau_anchor) + float(epsilon) + eps)
+    for _ in range(iterations):
+        kv = torch.matmul(kernel, v.unsqueeze(-1)).squeeze(-1).clamp_min(eps)
+        u = (a / kv).clamp_min(eps).pow(patch_power)
+        ktu = torch.matmul(kernel.transpose(1, 2), u.unsqueeze(-1)).squeeze(-1).clamp_min(eps)
+        v = (b / ktu).clamp_min(eps).pow(anchor_power)
+    return u.unsqueeze(-1) * kernel * v.unsqueeze(1)
+
+
+def _partial_transport(cost, a, b, partial_mass=0.9, epsilon=0.05, iterations=50, eps=1e-8):
+    batch, patch_count, anchor_count = cost.shape
+    keep_count = max(1, min(patch_count, int(math.ceil(patch_count * float(partial_mass)))))
+    min_cost = cost.min(dim=-1).values
+    keep_indices = min_cost.topk(keep_count, largest=False, dim=1).indices
+
+    gamma = torch.zeros_like(cost)
+    for batch_idx in range(batch):
+        sub_cost = cost[batch_idx:batch_idx + 1, keep_indices[batch_idx], :]
+        sub_a = torch.full(
+            (1, keep_count),
+            float(partial_mass) / keep_count,
+            device=cost.device,
+            dtype=cost.dtype,
+        )
+        sub_b = torch.full(
+            (1, anchor_count),
+            float(partial_mass) / anchor_count,
+            device=cost.device,
+            dtype=cost.dtype,
+        )
+        sub_gamma = _balanced_sinkhorn(sub_cost, sub_a, sub_b, epsilon, iterations, eps)[0]
+        gamma[batch_idx, keep_indices[batch_idx], :] = sub_gamma
+    return gamma
+
+
+def _transport_plan(
+        cost,
+        mode="unbalanced",
+        epsilon=0.05,
+        tau_patch=0.5,
+        tau_anchor=0.5,
+        partial_mass=0.9,
+        iterations=50,
+        eps=1e-8,
+):
+    batch, patch_count, anchor_count = cost.shape
+    a = torch.full((batch, patch_count), 1.0 / patch_count, device=cost.device, dtype=cost.dtype)
+    b = torch.full((batch, anchor_count), 1.0 / anchor_count, device=cost.device, dtype=cost.dtype)
+
+    if mode == "balanced":
+        gamma = _balanced_sinkhorn(cost, a, b, epsilon, iterations, eps)
+    elif mode == "partial":
+        gamma = _partial_transport(cost, a, b, partial_mass, epsilon, iterations, eps)
+    elif mode == "unbalanced":
+        gamma = _unbalanced_sinkhorn(cost, a, b, epsilon, tau_patch, tau_anchor, iterations, eps)
+    else:
+        raise ValueError(f"unknown ot_mode: {mode}")
+    return gamma, a, b
+
+
+def compute_transport_anomaly(
+        patch_features,
+        text_features,
+        ot_mode="unbalanced",
+        ot_cost="hyperbolic_cone",
+        ot_anchor_mode="normal",
+        ot_epsilon=0.05,
+        ot_tau_patch=0.5,
+        ot_tau_anchor=0.5,
+        ot_partial_mass=0.9,
+        ot_iterations=50,
+        ot_score="combined",
+        ot_alpha=1.0,
+        ot_beta=1.0,
+        curvature=1.0,
+        temperature=1.0,
+        radius_scale=0.1,
+        cone_aperture=0.1,
+        margin=0.2,
+        eps=1e-5,
+):
+    """Score patches with balanced, partial, or unbalanced transport to text anchors."""
+    cost = _transport_cost_matrix(
+        patch_features,
+        text_features,
+        cost_type=ot_cost,
+        anchor_mode=ot_anchor_mode,
+        curvature=curvature,
+        radius_scale=radius_scale,
+        cone_aperture=cone_aperture,
+        eps=eps,
+    ).clamp_min(0.0)
+    gamma, source_mass, _ = _transport_plan(
+        cost,
+        mode=ot_mode,
+        epsilon=ot_epsilon,
+        tau_patch=ot_tau_patch,
+        tau_anchor=ot_tau_anchor,
+        partial_mass=ot_partial_mass,
+        iterations=ot_iterations,
+        eps=eps,
+    )
+
+    transported_mass = gamma.sum(dim=-1)
+    unmatched_mass = (source_mass - transported_mass).clamp_min(0.0)
+    unmatched_ratio = unmatched_mass / source_mass.clamp_min(eps)
+    matched_cost = (gamma * cost).sum(dim=-1) / transported_mass.clamp_min(eps)
+    transport_entropy = -(gamma.clamp_min(eps) * gamma.clamp_min(eps).log()).sum(dim=-1)
+
+    if ot_score == "unmatched":
+        score = unmatched_ratio
+    elif ot_score == "cost":
+        score = matched_cost
+    elif ot_score == "combined":
+        score = float(ot_alpha) * unmatched_ratio + float(ot_beta) * matched_cost
+    else:
+        raise ValueError(f"unknown ot_score: {ot_score}")
+
+    similarity = _energy_to_logits(score, margin, temperature).softmax(dim=-1)
+    components = {
+        "transport_score": score,
+        "unmatched_mass": unmatched_mass,
+        "unmatched_ratio": unmatched_ratio,
+        "matched_cost": matched_cost,
+        "transported_mass": transported_mass,
+        "transport_entropy": transport_entropy,
+        "min_transport_cost": cost.min(dim=-1).values,
+    }
+    return similarity, score, components

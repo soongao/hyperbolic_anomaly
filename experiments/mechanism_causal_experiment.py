@@ -150,7 +150,19 @@ def region_stats(mask: np.ndarray, score_map: np.ndarray) -> dict[str, float]:
 def component_region_stats(mask: np.ndarray, component_maps: dict[str, np.ndarray]) -> dict[str, float]:
     stats: dict[str, float] = {}
     mask_bool = mask.astype(bool)
-    for name in ["normal_energy", "anomaly_energy", "energy_gap", "score_energy"]:
+    for name in [
+        "normal_energy",
+        "anomaly_energy",
+        "energy_gap",
+        "score_energy",
+        "transport_score",
+        "unmatched_mass",
+        "unmatched_ratio",
+        "matched_cost",
+        "transported_mass",
+        "transport_entropy",
+        "min_transport_cost",
+    ]:
         score_map = component_maps.get(name)
         if score_map is None:
             stats[f"{name}_mask_mean"] = float("nan")
@@ -264,7 +276,8 @@ def run_synthetic_causal(args: argparse.Namespace, ctx: Any, save_path: Path) ->
                     )
                     maps = {variant: outputs[variant]["anomaly_map"] for variant in args.variants}
 
-                    contrastive_gap = -math.inf
+                    mechanism_gap = -math.inf
+                    mechanism_variant = None
                     for variant, output in outputs.items():
                         stats = region_stats(mask_np, output["anomaly_map"])
                         component_stats = component_region_stats(mask_np, output["component_maps"])
@@ -283,21 +296,29 @@ def run_synthetic_causal(args: argparse.Namespace, ctx: Any, save_path: Path) ->
                             **component_stats,
                         }
                         rows.append(row)
-                        if variant == "cone_contrastive":
-                            contrastive_gap = max(contrastive_gap, stats["region_gap"])
+                        if variant in {"uot_hyperbolic_cone", "cone_contrastive"} and stats["region_gap"] > mechanism_gap:
+                            mechanism_gap = stats["region_gap"]
+                            mechanism_variant = variant
 
-                    if severity == max_severity and np.isfinite(contrastive_gap):
-                        energy_maps = outputs.get("cone_contrastive", {}).get("component_maps", {})
+                    if severity == max_severity and np.isfinite(mechanism_gap):
+                        energy_maps = outputs.get(mechanism_variant, {}).get("component_maps", {})
                         push_candidate(
                             visual_candidates[cls_name],
                             {
-                                "rank_score": contrastive_gap,
+                                "rank_score": mechanism_gap,
                                 "image": synthetic_image.copy(),
                                 "mask": mask_np.copy(),
                                 "maps": {name: score_map.copy() for name, score_map in maps.items()},
                                 "energy_maps": {
                                     name: energy_maps[name].copy()
-                                    for name in ["normal_energy", "anomaly_energy", "energy_gap"]
+                                    for name in [
+                                        "normal_energy",
+                                        "anomaly_energy",
+                                        "energy_gap",
+                                        "transport_score",
+                                        "unmatched_ratio",
+                                        "matched_cost",
+                                    ]
                                     if name in energy_maps
                                 },
                                 "defect_type": defect_type,
@@ -440,6 +461,11 @@ def main() -> None:
         "anomaly_energy_region_gap",
         "energy_gap_region_gap",
         "score_energy_region_gap",
+        "transport_score_region_gap",
+        "unmatched_ratio_region_gap",
+        "matched_cost_region_gap",
+        "transported_mass_region_gap",
+        "transport_entropy_region_gap",
     ]
     write_csv(save_path / "causal_synthetic_per_sample.csv", synthetic_rows)
     write_csv(
@@ -461,6 +487,9 @@ def main() -> None:
                 "normal_energy_region_gap",
                 "energy_gap_region_gap",
                 "score_energy_region_gap",
+                "transport_score_region_gap",
+                "unmatched_ratio_region_gap",
+                "matched_cost_region_gap",
             ],
         ),
     )

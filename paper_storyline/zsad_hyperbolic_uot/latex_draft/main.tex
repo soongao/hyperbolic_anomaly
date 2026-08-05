@@ -1,0 +1,488 @@
+\documentclass[10pt]{article}
+
+\usepackage[margin=1in]{geometry}
+\usepackage{amsmath,amssymb,amsfonts}
+\usepackage{booktabs}
+\usepackage{graphicx}
+\usepackage{xcolor}
+\usepackage{hyperref}
+\usepackage{enumitem}
+\usepackage{multirow}
+\usepackage{array}
+
+\hypersetup{
+    colorlinks=true,
+    linkcolor=blue,
+    citecolor=blue,
+    urlcolor=blue
+}
+
+\newcommand{\method}{H-UOT}
+\newcommand{\needcite}[1]{\textcolor{red}{[cite: #1]}}
+\newcommand{\resulttodo}[1]{\textcolor{red}{[RESULT TODO: #1]}}
+\newcommand{\prooftodo}[1]{\textcolor{red}{[PROOF TODO: #1]}}
+\newcommand{\figtodo}[1]{\textcolor{red}{[FIGURE TODO: #1]}}
+\newcommand{\tabtodo}[1]{\textcolor{red}{[TABLE TODO: #1]}}
+\newcommand{\placeholderfigure}[2]{
+\begin{figure}[t]
+    \centering
+    \fbox{
+    \begin{minipage}[c][0.18\textheight][c]{0.92\linewidth}
+        \centering
+        \figtodo{#1}
+    \end{minipage}}
+    \caption{#2}
+    \label{fig:#1}
+\end{figure}
+}
+
+\title{Hyperbolic Unbalanced Semantic Transport for CLIP-based Zero-shot Anomaly Localization}
+\author{Anonymous Authors}
+\date{}
+
+\begin{document}
+\maketitle
+
+\begin{abstract}
+CLIP-based zero-shot anomaly localization commonly scores image patches by comparing them with normal and abnormal text prompts.
+This scoring view is effective, but it mainly produces relative patch-to-prompt similarity and does not explicitly ask whether a patch should be rejected from normal semantic explanation.
+This paper formulates CLIP-based zero-shot anomaly localization as rejectable patch-to-normality semantic transport.
+Normal patches should be transported to normality anchors at low semantic cost, whereas anomalous patches should appear as high-cost or unmatched mass.
+We instantiate this formulation with a hyperbolic normality cost and unbalanced optimal transport.
+The hyperbolic cost models structured normality beyond flat prototype similarity, while unbalanced transport relaxes mass conservation so that patches not explainable by normality anchors need not be forcibly matched.
+The resulting anomaly score combines unmatched mass and matched transport cost.
+Experiments will evaluate whether mass relaxation, hyperbolic cost, and unmatched-mass scoring each contribute to localization quality and failure-mode repair.
+\resulttodo{Insert one sentence summarizing the final benchmark result after experiments are finalized.}
+\end{abstract}
+
+\section{Introduction}
+
+Zero-shot anomaly localization aims to identify abnormal regions without target-domain anomaly samples.
+This setting is important in industrial inspection and medical screening, where abnormal patterns are sparse, open-ended, and expensive to collect.
+Vision-language models such as CLIP provide a natural route for this task because they align visual features with open-vocabulary text descriptions \needcite{CLIP}.
+Recent CLIP-based anomaly methods adapt this alignment by comparing image-level or patch-level visual features with normal and abnormal prompts \needcite{AnomalyCLIP, WinCLIP, PromptAD, APRILGAN, VAND}.
+The common operational question is whether a patch is more compatible with normal text or abnormal text.
+
+This paper argues that the more relevant question is different: can a patch be explained by normality at all?
+Industrial defects such as scratches, dents, contaminations, missing parts, and broken boundaries are not always stable semantic categories parallel to normal object states.
+They are often local violations of surface, texture, material, or structural regularity.
+A patch affected by such a defect may be poorly described by both a generic abnormal prompt and a normal prompt, but the key localization evidence is its failure to fit normality.
+Flat patch-wise prompt scoring does not explicitly represent this reject option.
+
+We therefore cast zero-shot anomaly localization as a patch-to-normality matching problem with rejection.
+Given CLIP patch features and a set of normality anchors, normal regions should be explainable by low-cost matching to normality, while anomalous regions should either incur high matching cost or remain partially unmatched.
+This view connects anomaly localization to one-class recognition and reject-option detection: the normal side defines the explainable set, and anomalies are exposed by failed explanation rather than by membership in a closed abnormal class.
+
+Optimal transport provides a classical tool for distribution matching, but the balanced formulation is misaligned with anomaly localization.
+Balanced optimal transport preserves all source and target mass, which means that every patch must be assigned to some anchor.
+For anomaly localization, this constraint can over-explain anomalous regions as normal.
+Unbalanced optimal transport (UOT) relaxes mass conservation through soft divergence penalties \needcite{OptimalTransport, UnbalancedOptimalTransport}.
+This relaxation gives a direct mechanism for rejection: patch mass that cannot be transported to normality at reasonable cost can remain unmatched.
+
+The transport formulation also makes the cost matrix central.
+If the cost is only cosine or Euclidean distance between CLIP features, normality anchors remain flat prototypes.
+Normality, however, often has a structured form: an object contains parts, parts have surfaces, surfaces have texture or material states, and defects violate this structure locally.
+Hyperbolic geometry is widely used to represent hierarchical and entailment-like structure \needcite{HyperbolicEmbeddings, HyperbolicVisionLanguage}.
+We use it here in a restricted way: not as an independent novelty claim, but as a normality-aware cost for rejectable semantic transport.
+
+This paper proposes \method{}, a hyperbolic unbalanced semantic transport framework for CLIP-based zero-shot anomaly localization.
+The method builds a cost matrix from image patches to normality anchors in hyperbolic space, solves an unbalanced transport problem, and scores each patch using unmatched mass and matched cost.
+The contribution is not the mere combination of CLIP, hyperbolic geometry, and optimal transport.
+The contribution is a formulation: anomaly localization can be treated as mass-relaxed normality matching.
+
+The paper makes three bounded contributions:
+\begin{enumerate}[leftmargin=*]
+    \item We formulate CLIP-based zero-shot anomaly localization as rejectable patch-to-normality semantic transport, where anomalous regions are identified by high-cost or unmatched transport to normality anchors.
+    \item We instantiate the transport cost with hyperbolic normality geometry, enabling patch-to-anchor matching beyond flat prompt similarity while keeping the geometric claim conditional on cost ablations.
+    \item We design mechanism-oriented experiments that separate transport mode, cost type, anchor semantics, and anomaly signal composition.
+    \resulttodo{After experiments are inserted, state only the claims supported by the final ablations.}
+\end{enumerate}
+
+\placeholderfigure{motivation}{Motivation. Flat prompt scoring compares each patch with normal and abnormal prompts. Balanced transport still forces all patch mass to be matched. Unbalanced semantic transport allows anomalous regions to appear as unmatched or high-cost mass.}
+
+\section{Related Work}
+
+\subsection{CLIP-based zero-shot anomaly localization}
+
+CLIP-based anomaly localization methods use the image-text alignment of vision-language models to reduce dependence on target-domain abnormal samples \needcite{CLIP, ZSADSurvey}.
+A common strategy is to construct normal and abnormal text prompts, extract image or patch features, and transform visual-text similarity into an anomaly score \needcite{WinCLIP, AnomalyCLIP, PromptAD}.
+Later variants improve prompt learning, patch alignment, local visual features, or object-agnostic transfer \needcite{APRILGAN, VAND}.
+These methods establish CLIP as a strong backbone for zero-shot anomaly detection.
+
+Our work focuses on a different aspect of the scoring rule.
+Instead of asking only whether a patch is relatively closer to normal or abnormal text, we ask whether the patch can be accepted by a distribution of normality anchors.
+This distinction matters because many defects are better understood as failures of normal explanation than as instances of a coherent abnormal semantic class.
+The proposed transport view is designed to expose that failure through unmatched mass and transport cost.
+
+\subsection{Hyperbolic representation and visual-language structure}
+
+Hyperbolic spaces have been used to model tree-like, hierarchical, and entailment-like relations because negative curvature can embed such structures with lower distortion than Euclidean spaces \needcite{PoincareEmbeddings, HyperbolicNeuralNetworks}.
+In vision and vision-language learning, hyperbolic geometry has been explored for hierarchical classification, visual entailment, representation alignment, and structured semantic reasoning \needcite{HyperbolicVision, HyperbolicCLIP}.
+Some anomaly detection methods also investigate hyperbolic representations or hyperbolic prompt learning \needcite{HyperbolicAnomaly}.
+
+We do not claim novelty from using hyperbolic space alone.
+The role of hyperbolic geometry in \method{} is narrower and more testable: it defines the semantic cost in a transport problem.
+If flat costs perform equally well under the same UOT solver, then the final paper should demote the hyperbolic component and emphasize unbalanced semantic transport instead.
+This boundary is built into the experiment design.
+
+\subsection{Optimal transport, unbalanced transport, and rejection}
+
+Optimal transport compares distributions by finding a minimum-cost coupling between them \needcite{OptimalTransport}.
+It has been used in computer vision, domain adaptation, representation learning, and vision-language matching \needcite{OTVision, OTVL}.
+Balanced optimal transport assumes that all source mass is transported to all target mass.
+Partial optimal transport relaxes this by matching a fixed amount of mass, while unbalanced optimal transport relaxes marginal constraints through divergence penalties \needcite{PartialOT, UnbalancedOptimalTransport, Sinkhorn}.
+
+Anomaly localization is naturally incompatible with strict mass conservation.
+If a test image contains anomalous regions, forcing all patch mass into normal anchors can produce over-matching.
+UOT gives a principled reject mechanism by allowing unmatched mass.
+Our use of UOT is therefore not intended as generic post-processing; the unmatched mass itself is part of the anomaly evidence.
+
+\subsection{One-class and open-set anomaly detection}
+
+One-class anomaly detection models normal data and treats deviations from normality as abnormal \needcite{OneClassAD}.
+Open-set recognition similarly requires rejecting samples that do not belong to known classes \needcite{OpenSetRecognition}.
+The proposed framework follows this spirit in a CLIP-based zero-shot setting.
+Normality anchors define what can be semantically explained, and UOT determines which patches should be accepted or rejected by that normality structure.
+
+\section{Method}
+
+\subsection{Problem setup}
+
+Let $x$ be a test image.
+A CLIP image encoder or CLIP-derived anomaly model extracts $N$ patch features
+\begin{equation}
+    P = \{p_i\}_{i=1}^{N}, \qquad p_i \in \mathbb{R}^{d}.
+\end{equation}
+Text prompts or learned normal prompts produce $M$ normality anchors
+\begin{equation}
+    T = \{t_j\}_{j=1}^{M}, \qquad t_j \in \mathbb{R}^{d}.
+\end{equation}
+The goal is to produce a patch-level anomaly score $s_i$ for each patch and then upsample these scores to a pixel-level anomaly map.
+The zero-shot setting assumes no target anomaly examples during training or inference-time adaptation.
+
+\subsection{Normality anchors}
+
+Normality anchors describe what forms of normal evidence can explain a patch.
+In the minimal setting, they are obtained from learned normal prompts in an existing CLIP-based anomaly model.
+In an interpretable setting, they may be constructed from generic normality descriptions, such as normal surface, intact structure, regular texture, normal boundary, and undamaged material state.
+Object-conditioned anchors can be used as an upper-bound setting when class names are available.
+
+Anchor design is a major confound, so the method must be tested against negative controls.
+Random text anchors, unrelated text anchors, shuffled class anchors, and anomaly-only anchors should be evaluated under the same UOT hyperparameters and the same anchor count.
+If these controls match normality anchors, then the normality-transport explanation is not supported.
+
+\subsection{Hyperbolic normality cost}
+
+The transport solver requires a cost matrix $C \in \mathbb{R}^{N \times M}$ between patch features and normality anchors.
+We map normalized visual and text features to a Poincare ball $\mathbb{B}^{d}_{c}$ using an exponential map at the origin:
+\begin{equation}
+    z_i = \operatorname{Exp}^{c}_{0}(p_i), \qquad
+    u_j = \operatorname{Exp}^{c}_{0}(t_j),
+\end{equation}
+where $c>0$ controls curvature.
+One cost choice is hyperbolic distance,
+\begin{equation}
+    C_{ij}^{\mathrm{dist}} = d_{\mathbb{B}}(z_i, u_j).
+\end{equation}
+This cost measures how far a patch is from a normality anchor in the curved space.
+
+A second cost choice treats each normality anchor as defining a semantic cone:
+\begin{equation}
+    C_{ij}^{\mathrm{cone}} = V(z_i, \operatorname{Cone}(u_j)).
+\end{equation}
+Here $V(\cdot)$ measures the degree to which a patch violates the anchor-induced normality cone.
+The cone formulation is useful when normality is better described as a constraint region than as a single prototype.
+The final paper should keep this claim conditional: hyperbolic distance and hyperbolic cone costs must be compared with cosine and Euclidean costs under the same UOT solver.
+
+\subsection{Unbalanced semantic transport}
+
+Let $a \in \mathbb{R}_{+}^{N}$ denote the patch-side mass and $b \in \mathbb{R}_{+}^{M}$ denote the anchor-side mass.
+Balanced optimal transport solves
+\begin{equation}
+    \min_{\gamma \geq 0} \langle \gamma, C \rangle
+    \quad
+    \mathrm{s.t.}\quad
+    \gamma \mathbf{1}_{M}=a,\quad
+    \gamma^{\top}\mathbf{1}_{N}=b,
+\end{equation}
+where $\gamma \in \mathbb{R}_{+}^{N \times M}$ is the transport plan.
+The constraints require every patch-side mass unit to be transported.
+This is undesirable when some patches correspond to abnormal regions.
+
+We instead solve an entropic UOT problem:
+\begin{equation}
+\begin{split}
+    \min_{\gamma \geq 0} \quad
+    &\langle \gamma, C \rangle
+    + \tau_{p} D_{\mathrm{KL}}(\gamma \mathbf{1}_{M} \,\|\, a) \\
+    &+ \tau_{t} D_{\mathrm{KL}}(\gamma^{\top}\mathbf{1}_{N} \,\|\, b)
+    + \epsilon \Omega(\gamma),
+\end{split}
+\label{eq:uot}
+\end{equation}
+where $\Omega(\gamma)=\sum_{ij}\gamma_{ij}(\log \gamma_{ij}-1)$ is the entropic regularizer.
+The coefficients $\tau_p$ and $\tau_t$ control how strongly patch-side and anchor-side mass should be preserved.
+Small values allow more mass variation; large values approach balanced transport.
+This objective gives the method its reject option.
+Patches that cannot be matched to normality anchors at low cost can retain lower transported mass.
+
+\subsection{Anomaly score}
+
+For patch $i$, the transported mass is
+\begin{equation}
+    m_i = \sum_{j=1}^{M} \gamma_{ij}.
+\end{equation}
+The unmatched mass is
+\begin{equation}
+    u_i = \max(a_i - m_i, 0).
+\end{equation}
+The matched cost is
+\begin{equation}
+    q_i =
+    \frac{\sum_{j=1}^{M} \gamma_{ij} C_{ij}}{m_i + \delta},
+\end{equation}
+where $\delta$ is a small constant for numerical stability.
+The final anomaly score is
+\begin{equation}
+    s_i = \alpha \frac{u_i}{a_i+\delta} + \beta \,\operatorname{Norm}(q_i),
+\end{equation}
+where $\alpha$ and $\beta$ control the contribution of rejection and difficult matching.
+Unmatched mass captures patches that normality anchors reject.
+Matched cost captures patches that are accepted only at high semantic cost.
+Their combination is intended to cover both clear defects and subtle defects that remain partially transportable.
+
+\subsection{Inference and complexity}
+
+The UOT problem is solved with a Sinkhorn-style iteration.
+The computational overhead depends on the number of patches, the number of anchors, and the number of iterations.
+If $N$ is the patch count, $M$ is the anchor count, and $K$ is the iteration count, the dominant cost is $O(KNM)$ after feature extraction.
+The method is therefore most practical when the anchor bank is compact.
+\resulttodo{Insert final runtime and memory measurements.}
+
+\placeholderfigure{method}{Method overview. The image encoder produces patch features, the text encoder produces normality anchors, a hyperbolic cost matrix is built, UOT produces a transport plan, and unmatched mass plus matched cost form the anomaly map.}
+
+\section{Experiments}
+
+This draft leaves all experimental results blank.
+The purpose of this section is to specify what evidence is required to support the narrative.
+No performance conclusion should be written until the tables and visualizations are filled.
+
+\subsection{Experimental questions}
+
+The experiments should answer four questions:
+\begin{enumerate}[leftmargin=*]
+    \item Does mass relaxation help compared with no transport, balanced transport, and partial transport?
+    \item Does hyperbolic normality cost help compared with cosine and Euclidean costs under the same UOT setting?
+    \item Does unmatched mass itself align with ground-truth anomaly regions?
+    \item Do meaningful normality anchors outperform random, unrelated, or shuffled anchors?
+\end{enumerate}
+
+\subsection{Datasets, protocols, and metrics}
+
+The main benchmark should include MVTec AD and VisA.
+Additional industrial or medical datasets may be added if the evaluation protocol remains comparable.
+The protocol should follow the zero-shot or train-once/test-other setting used by the CLIP-based baseline.
+\needcite{MVTecAD, VisA}
+
+Standard metrics should include pixel AUROC, pixel AUPRO, image AUROC, and image AP.
+Mechanism metrics should include unmatched-mass AUROC, unmatched-mass gap between anomalous and normal pixels, matched-cost gap, over-match rate for balanced OT, normal-image false positive rate at a fixed anomaly-pixel true positive rate, transport entropy, runtime, and memory.
+
+\subsection{Main comparison}
+
+The main comparison should include CLIP prompt scoring, existing CLIP-based zero-shot anomaly baselines, non-OT hyperbolic baselines, UOT with flat cost, and the final hyperbolic UOT variant.
+The text below must be completed only after the final numbers are inserted:
+\resulttodo{Summarize whether the final method improves localization metrics and whether the improvement is consistent across datasets.}
+
+\begin{table*}[t]
+\centering
+\caption{Main zero-shot anomaly localization comparison. Fill all entries after final evaluation.}
+\label{tab:main}
+\resizebox{\textwidth}{!}{
+\begin{tabular}{lcccccc}
+\toprule
+Method & Cost & Transport & Pixel AUROC & Pixel AUPRO & Image AUROC & Image AP \\
+\midrule
+CLIP prompt scoring & cosine & none & -- & -- & -- & -- \\
+AnomalyCLIP & learned prompt & none & -- & -- & -- & -- \\
+Hyperbolic cone scoring & cone & none & -- & -- & -- & -- \\
+UOT with cosine cost & cosine & unbalanced & -- & -- & -- & -- \\
+UOT with hyperbolic distance & hyperbolic distance & unbalanced & -- & -- & -- & -- \\
+\method{} & hyperbolic cone & unbalanced & -- & -- & -- & -- \\
+\bottomrule
+\end{tabular}
+}
+\end{table*}
+
+\subsection{Transport mode ablation}
+
+This ablation tests whether rejection requires unbalanced transport.
+All variants should use the same anchors and the same hyperbolic cone cost.
+If balanced OT performs similarly to UOT and shows no over-matching failure, the mass-relaxation claim should be weakened.
+
+\begin{table}[t]
+\centering
+\caption{Transport mode ablation. The key mechanism columns are unmatched-mass gap and over-match rate.}
+\label{tab:transport}
+\begin{tabular}{lcccc}
+\toprule
+Mode & Pixel AUPRO & Unmatched gap & Over-match rate & Normal FPR \\
+\midrule
+No transport & -- & -- & -- & -- \\
+Balanced OT & -- & -- & -- & -- \\
+Partial OT & -- & -- & -- & -- \\
+Unbalanced OT & -- & -- & -- & -- \\
+\bottomrule
+\end{tabular}
+\end{table}
+
+\resulttodo{Insert the transport-mode interpretation. State only whether UOT changes the failure mode if over-match and unmatched-mass evidence support it.}
+
+\subsection{Cost type ablation}
+
+This ablation tests whether hyperbolic cost is necessary once UOT is fixed.
+The same anchors, UOT parameters, feature layers, and score composition should be used for all costs.
+If UOT with cosine cost matches the final method, the paper should emphasize UOT rather than hyperbolic geometry.
+
+\begin{table}[t]
+\centering
+\caption{Cost type ablation under identical UOT settings.}
+\label{tab:cost}
+\begin{tabular}{lcccc}
+\toprule
+Cost & Pixel AUPRO & Unmatched AUC & Matched-cost gap & Normal FPR \\
+\midrule
+Cosine & -- & -- & -- & -- \\
+Euclidean & -- & -- & -- & -- \\
+Hyperbolic distance & -- & -- & -- & -- \\
+Hyperbolic cone & -- & -- & -- & -- \\
+\bottomrule
+\end{tabular}
+\end{table}
+
+\subsection{Anomaly signal decomposition}
+
+This ablation separates unmatched mass, matched cost, and their combination.
+It is essential because the paper claims that unmatched mass is not merely a byproduct of the solver but an anomaly signal.
+
+\begin{table}[t]
+\centering
+\caption{Anomaly signal decomposition.}
+\label{tab:score}
+\begin{tabular}{lcccc}
+\toprule
+Score & Pixel AUROC & Pixel AUPRO & Unmatched AUC & Normal FPR \\
+\midrule
+Unmatched mass only & -- & -- & -- & -- \\
+Matched cost only & -- & -- & -- & -- \\
+Combined score & -- & -- & -- & -- \\
+Weighted combined score & -- & -- & -- & -- \\
+\bottomrule
+\end{tabular}
+\end{table}
+
+\subsection{Anchor controls}
+
+This ablation tests whether the method depends on meaningful normality anchors.
+Random, unrelated, shuffled, and anomaly-only anchors are negative controls.
+If these controls approach the normal-anchor setting, the semantic-transport explanation should be rejected or substantially weakened.
+
+\begin{table}[t]
+\centering
+\caption{Normality anchor ablation and negative controls.}
+\label{tab:anchors}
+\begin{tabular}{lcccc}
+\toprule
+Anchor set & Pixel AUPRO & Unmatched AUC & Normal FPR & Comment \\
+\midrule
+Learned normal prompts & -- & -- & -- & -- \\
+Generic normality bank & -- & -- & -- & -- \\
+Object-conditioned bank & -- & -- & -- & -- \\
+Random text anchors & -- & -- & -- & -- \\
+Unrelated text anchors & -- & -- & -- & -- \\
+Shuffled class anchors & -- & -- & -- & -- \\
+Anomaly-only anchors & -- & -- & -- & -- \\
+\bottomrule
+\end{tabular}
+\end{table}
+
+\subsection{Failure-mode visualization}
+
+The paper should include visualizations on complex normal structures and true defect images.
+The key comparison is not only whether the final anomaly map looks sharper, but whether UOT reduces false positives on normal images while preserving true anomaly localization.
+
+\placeholderfigure{mechanism}{Mechanism visualization. Show original image, ground-truth mask, transport mass, unmatched mass, matched cost, and final score.}
+\placeholderfigure{failure}{Failure-mode visualization. Compare cosine scoring, hyperbolic cone scoring without OT, balanced OT, and UOT on normal complex structures and defect cases.}
+
+\subsection{Sensitivity and runtime}
+
+UOT introduces hyperparameters and additional inference cost.
+The final paper should report sensitivity to $\epsilon$, $\tau_p$, $\tau_t$, curvature, anchor count, feature layer, and Sinkhorn iterations.
+It should also report runtime and memory relative to direct prompt scoring.
+
+\begin{table}[t]
+\centering
+\caption{Runtime and sensitivity summary.}
+\label{tab:runtime}
+\begin{tabular}{lcccc}
+\toprule
+Setting & Pixel AUPRO & Runtime & Memory & Notes \\
+\midrule
+Default & -- & -- & -- & -- \\
+Low anchor count & -- & -- & -- & -- \\
+High anchor count & -- & -- & -- & -- \\
+Low iteration count & -- & -- & -- & -- \\
+High iteration count & -- & -- & -- & -- \\
+\bottomrule
+\end{tabular}
+\end{table}
+
+\section{Discussion}
+
+The proposed formulation changes the role of CLIP in zero-shot anomaly localization.
+Instead of using CLIP only to assign local patches to normal or abnormal prompts, \method{} uses CLIP features to define a normality transport problem.
+This distinction matters because anomaly localization often requires identifying what cannot be normally explained.
+UOT gives this idea an explicit computational object: unmatched mass.
+
+The main claim should remain conditional on the mechanism evidence.
+If UOT outperforms balanced and partial transport while producing unmatched mass aligned with anomaly masks, then mass relaxation supports the rejectable-transport interpretation.
+If hyperbolic costs improve over cosine and Euclidean costs under identical UOT settings, then hyperbolic normality geometry is supported as a useful cost design.
+If either condition fails, the corresponding claim should be weakened.
+
+This conditional framing is intentional.
+It prevents the paper from becoming a method-stacking story.
+The strongest version of the paper is not that hyperbolic geometry and UOT are universally better.
+The strongest version is that zero-shot anomaly localization can be audited as a normality explanation problem, and that UOT exposes whether a patch is accepted, rejected, or only matched at high cost.
+
+\section{Limitations}
+
+The method depends on the quality and coverage of normality anchors.
+If the anchors are too coarse, too numerous, or accidentally aligned with irrelevant text features, the transport plan may not reflect normality.
+For this reason, random, unrelated, and shuffled anchors are not optional controls.
+
+The hyperbolic cost is also not guaranteed to help.
+CLIP features may not contain a hierarchy that benefits from hyperbolic distance after a simple exponential map.
+If flat UOT costs match hyperbolic costs, the final paper should demote hyperbolic geometry and focus on unbalanced semantic transport.
+
+UOT introduces additional hyperparameters, including mass-relaxation strengths, entropy regularization, curvature, anchor count, and iteration count.
+These parameters must be shown to be stable over a reasonable range.
+Otherwise, the method may appear to require dataset-specific tuning, which would weaken the zero-shot claim.
+
+Finally, the related-work boundary must be verified before submission.
+The paper should not claim to be the first use of optimal transport, unbalanced transport, hyperbolic geometry, or CLIP for anomaly detection unless a dedicated literature check supports the narrower claim.
+
+\section{Conclusion}
+
+This paper presents a narrative and method framework for CLIP-based zero-shot anomaly localization based on rejectable semantic transport.
+Normal regions are modeled as patch mass that can be transported to normality anchors at low cost.
+Anomalous regions are modeled as high-cost or unmatched mass under a hyperbolic normality cost and an unbalanced transport solver.
+The resulting framework offers a concrete way to test whether anomaly localization benefits from explicit rejection rather than only from relative normal-versus-abnormal prompt scoring.
+\resulttodo{Insert final conclusion sentence after the mechanism experiments and benchmarks are filled.}
+
+\section*{AI Disclosure}
+This draft was prepared with the assistance of AI-powered academic writing tools under author direction.
+All experimental results, citations, claims, and final conclusions must be verified and completed by the author before submission.
+
+\section*{References}
+\textcolor{red}{Reference list intentionally left blank in this narrative draft. Replace all citation placeholders with verified citations and populate \texttt{references.bib} before submission.}
+
+\end{document}

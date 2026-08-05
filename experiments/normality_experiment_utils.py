@@ -61,6 +61,55 @@ VARIANT_CONFIGS: dict[str, dict[str, Any]] = {
         "order_weight": 0.0,
         "patch_score_space": "prob",
     },
+    "bot_cosine": {
+        "score_mode": "hyperbolic_uot",
+        "ot_mode": "balanced",
+        "ot_cost": "cosine",
+        "ot_score": "cost",
+        "patch_score_space": "prob",
+    },
+    "bot_hyperbolic_cone": {
+        "score_mode": "hyperbolic_uot",
+        "ot_mode": "balanced",
+        "ot_cost": "hyperbolic_cone",
+        "ot_score": "cost",
+        "patch_score_space": "prob",
+    },
+    "pot_hyperbolic_cone": {
+        "score_mode": "hyperbolic_uot",
+        "ot_mode": "partial",
+        "ot_cost": "hyperbolic_cone",
+        "ot_score": "combined",
+        "patch_score_space": "prob",
+    },
+    "uot_cosine": {
+        "score_mode": "hyperbolic_uot",
+        "ot_mode": "unbalanced",
+        "ot_cost": "cosine",
+        "ot_score": "combined",
+        "patch_score_space": "prob",
+    },
+    "uot_euclidean": {
+        "score_mode": "hyperbolic_uot",
+        "ot_mode": "unbalanced",
+        "ot_cost": "euclidean",
+        "ot_score": "combined",
+        "patch_score_space": "prob",
+    },
+    "uot_hyperbolic_distance": {
+        "score_mode": "hyperbolic_uot",
+        "ot_mode": "unbalanced",
+        "ot_cost": "hyperbolic_distance",
+        "ot_score": "combined",
+        "patch_score_space": "prob",
+    },
+    "uot_hyperbolic_cone": {
+        "score_mode": "hyperbolic_uot",
+        "ot_mode": "unbalanced",
+        "ot_cost": "hyperbolic_cone",
+        "ot_score": "combined",
+        "patch_score_space": "prob",
+    },
 }
 
 
@@ -94,6 +143,17 @@ def add_common_args(parser: argparse.ArgumentParser) -> None:
     parser.add_argument("--radial_weight", type=float, default=0.25)
     parser.add_argument("--order_weight", type=float, default=0.0)
     parser.add_argument("--patch_score_space", type=str, default="prob", choices=["prob", "energy"])
+    parser.add_argument("--ot_mode", type=str, default="unbalanced", choices=["balanced", "partial", "unbalanced"])
+    parser.add_argument("--ot_cost", type=str, default="hyperbolic_cone", choices=["cosine", "euclidean", "hyperbolic_distance", "hyperbolic_cone"])
+    parser.add_argument("--ot_anchor_mode", type=str, default="normal", choices=["normal", "anomaly", "both", "normal_anomaly"])
+    parser.add_argument("--ot_epsilon", type=float, default=0.05)
+    parser.add_argument("--ot_tau_patch", type=float, default=0.5)
+    parser.add_argument("--ot_tau_anchor", type=float, default=0.5)
+    parser.add_argument("--ot_partial_mass", type=float, default=0.9)
+    parser.add_argument("--ot_iterations", type=int, default=50)
+    parser.add_argument("--ot_score", type=str, default="combined", choices=["unmatched", "cost", "combined"])
+    parser.add_argument("--ot_alpha", type=float, default=1.0)
+    parser.add_argument("--ot_beta", type=float, default=1.0)
     parser.add_argument("--seed", type=int, default=111)
     parser.add_argument("--sigma", type=float, default=4.0)
     parser.add_argument("--class_filter", type=str, nargs="+", default=None)
@@ -144,6 +204,27 @@ def normality_kwargs(args: argparse.Namespace, cfg: dict[str, Any]) -> dict[str,
         "order_weight": cfg.get("order_weight", args.order_weight),
         "margin": args.entailment_margin,
         "entailment_mode": cfg["entailment_mode"],
+    }
+
+
+def transport_kwargs(args: argparse.Namespace, cfg: dict[str, Any]) -> dict[str, Any]:
+    return {
+        "ot_mode": cfg.get("ot_mode", args.ot_mode),
+        "ot_cost": cfg.get("ot_cost", args.ot_cost),
+        "ot_anchor_mode": cfg.get("ot_anchor_mode", args.ot_anchor_mode),
+        "ot_epsilon": cfg.get("ot_epsilon", args.ot_epsilon),
+        "ot_tau_patch": cfg.get("ot_tau_patch", args.ot_tau_patch),
+        "ot_tau_anchor": cfg.get("ot_tau_anchor", args.ot_tau_anchor),
+        "ot_partial_mass": cfg.get("ot_partial_mass", args.ot_partial_mass),
+        "ot_iterations": cfg.get("ot_iterations", args.ot_iterations),
+        "ot_score": cfg.get("ot_score", args.ot_score),
+        "ot_alpha": cfg.get("ot_alpha", args.ot_alpha),
+        "ot_beta": cfg.get("ot_beta", args.ot_beta),
+        "curvature": args.hyperbolic_curvature,
+        "temperature": args.hyperbolic_temperature,
+        "radius_scale": args.hyperbolic_radius_scale,
+        "cone_aperture": args.cone_aperture,
+        "margin": args.entailment_margin,
     }
 
 
@@ -281,6 +362,8 @@ def score_extracted_features(
                 entailment_mode=cfg["entailment_mode"],
             )
             image_score = image_logits.softmax(dim=-1)[:, 1]
+        elif score_mode == "hyperbolic_uot":
+            image_score = None
         elif score_mode == "cosine":
             text_probs = image_features @ ctx.text_features.permute(0, 2, 1)
             text_probs = (text_probs / 0.07).softmax(-1)
@@ -326,6 +409,12 @@ def score_extracted_features(
                     margin=args.entailment_margin,
                     entailment_mode=cfg["entailment_mode"],
                 )
+            elif score_mode == "hyperbolic_uot":
+                similarity, score_energy, components = AnomalyCLIP_lib.compute_transport_anomaly(
+                    patch_feature_raw,
+                    text_features_raw,
+                    **transport_kwargs(args, cfg),
+                )
             else:
                 patch_feature_norm = patch_feature / patch_feature.norm(dim=-1, keepdim=True)
                 similarity, _ = AnomalyCLIP_lib.compute_similarity(patch_feature_norm, text_features)
@@ -354,6 +443,10 @@ def score_extracted_features(
         anomaly_map = torch.stack(anomaly_map_list).sum(dim=0)[0].detach().cpu().numpy()
         if args.sigma and args.sigma > 0:
             anomaly_map = gaussian_filter(anomaly_map, sigma=args.sigma)
+        if image_score is None:
+            image_score_value = float(np.max(anomaly_map))
+        else:
+            image_score_value = float(image_score.detach().cpu().item())
 
         component_maps: dict[str, np.ndarray] = {}
         for name, maps in component_map_lists.items():
@@ -364,7 +457,7 @@ def score_extracted_features(
 
     return {
         "variant": variant,
-        "image_score": float(image_score.detach().cpu().item()),
+        "image_score": image_score_value,
         "anomaly_map": anomaly_map.astype(np.float32),
         "component_maps": component_maps,
     }
