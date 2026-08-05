@@ -1,0 +1,125 @@
+%% H-UOT method architecture.
+%% This figure is a method schematic only. It contains no experimental results.
+
+flowchart LR
+    %% =========================
+    %% Inputs
+    %% =========================
+    subgraph input["Input and CLIP Features"]
+        direction TB
+        img["Test image x"]
+        clip_img["CLIP / AnomalyCLIP<br/>image encoder"]
+        patches["Patch features P<br/>p_i in R^d"]
+        fmap["Feature map grid<br/>N patch tokens"]
+
+        img --> clip_img --> patches --> fmap
+    end
+
+    subgraph text["Normality Anchor"]
+        direction TB
+        prompt["AnomalyCLIP<br/>learned normal prompt"]
+        text_enc["Text encoder / prompt learner"]
+        anchor["Learned normal anchor T<br/>anchor_mode = normal"]
+
+        prompt --> text_enc --> anchor
+    end
+
+    %% =========================
+    %% Hyperbolic cost
+    %% =========================
+    subgraph geometry["Hyperbolic Normality Cost"]
+        direction TB
+        normalize["Feature normalization"]
+        expmap["Exp map to Poincare ball<br/>z_i = Exp_0(p_i), u_j = Exp_0(t_j)"]
+        cone["Normality acceptance cone<br/>Cone(u_j)"]
+        cost["Cone violation cost C_ij<br/>angle outside acceptance cone"]
+
+        normalize --> expmap --> cone --> cost
+    end
+
+    fmap --> normalize
+    anchor --> normalize
+
+    %% =========================
+    %% UOT
+    %% =========================
+    subgraph transport["Unbalanced Semantic Transport"]
+        direction TB
+        masses["Patch mass a and anchor mass b"]
+        uot["Entropy-regularized UOT<br/>softens marginal constraints"]
+        gamma["Transport plan gamma_ij"]
+        reject["Soft rejection channel<br/>patch mass need not be fully accepted"]
+
+        masses --> uot
+        cost --> uot --> gamma --> reject
+    end
+
+    fmap --> masses
+    anchor --> masses
+
+    %% =========================
+    %% Scores
+    %% =========================
+    subgraph scoring["Decomposed Patch Evidence"]
+        direction TB
+        transported["Transported mass<br/>m_i = sum_j gamma_ij"]
+        unmatched["Unmatched ratio<br/>r_i = max(a_i - m_i, 0) / a_i"]
+        matched["Conditional matched cost<br/>q_i = sum_j gamma_ij C_ij / m_i"]
+        score["Patch anomaly score<br/>s_i = alpha r_i + beta Norm(q_i)"]
+
+        gamma --> transported
+        transported --> unmatched
+        gamma --> matched
+        cost --> matched
+        unmatched --> score
+        matched --> score
+    end
+
+    %% =========================
+    %% Outputs
+    %% =========================
+    subgraph output["Outputs"]
+        direction TB
+        amap["Pixel anomaly map<br/>reshape, upsample, smooth"]
+        iscore["Image anomaly score<br/>max / pooled patch score"]
+
+        score --> amap
+        score --> iscore
+    end
+
+    %% =========================
+    %% Diagnostics
+    %% =========================
+    subgraph diagnostics["Mechanism Diagnostics"]
+        direction TB
+        d1["Transport mode ablation<br/>none / balanced / partial / UOT"]
+        d2["Cost ablation<br/>cosine / euclidean / hyp-distance / hyp-cone"]
+        d3["Signal decomposition<br/>unmatched ratio vs matched cost"]
+        d4["Anchor negative controls<br/>normal / anomaly / both / shuffled"]
+        d5["Synthetic severity test<br/>monotonic rejection response"]
+    end
+
+    reject -.-> d1
+    cost -.-> d2
+    score -.-> d3
+    anchor -.-> d4
+    unmatched -.-> d5
+
+    %% =========================
+    %% Styles
+    %% =========================
+    classDef inputCls fill:#EAF4FB,stroke:#0072B2,stroke-width:1px,color:#222222;
+    classDef textCls fill:#EAF7F0,stroke:#009E73,stroke-width:1px,color:#222222;
+    classDef geomCls fill:#FFF8D8,stroke:#E69F00,stroke-width:1px,color:#222222;
+    classDef transportCls fill:#FDEEE7,stroke:#D55E00,stroke-width:1px,color:#222222;
+    classDef scoreCls fill:#F7EAF5,stroke:#CC79A7,stroke-width:1px,color:#222222;
+    classDef outputCls fill:#F2F2F2,stroke:#666666,stroke-width:1px,color:#222222;
+    classDef diagCls fill:#FFFFFF,stroke:#A6A6A6,stroke-width:1px,stroke-dasharray: 4 3,color:#222222;
+
+    class img,clip_img,patches,fmap inputCls;
+    class prompt,text_enc,anchor textCls;
+    class normalize,expmap,cone,cost geomCls;
+    class masses,uot,gamma,reject transportCls;
+    class transported,unmatched,matched,score scoreCls;
+    class amap,iscore outputCls;
+    class d1,d2,d3,d4,d5 diagCls;
