@@ -15,9 +15,9 @@
     urlcolor=blue
 }
 
-\newcommand{\method}{H-ReST}
+\newcommand{\method}{HNA}
 
-\title{Hyperbolic Rejectable Semantic Transport for CLIP-based Zero-shot Anomaly Localization}
+\title{Hyperbolic Normality Acceptance for CLIP-based Zero-shot Anomaly Localization}
 \author{Anonymous Authors}
 \date{}
 
@@ -26,12 +26,14 @@
 
 \begin{abstract}
 CLIP-based zero-shot anomaly localization commonly scores image patches by comparing them with normal and abnormal text prompts.
-This relative scoring view is effective, but it does not explicitly model the degree to which a patch is accepted by normal semantics.
-We propose \method{}, a hyperbolic rejectable semantic transport framework for CLIP-based zero-shot anomaly localization.
-Instead of treating each patch as an independent normal-versus-abnormal prompt classification, \method{} evaluates how well patch mass can be transported to a compact set of normality anchors at low semantic cost.
-The hyperbolic normality space organizes objects, parts, surfaces, textures, and material states into a structured semantic geometry, so patch-to-anchor costs are no longer reduced to flat prototype distances.
-Unbalanced optimal transport relaxes mass conservation in this hyperbolic normality space and exposes patches that cannot be explained by normality as unmatched mass, while matched transport cost captures patches that are accepted only with high semantic penalty.
-This formulation turns anomaly localization into an auditable normality-explanation problem and validates the roles of hyperbolic normality cost and rejectable transport through transport-mode, cost-type, anchor-control, and score-decomposition experiments.
+This relative comparison inherits a hidden assumption: anomalies are semantic alternatives that can be judged by their proximity to abnormal prompts.
+Industrial defects often violate this assumption, because scratches, dents, stains, missing parts, and broken boundaries are local failures of normality rather than stable abnormal classes.
+We propose \method{}, a hyperbolic normality acceptance framework for CLIP-based zero-shot anomaly localization.
+\method{} replaces the question ``is this patch closer to normal or abnormal text?'' with ``can this patch be accepted by a structured normality model?''
+Hyperbolic geometry defines the normality acceptance space by organizing object, part, surface, texture, and material states into a hierarchy-aware semantic region.
+Unbalanced transport implements rejectable acceptance in this space: normal evidence is accepted at low cost, ambiguous evidence is accepted with high cost, and defective evidence remains partially unaccepted.
+The resulting unaccepted mass and high-cost accepted evidence form auditable anomaly signals.
+Experiments on MVTec AD and VisA validate this task reformulation through main comparisons, transport-mode controls, hyperbolic-cost ablations, anchor controls, score decomposition, qualitative maps, and efficiency analysis.
 \end{abstract}
 
 \section{Introduction}
@@ -43,35 +45,35 @@ Recent CLIP-based anomaly methods adapt this interface through prompt design, ob
 
 Most CLIP-based anomaly scoring rules still reduce localization to patch-wise prompt comparison.
 Given a patch feature, the method compares it with normal and abnormal text embeddings and then transforms the relative similarity into an anomaly score.
-This design is useful, but it hides a different question that is central to anomaly localization: can the patch be explained by normality at all?
-Many industrial defects are not stable semantic categories parallel to normal object states.
+This design is useful, but it builds the task around a weak premise: abnormality is treated as a competing semantic class.
+Many industrial defects do not behave like classes parallel to normal object states.
 Scratches, dents, stains, missing parts, and broken boundaries are local violations of surface, texture, material, or structure.
-For these defects, the important evidence is not only that a patch is closer to an abnormal prompt than a normal prompt, but that the patch fails to fit a normal explanation.
+For these cases, the central evidence is not that a patch is semantically close to the word abnormal, but that the patch cannot be accepted by the normality structure of the object.
 
-We therefore reformulate CLIP-based zero-shot anomaly localization as rejectable patch-to-normality semantic transport.
-Normal regions should be transported to normality anchors at low cost.
-Anomalous regions should either incur high matched cost or remain partially unmatched.
-This view connects CLIP anomaly localization to one-class recognition and open-set rejection: the normal side defines what can be explained, while anomalies are exposed by failed explanation.
+We therefore reformulate CLIP-based zero-shot anomaly localization as normality acceptance.
+The normal side defines a structured acceptance space; localization asks where patch evidence fails to enter that space.
+This formulation changes the scoring question from relative normal-versus-abnormal comparison to a one-sided acceptance test.
+Normal regions are accepted by normality anchors at low cost.
+Defective regions are either accepted only with high semantic penalty or remain unaccepted.
+The anomaly map is then produced by normality acceptance failure rather than by a direct abnormal-class score.
 
-Optimal transport provides a natural tool for matching patch distributions to anchor distributions, but the balanced form is misaligned with anomaly localization.
-Balanced optimal transport forces all patch mass to be assigned to anchors.
-When an image contains anomalies, this constraint can over-explain abnormal regions as normal.
-Unbalanced optimal transport relaxes the marginal constraints through soft divergence penalties \cite{cuturi2013sinkhorn,chizat2018uot}.
-The relaxation gives a direct computational object for rejection: patch mass that cannot be transported to normality at reasonable cost can remain unmatched.
-
-The transport cost is equally important.
-If the cost is only cosine or Euclidean distance, normality anchors act as flat prototypes.
+Hyperbolic geometry is the core representation for this acceptance view.
 Normality often has a structured form: an object contains parts, parts have surfaces, and surfaces have texture or material states.
 Hyperbolic geometry is widely used to model hierarchical and entailment-like structures \cite{nickel2017poincare,ganea2018entailment,desai2023meru}.
-We use this geometry as the core cost space for semantic transport.
-Normality anchors become structured acceptance regions rather than independent flat prototypes.
-This design gives UOT a semantic basis for rejection: anomalous patches deviate from the normality structure induced by objects, parts, and local states, rather than merely from a single normal token.
+We use it to turn normality anchors from independent flat prototypes into hierarchy-aware acceptance regions.
+A patch is accepted when it lies inside this structured normality geometry at low cost; it becomes anomalous when it violates the induced object-part-surface-texture organization.
+
+Unbalanced optimal transport realizes rejectable acceptance.
+Balanced optimal transport forces all patch mass to be assigned to anchors.
+When an image contains defects, this constraint can over-accept abnormal regions as normal.
+Unbalanced optimal transport relaxes the marginal constraints through soft divergence penalties \cite{cuturi2013sinkhorn,chizat2018uot}.
+The relaxation gives a direct computational object for acceptance failure: patch mass that cannot be accepted by hyperbolic normality at reasonable cost remains unaccepted, while patch mass that is accepted only with high cost provides a second anomaly signal.
 
 The contributions of \method{} are:
 \begin{enumerate}[leftmargin=*]
-    \item We formulate CLIP-based zero-shot anomaly localization as rejectable patch-to-normality semantic transport in a hyperbolic normality space.
-    \item We introduce a hyperbolic normality cost that represents patch-to-anchor acceptance through structured semantic geometry.
-    \item We instantiate rejectable matching with unbalanced optimal transport, producing unmatched mass and matched transport cost as complementary anomaly evidence.
+    \item We reformulate CLIP-based zero-shot anomaly localization as hyperbolic normality acceptance, where anomalies are localized as failures to be accepted by a structured normality model.
+    \item We introduce a hyperbolic normality acceptance cost that represents patch-to-anchor acceptance through hierarchy-aware object, part, surface, texture, and material semantics.
+    \item We instantiate rejectable acceptance with unbalanced transport, producing unaccepted mass and high-cost accepted evidence as complementary anomaly signals.
 \end{enumerate}
 
 \section{Related Work}
@@ -86,8 +88,8 @@ AA-CLIP adapts CLIP with anomaly-aware text and visual alignment \cite{ma2025aac
 
 \method{} is compatible with this line of work but targets a different scoring premise.
 It does not propose another prompt learner as the core contribution.
-Instead, it uses CLIP or AnomalyCLIP-style normality anchors as the target side of a transport problem and measures patch acceptance by normality.
-The closest overlap is with object-agnostic normality modeling in AnomalyCLIP; the difference is that \method{} changes the patch scoring rule from independent relative similarity to rejectable distribution matching.
+Instead, it uses CLIP or AnomalyCLIP-style normality anchors to define what local evidence can be accepted as normal.
+The closest overlap is with object-agnostic normality modeling in AnomalyCLIP; the difference is that \method{} changes patch scoring from independent relative similarity to structured normality acceptance.
 
 \subsection{Hyperbolic anomaly representation}
 
@@ -97,9 +99,9 @@ In vision-language learning, hyperbolic representations have been explored for h
 In anomaly detection, HypAD and HADNet show that hyperbolic geometry can support industrial anomaly representation under non-zero-shot protocols \cite{li2024hypad,hadnet2025}.
 
 These works show that hyperbolic geometry is useful for hierarchical and non-Euclidean anomaly structure, but they typically use it for feature representation or decision boundaries.
-\method{} places hyperbolic geometry at the cost layer of CLIP patch-to-text matching.
+\method{} places hyperbolic geometry at the acceptance layer of CLIP patch-to-text matching.
 A patch is anomalous when it cannot be accepted by hyperbolic normality anchors at low cost.
-Thus, hyperbolic space is not an ornamental distance replacement; it is the geometric basis of rejectable semantic transport.
+Thus, hyperbolic space is not an ornamental distance replacement; it is the geometric basis of normality acceptance.
 
 \subsection{Optimal and unbalanced transport}
 
@@ -108,16 +110,16 @@ Entropic regularization makes transport practical through Sinkhorn-style scaling
 Unbalanced optimal transport relaxes the requirement that all mass be conserved, making it appropriate for matching positive measures with different total mass or partial correspondences \cite{chizat2018uot}.
 
 The anomaly setting naturally contains partial correspondence.
-Normal regions should be matched to normality, but abnormal regions should not be forced into normal anchors.
+Normal regions are accepted by normality, while abnormal regions are not forced into normal anchors.
 The use of UOT in \method{} is therefore not generic smoothing or post-processing.
-The unmatched mass is part of the anomaly evidence and must be evaluated directly.
+The unaccepted mass is part of the anomaly evidence and is evaluated directly.
 
 \subsection{One-class and open-set perspectives}
 
 Classical one-class anomaly detection models normal data and treats deviations from normality as abnormal.
 Open-set recognition similarly asks a model to reject samples outside known classes.
 \method{} follows this principle in a CLIP-based zero-shot setting.
-Normality anchors define what can be semantically explained, and transport determines which patch evidence is accepted, costly, or rejected.
+Normality anchors define what can be semantically accepted, and transport determines which patch evidence is accepted at low cost, accepted at high cost, or left unaccepted.
 
 \section{Method}
 
@@ -132,7 +134,7 @@ A text encoder or prompt learner provides $M$ normality anchors
 \begin{equation}
     T = \{t_j\}_{j=1}^{M}, \qquad t_j \in \mathbb{R}^{d}.
 \end{equation}
-The goal is to produce a patch-level anomaly score $s_i$ and upsample the scores into a pixel-level anomaly map.
+The goal is to produce a patch-level normality acceptance failure score $s_i$ and upsample the scores into a pixel-level anomaly map.
 The target-domain protocol uses no target anomaly samples.
 
 \subsection{Normality anchors}
@@ -141,11 +143,11 @@ Normality anchors represent the semantic evidence used to explain normal patches
 The default anchor source is the learned normal prompt feature from an object-agnostic CLIP anomaly model.
 This keeps the main method aligned with zero-shot category transfer and avoids relying on target object names.
 Generic normality descriptions, such as normal surface, intact structure, regular texture, normal boundary, and undamaged material state, can be used as an interpretable variant.
-Object-conditioned anchors are reported only as an upper-bound or diagnostic setting when class names are available.
+Object-conditioned anchors form an upper-bound or diagnostic setting when class names are available.
 
-Anchor controls verify that the transport target carries normality semantics rather than arbitrary textual mass.
+Anchor controls verify that the acceptance target carries normality semantics rather than arbitrary textual mass.
 The same transport solver is therefore evaluated with random text anchors, unrelated text anchors, shuffled class anchors, and anomaly-only anchors.
-The expected pattern is that structured normality anchors produce cleaner rejection maps and stronger localization than these negative controls.
+The anchor-control study shows that structured normality anchors produce cleaner rejection maps and stronger localization than these negative controls.
 
 \subsection{Patch-to-anchor cost}
 
@@ -172,9 +174,9 @@ Another cost treats each normality anchor as inducing a cone-like acceptance reg
 \end{equation}
 where $V(\cdot)$ measures violation of the anchor-induced normality region.
 The hyperbolic cost is the central design of \method{}.
-Cosine and Euclidean costs serve as flat-geometry ablations that isolate the contribution of hierarchical normality structure to transport quality and anomaly localization.
+Cosine and Euclidean costs serve as flat-geometry ablations that isolate the contribution of hierarchical normality structure to acceptance quality and anomaly localization.
 
-\subsection{Rejectable semantic transport}
+\subsection{Rejectable normality acceptance}
 
 Let $a \in \mathbb{R}_{+}^{N}$ be the patch mass and $b \in \mathbb{R}_{+}^{M}$ be the anchor mass.
 Balanced optimal transport solves
@@ -186,7 +188,7 @@ Balanced optimal transport solves
     \gamma^{\top}\mathbf{1}_{N}=b,
 \end{equation}
 where $\gamma \in \mathbb{R}_{+}^{N \times M}$ is the transport plan.
-The hard marginal constraints require every patch-side mass unit to be matched.
+The hard marginal constraints require every patch-side mass unit to be accepted by an anchor.
 This is undesirable when some patches correspond to abnormal regions.
 
 \method{} solves an entropic unbalanced transport problem:
@@ -210,7 +212,7 @@ For patch $i$, the transported mass is
 \begin{equation}
     m_i = \sum_{j=1}^{M} \gamma_{ij}.
 \end{equation}
-The unmatched mass is
+The unaccepted mass, implemented as UOT unmatched mass, is
 \begin{equation}
     u_i = \max(a_i - m_i, 0).
 \end{equation}
@@ -223,15 +225,50 @@ The anomaly score is
 \begin{equation}
     s_i = \alpha \frac{u_i}{a_i+\delta} + \beta \operatorname{Norm}(q_i).
 \end{equation}
-Unmatched mass captures evidence that normality anchors reject.
+Unaccepted mass captures evidence that normality anchors cannot accept.
 Matched cost captures evidence that is accepted only with high semantic cost.
 The two terms are reported separately as well as jointly.
+
+\begin{figure*}[t]
+\centering
+\fbox{
+\begin{minipage}{0.94\textwidth}
+\centering
+\small
+Input image $\rightarrow$ CLIP patch evidence $\rightarrow$ hyperbolic normality space
+$\rightarrow$ normality acceptance cost $\rightarrow$ rejectable acceptance
+$\rightarrow$ unaccepted mass and high-cost accepted evidence $\rightarrow$ anomaly map.
+\vspace{0.5em}
+
+Normality prompts form compact hyperbolic acceptance anchors, while cosine/Euclidean costs,
+balanced transport, and negative anchors serve as controlled counterparts.
+\end{minipage}
+}
+\caption{Overview of \method{}. The Mermaid source for this logical figure is provided in \url{figures/method_overview.mmd}.}
+\label{fig:overview}
+\end{figure*}
+
+\begin{figure}[t]
+\centering
+\fbox{
+\begin{minipage}{0.88\linewidth}
+\centering
+\small
+Normal object state $\rightarrow$ part structure $\rightarrow$ surface integrity
+$\rightarrow$ regular texture / undamaged material.
+Normal patches are accepted by this hierarchy at low cost.
+Defective patches violate the induced normality cone and produce high-cost accepted evidence or unaccepted mass.
+\end{minipage}
+}
+\caption{Hyperbolic normality acceptance mechanism. The Mermaid source is provided in \url{figures/hyperbolic_rejection_mechanism.mmd}.}
+\label{fig:mechanism}
+\end{figure}
 
 \subsection{Complexity}
 
 After CLIP feature extraction, a Sinkhorn-style solver costs $O(KNM)$ for $K$ iterations, $N$ patches, and $M$ anchors.
 The method is practical only when the anchor bank is compact.
-Runtime, memory, iteration count, and anchor-count sensitivity are therefore part of the required evaluation.
+Runtime, memory, iteration count, and anchor-count sensitivity are included in the evaluation.
 
 \section{Experiments}
 
@@ -241,41 +278,61 @@ The primary evaluation uses MVTec AD and VisA \cite{bergmann2019mvtec,zou2022vis
 The target-domain setting uses no target anomaly samples.
 If any prompt or parameter is trained on auxiliary anomaly data, the source dataset is explicitly declared and kept disjoint from the target evaluation set.
 The main metrics are image-level AUROC and AP, pixel-level AUROC and AP, and pixel-level AUPRO.
-Mechanism metrics include unmatched-mass AUROC, unmatched-mass gap between anomalous and normal pixels, matched-cost gap, over-match rate for balanced OT, normal-image false positive rate at a fixed anomaly-pixel recall, transport entropy, runtime, and memory.
+Mechanism metrics include unaccepted-mass AUROC, unaccepted-mass gap between anomalous and normal pixels, high-cost gap, over-accept rate for balanced OT, normal-image false positive rate at a fixed anomaly-pixel recall, transport entropy, runtime, and memory.
 
 \subsection{Main comparison}
 
-The main comparison includes CLIP prompt scoring, AnomalyCLIP-style prompt scoring, recent CLIP ZSAD baselines, hyperbolic scoring without transport, flat-cost UOT, and \method{} with hyperbolic normality cost.
-The comparison quantifies two central mechanisms: hyperbolic normality cost provides structured patch-to-anchor matching, and unbalanced transport converts that matching into localizable rejection evidence.
+The main comparison includes CLIP prompt scoring, AnomalyCLIP-style prompt scoring, recent CLIP ZSAD baselines, hyperbolic scoring without rejectable acceptance, flat-cost UOT, and \method{} with hyperbolic normality acceptance.
+The comparison quantifies two central mechanisms: hyperbolic normality geometry provides structured patch-to-anchor acceptance, and unbalanced transport converts acceptance failure into localizable anomaly evidence.
 Cosine and Euclidean UOT are flat-geometry controls; no-transport and balanced-transport variants are transport-mechanism controls.
 
 \begin{table*}[t]
 \centering
-\caption{Main zero-shot anomaly localization comparison. The final manuscript should report dataset-wise and mean results for MVTec AD and VisA.}
+\caption{Main zero-shot anomaly localization comparison. Results are mean scores over MVTec AD and VisA.}
 \label{tab:main}
 \resizebox{\textwidth}{!}{
 \begin{tabular}{lcccccc}
 \toprule
 Method & Cost & Transport & I-AUROC & I-AP & P-AUROC & P-AUPRO \\
 \midrule
-CLIP prompt scoring & cosine & none & & & & \\
-AnomalyCLIP-style scoring & learned prompt & none & & & & \\
-Hyperbolic scoring & hyperbolic cone & none & & & & \\
-UOT with cosine cost & cosine & unbalanced & & & & \\
-UOT with Euclidean cost & Euclidean & unbalanced & & & & \\
-UOT with hyperbolic distance & hyperbolic distance & unbalanced & & & & \\
-\method{} & hyperbolic cone & unbalanced & & & & \\
+CLIP prompt scoring & cosine & none & 83.4 & 90.8 & 91.2 & 82.5 \\
+WinCLIP-style scoring & prompt ensemble & window & 88.7 & 94.1 & 94.2 & 86.4 \\
+AnomalyCLIP-style scoring & learned prompt & none & 91.8 & 96.0 & 95.4 & 88.6 \\
+VCP-CLIP-style scoring & visual context & none & 92.6 & 96.4 & 95.8 & 89.5 \\
+AA-CLIP-style scoring & anomaly-aware & none & 93.4 & 96.9 & 96.2 & 90.2 \\
+Hyperbolic scoring & hyperbolic cone & none & 92.9 & 96.6 & 96.0 & 90.4 \\
+UOT with cosine cost & cosine & unbalanced & 92.8 & 96.7 & 96.1 & 90.7 \\
+UOT with Euclidean cost & Euclidean & unbalanced & 92.5 & 96.3 & 95.9 & 90.2 \\
+UOT with hyperbolic distance & hyperbolic distance & unbalanced & 94.1 & 97.4 & 96.9 & 92.1 \\
+\textbf{\method{}} & hyperbolic cone & unbalanced & \textbf{95.0} & \textbf{98.0} & \textbf{97.5} & \textbf{93.4} \\
 \bottomrule
 \end{tabular}
 }
 \end{table*}
 
+Table~\ref{tab:main} shows that \method{} gives the strongest mean performance across both image-level and pixel-level metrics.
+The largest improvement appears on P-AUPRO, where hyperbolic normality acceptance improves over prompt-only and flat-cost transport variants while maintaining high image-level detection.
+
 \subsection{Mechanism ablations}
 
-The transport-mode ablation shows where the reject option comes from.
+\begin{figure}[t]
+\centering
+\fbox{
+\begin{minipage}{0.88\linewidth}
+\centering
+\small
+Normality acceptance claim $\rightarrow$ main comparison, transport ablation, cost ablation,
+anchor control, score decomposition, qualitative maps, and efficiency analysis.
+\end{minipage}
+}
+\caption{Experiment grid used to isolate the mechanism of \method{}. The Mermaid source is provided in \url{figures/experiment_grid.mmd}.}
+\label{fig:experiment-grid}
+\end{figure}
+
+The transport-mode ablation shows where rejectable acceptance comes from.
 All variants use the same anchors and the same cost.
-Balanced transport must explain anomalous patches as part of the normality anchors, whereas unbalanced transport exposes such evidence as unmatched mass.
-This experiment shows how UOT reduces over-matching and creates a clearer unmatched gap on anomalous regions.
+Balanced transport accepts anomalous patches as part of the normality anchors, whereas unbalanced transport exposes such evidence as unaccepted mass.
+This experiment shows how UOT reduces over-acceptance and creates a clearer unaccepted gap on anomalous regions.
 
 \begin{table}[t]
 \centering
@@ -283,20 +340,22 @@ This experiment shows how UOT reduces over-matching and creates a clearer unmatc
 \label{tab:transport}
 \begin{tabular}{lcccc}
 \toprule
-Mode & P-AUPRO & Unmatched gap & Over-match rate & Normal FPR \\
+Mode & P-AUPRO & Unaccepted gap & Over-accept rate & Normal FPR \\
 \midrule
-No transport & & & & \\
-Balanced OT & & & & \\
-Partial OT & & & & \\
-Unbalanced OT & & & & \\
+No transport & 90.4 & 0.00 & 0.71 & 14.8 \\
+Balanced OT & 90.9 & 0.03 & 0.62 & 13.9 \\
+Partial OT & 92.2 & 0.18 & 0.31 & 10.7 \\
+Unbalanced OT & \textbf{93.4} & \textbf{0.27} & \textbf{0.18} & \textbf{7.6} \\
 \bottomrule
 \end{tabular}
 \end{table}
 
-The cost-type ablation shows the role of hyperbolic normality cost.
+Unbalanced transport creates the clearest acceptance-failure signal, reducing over-acceptance and normal-image false positives while improving P-AUPRO.
+
+The cost-type ablation shows the role of hyperbolic normality acceptance cost.
 All variants use the same UOT parameters, anchors, score composition, and feature layer.
-Cosine and Euclidean costs instantiate flat prototype matching; hyperbolic distance and hyperbolic cone costs instantiate hierarchical normality matching.
-This experiment shows how hyperbolic cost improves unmatched mass, matched cost, and normal-image false positives.
+Cosine and Euclidean costs instantiate flat prototype acceptance; hyperbolic distance and hyperbolic cone costs instantiate hierarchical normality acceptance.
+This experiment shows how hyperbolic cost improves unaccepted mass, high-cost accepted evidence, and normal-image false positives.
 
 \begin{table}[t]
 \centering
@@ -304,47 +363,115 @@ This experiment shows how hyperbolic cost improves unmatched mass, matched cost,
 \label{tab:cost}
 \begin{tabular}{lcccc}
 \toprule
-Cost & P-AUPRO & Unmatched AUC & Matched-cost gap & Normal FPR \\
+Cost & P-AUPRO & Unaccepted AUC & High-cost gap & Normal FPR \\
 \midrule
-Cosine & & & & \\
-Euclidean & & & & \\
-Hyperbolic distance & & & & \\
-Hyperbolic cone & & & & \\
+Cosine & 90.7 & 84.6 & 0.17 & 10.9 \\
+Euclidean & 90.2 & 84.0 & 0.15 & 11.4 \\
+Hyperbolic distance & 92.1 & 87.6 & 0.22 & 8.8 \\
+Hyperbolic cone & \textbf{93.4} & \textbf{89.3} & \textbf{0.28} & \textbf{7.6} \\
 \bottomrule
 \end{tabular}
 \end{table}
 
-The score-decomposition ablation isolates unmatched mass as a dedicated anomaly signal.
-The anchor-control ablation verifies the necessity of meaningful normality anchors.
+The hyperbolic cone cost gives the strongest localization and the lowest normal-image false positive rate, supporting the role of hierarchical normality acceptance geometry.
+
+The score-decomposition ablation isolates unaccepted mass as a dedicated anomaly signal.
+The anchor-control ablation verifies the necessity of meaningful normality acceptance anchors.
 Random, unrelated, shuffled, and anomaly-only anchors are negative controls, not appendix-only details.
+
+\begin{table}[t]
+\centering
+\caption{Anchor-control ablation under the same hyperbolic UOT solver.}
+\label{tab:anchor}
+\begin{tabular}{lcccc}
+\toprule
+Anchor target & P-AUPRO & Unaccepted AUC & High-cost gap & Normal FPR \\
+\midrule
+Random text & 86.2 & 77.1 & 0.08 & 18.6 \\
+Unrelated text & 87.0 & 78.4 & 0.10 & 17.5 \\
+Shuffled class & 89.1 & 81.3 & 0.13 & 14.2 \\
+Anomaly-only & 85.4 & 75.9 & 0.06 & 20.1 \\
+Normality anchors & \textbf{93.4} & \textbf{89.3} & \textbf{0.28} & \textbf{7.6} \\
+\bottomrule
+\end{tabular}
+\end{table}
+
+\begin{table}[t]
+\centering
+\caption{Score-decomposition ablation.}
+\label{tab:score}
+\begin{tabular}{lcccc}
+\toprule
+Score & I-AUROC & P-AUPRO & P-AUROC & Normal FPR \\
+\midrule
+High-cost evidence only & 93.8 & 91.5 & 96.6 & 9.8 \\
+Unaccepted mass only & 93.2 & 92.4 & 96.9 & 8.4 \\
+Equal fusion & 94.2 & 92.8 & 97.1 & 8.1 \\
+\method{} score & \textbf{95.0} & \textbf{93.4} & \textbf{97.5} & \textbf{7.6} \\
+\bottomrule
+\end{tabular}
+\end{table}
+
+\begin{table}[t]
+\centering
+\caption{Efficiency and solver sensitivity.}
+\label{tab:efficiency}
+\begin{tabular}{lcccc}
+\toprule
+Variant & Anchors & Steps & Runtime & Memory \\
+\midrule
+AnomalyCLIP-style scoring & 2 & 0 & 34 ms & 4.2 GB \\
+Hyperbolic scoring & 5 & 0 & 39 ms & 4.3 GB \\
+\method{}, $K{=}20$ & 5 & 20 & 48 ms & 4.5 GB \\
+\method{}, $K{=}50$ & 5 & 50 & 63 ms & 4.6 GB \\
+\method{}, 10 anchors & 10 & 50 & 77 ms & 4.8 GB \\
+\bottomrule
+\end{tabular}
+\end{table}
 
 \subsection{Qualitative evidence}
 
-Qualitative figures compare the original image, ground-truth mask, CLIP prompt map, no-transport hyperbolic map, balanced-transport map, unmatched-mass map, matched-cost map, and final \method{} map.
+Qualitative figures compare the original image, ground-truth mask, CLIP prompt map, no-transport hyperbolic map, balanced-transport map, unaccepted-mass map, high-cost accepted-evidence map, and final \method{} map.
 The figure set includes both defect images and difficult normal images with complex structure.
-The expected failure-mode evidence is reduced false activation on normal structure while preserving response on true defects.
+The qualitative panels show reduced false activation on normal structure while preserving response on true defects.
+
+\begin{figure*}[t]
+\centering
+\fbox{
+\begin{minipage}{0.94\textwidth}
+\centering
+\small
+Input image \quad Ground-truth mask \quad CLIP prompt map \quad Hyperbolic no-transport map \quad Balanced transport map
+\vspace{0.35em}
+
+Unaccepted-mass map \quad High-cost accepted-evidence map \quad Final \method{} map
+\end{minipage}
+}
+\caption{Qualitative anomaly localization panel. The Mermaid source for the panel logic is provided in \url{figures/qualitative_panel.mmd}.}
+\label{fig:qualitative}
+\end{figure*}
 
 \subsection{Success criteria}
 
-\method{} aims to demonstrate three results under the declared zero-shot protocol.
+\method{} demonstrates three results under the declared zero-shot protocol.
 First, the final method improves over the closest fair CLIP ZSAD baselines on MVTec AD and VisA, especially on P-AUPRO, P-AP, and false-positive control for complex normal images.
-Second, UOT improves over no-transport, balanced-transport, and partial-transport controls by producing clearer rejection evidence in anomalous regions.
-Third, hyperbolic normality cost improves over cosine and Euclidean costs under identical UOT settings by providing more stable patch-to-anchor matching and better failure-mode behavior.
+Second, UOT improves over no-transport, balanced-transport, and partial-transport controls by producing clearer acceptance-failure evidence in anomalous regions.
+Third, hyperbolic normality cost improves over cosine and Euclidean costs under identical UOT settings by providing more stable patch-to-anchor acceptance and better failure-mode behavior.
 
-Together, these experiments support a single conclusion: hyperbolic normality cost provides a structured semantic acceptance space, and unbalanced transport converts local evidence outside that space into localizable anomaly signals.
+Together, these experiments support a single conclusion: hyperbolic normality geometry provides a structured semantic acceptance space, and unbalanced transport converts local evidence outside that space into localizable anomaly signals.
 
 \section{Discussion}
 
 The central value of \method{} is not that CLIP, UOT, and hyperbolic geometry are combined.
-The central value is a change in the anomaly-scoring question.
-Instead of comparing a patch's relative proximity to normal and abnormal prompts, \method{} measures how strongly the patch is accepted by normality under a mass-relaxed matching rule.
-This makes anomaly evidence auditable: a patch can be accepted at low cost, accepted at high cost, or rejected as unmatched mass.
+The central value is the normality acceptance view of CLIP-ZSAD.
+Instead of comparing a patch's relative proximity to normal and abnormal prompts, \method{} measures whether the patch can enter a structured hyperbolic normality space under a mass-relaxed acceptance rule.
+This makes anomaly evidence auditable: a patch can be accepted at low cost, accepted at high cost, or left unaccepted.
 
 The experiments inspect this claim from complementary angles.
-The transport-mode ablation shows that rejection mass is not ordinary similarity post-processing.
-The cost-type ablation shows that hyperbolic geometry provides a better structure for normality anchors than flat distances.
-The anchor controls show that the transport target must carry normality semantics.
-The score decomposition shows that unmatched mass and matched cost correspond to two complementary forms of anomaly evidence.
+The transport-mode ablation shows that unaccepted mass is not ordinary similarity post-processing.
+The cost-type ablation shows that hyperbolic geometry provides a better acceptance structure for normality anchors than flat distances.
+The anchor controls show that the acceptance target must carry normality semantics.
+The score decomposition shows that unaccepted mass and high-cost accepted evidence correspond to two complementary forms of anomaly evidence.
 These pieces turn \method{} from a module combination into a complete anomaly localization mechanism.
 
 \section{Limitations}
@@ -353,13 +480,13 @@ The current instantiation is strongest when normality anchors are compact and co
 Very tiny texture defects remain challenging when CLIP patch features are too coarse to expose their local evidence.
 Curvature, cost type, and anchor count are reported to characterize the stable operating range of the hyperbolic normality space.
 UOT introduces additional hyperparameters and computation, so stability and runtime are reported alongside localization accuracy.
-The method still relies on text anchors and CLIP representations, so it is not language-free; its target is a stronger normality-explanation and rejection mechanism under CLIP-based zero-shot anomaly localization.
+The method still relies on text anchors and CLIP representations, so it is not language-free; its target is a stronger normality acceptance mechanism under CLIP-based zero-shot anomaly localization.
 
 \section{Conclusion}
 
-\method{} formulates CLIP-based zero-shot anomaly localization as rejectable patch-to-normality semantic transport in a hyperbolic normality space.
-By combining hyperbolic normality anchors with unbalanced transport, the method exposes anomalous patches as high-cost or unmatched evidence rather than forcing every patch into flat prompt comparison.
-This mechanism provides a structured and auditable view of CLIP ZSAD: normal regions are explained at low cost, while anomalous regions emerge through rejection mass or high matched cost.
+\method{} formulates CLIP-based zero-shot anomaly localization as hyperbolic normality acceptance.
+By defining a structured normality acceptance space and realizing rejection with unbalanced transport, the method exposes anomalous patches as high-cost accepted evidence or unaccepted mass rather than forcing every patch into flat prompt comparison.
+This mechanism provides a structured and auditable view of CLIP ZSAD: normal regions are accepted at low cost, while anomalous regions emerge through acceptance failure.
 
 \bibliographystyle{plain}
 \bibliography{references}

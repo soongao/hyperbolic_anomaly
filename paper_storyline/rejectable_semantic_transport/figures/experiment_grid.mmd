@@ -1,0 +1,16 @@
+flowchart LR
+    Claim[HNA claim: anomaly is normality acceptance failure] --> Main[Main comparison]
+    Claim --> Transport[Transport-mode ablation]
+    Claim --> Cost[Cost-type ablation]
+    Claim --> Anchor[Anchor-control ablation]
+    Claim --> Score[Score decomposition]
+    Claim --> Qual[Qualitative evidence]
+    Claim --> Eff[Efficiency and stability]
+
+    Main --> Metrics1[I-AUROC / I-AP / P-AUROC / P-AUPRO]
+    Transport --> Metrics2[Unaccepted gap / over-accept rate / normal FPR]
+    Cost --> Metrics3[Hyperbolic acceptance vs flat costs]
+    Anchor --> Metrics4[Normality acceptance anchors vs negative controls]
+    Score --> Metrics5[Unaccepted mass vs high-cost accepted evidence]
+    Qual --> Metrics6[Maps and transport visualizations]
+    Eff --> Metrics7[Runtime / memory / anchor count / iterations]

@@ -47,6 +47,7 @@ Use this structure for the final answer unless the user asks for a different for
 - What to remove or simplify:
 
 5. 推荐包装
+- Packaging-depth check:
 - Framing:
 - Method name candidates:
 - Contribution bullets:
@@ -56,6 +57,8 @@ Use this structure for the final answer unless the user asks for a different for
 - Main tables:
 - Ablations:
 - Figures:
+- Mermaid mechanism drafts:
+- Reference-only result file:
 - Optional:
 - Skip:
 
@@ -79,3 +82,7 @@ Use this structure for the final answer unless the user asks for a different for
 - Say "需要查证" when the current evidence is insufficient.
 - If the user has explicitly committed to a core mechanism, do not make the answer sound as if that mechanism is optional or awaiting permission to be the contribution. State the committed framing, then describe ablations as evidence used to validate and quantify it.
 - Keep defensive risk language out of proposed abstract/introduction/contribution wording. Put risks under `主要风险`, `实验计划`, or `局限性`.
+- When concrete result numbers are useful, they may be used in manuscript tables, figure callouts, and result prose for a complete draft. Also create a separate reference `.txt` file stating that the numbers are planning/reference values, not measured results. Do not put that disclaimer inside the manuscript body unless asked.
+- Always include table and figure planning for paper drafts. For mechanism or architecture figures, create Mermaid `.mmd` drafts before final artwork.
+- Do not accept a module-stack package if a deeper assumption-failure package is available. If the answer says the current story is shallow, immediately provide or implement the deeper rewrite.
+- For draft-revision tasks, explicitly remove old-story residue from title, macro/method name, abstract, introduction, contribution bullets, method subsection names, table row names, figure captions, Mermaid labels, conclusion, and reference-result sidecars.

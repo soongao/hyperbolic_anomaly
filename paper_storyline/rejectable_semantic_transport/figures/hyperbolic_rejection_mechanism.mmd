@@ -1,0 +1,16 @@
+flowchart TB
+    Root[Normality acceptance space] --> Obj[Normal object state]
+    Obj --> Part[Part structure]
+    Part --> Surface[Surface integrity]
+    Surface --> Texture[Regular texture]
+    Surface --> Material[Undamaged material]
+
+    NP[Normal patch] -->|low hyperbolic cost| Texture
+    NP -->|accepted mass| Accepted[Accepted at low cost]
+
+    DP[Defective patch] -->|violates surface / texture / material| RejectRegion[Outside normality cone]
+    RejectRegion -->|accepted only with penalty| HighCost[High-cost accepted evidence]
+    RejectRegion -->|mass not accepted| Unmatched[Unaccepted evidence]
+
+    HighCost --> Score[Acceptance-failure score]
+    Unmatched --> Score

@@ -10,6 +10,45 @@ A good package is not a better name for a module. It is a causal story:
 prior assumption -> why it fails in ZSAD -> design principle -> technical mechanism -> measurable effect
 ```
 
+## Exemplar-Level Packaging Test
+
+Before writing a draft, compare the proposed story against the user's three canonical packaging examples:
+
+| Example | Raw move | Deep package |
+|---|---|---|
+| AnomalyCLIP | learn normal/abnormal prompts | object-agnostic abnormality because object identity is a nuisance variable |
+| VCP-CLIP | CoCoOp-like conditioning | visual context prompting because category/context is unavailable as reliable text |
+| AA-CLIP | two lightweight adapters | concept-first anomaly awareness because CLIP must learn the anomaly concept before visual alignment |
+
+The new idea must reach the same abstraction level:
+
+```text
+Raw move -> naive story -> failed prior assumption -> task-level problem reconstruction -> mechanism becomes necessary -> concept-level method name.
+```
+
+Reject shallow packages such as:
+
+- "we combine A and B";
+- "we replace Euclidean distance with hyperbolic distance";
+- "we add UOT for better matching";
+- "we add an adapter/prompt/module and improve performance".
+
+Accept only packages where the raw move becomes the natural solution to a ZSAD-specific mismatch.
+If a deeper story is identified after a draft exists, rewrite the title, abstract, introduction, contributions, method overview, and figures to follow that deeper story.
+
+This is a hard gate, not a style preference. A draft fails the gate if the reader can summarize the contribution as "use module A plus module B" after reading the title, abstract, and first page.
+
+When the raw move is `hyperbolic + UOT` for CLIP-ZSAD, do not leave the paper at `hyperbolic semantic transport` unless the task reconstruction truly makes transport the deepest concept. The stronger default reconstruction is:
+
+```text
+Failed prior assumption: patch-wise normal/abnormal prompt comparison assumes anomalies are stable semantic alternatives to normality.
+Task-level reconstruction: anomaly localization should ask whether local evidence can be accepted by normality.
+Mechanism necessity: hyperbolic geometry gives normality a structured acceptance space; UOT makes acceptance rejectable by exposing unaccepted mass and high-cost accepted evidence.
+Packaged concept: hyperbolic normality acceptance.
+```
+
+Under this package, transport is the implementation of rejectable acceptance, not the paper's outer identity.
+
 ## Narrative Commitment Rule
 
 If the user has explicitly chosen a mechanism as the paper's core, write the paper-facing story from that commitment.
@@ -17,7 +56,7 @@ If the user has explicitly chosen a mechanism as the paper's core, write the pap
 Good paper-facing stance:
 
 ```text
-Hyperbolic normality geometry is the core design that structures patch-to-anchor acceptance; flat costs are ablation controls used to isolate its contribution.
+Hyperbolic normality geometry is the core design that structures patch-to-anchor acceptance; UOT realizes rejectable acceptance; flat costs and balanced transport are ablation controls used to isolate these contributions.
 ```
 
 Bad paper-facing stance:
@@ -27,6 +66,19 @@ The transport cost can be flat or hyperbolic; whether hyperbolic becomes the cor
 ```
 
 The bad version is acceptable only as an internal planning note before the user has committed to the mechanism. Once the user has committed, the job is to make the strongest coherent version of that mechanism and design experiments that verify it. Do not ask the reader to decide whether the paper's own core idea should exist.
+
+## Draft Rewrite Rule
+
+When revising an existing paper, rewrite in this order:
+
+1. Replace the method name and title with the concept-level package.
+2. Rewrite the abstract around the failed assumption and task reconstruction.
+3. Rewrite the introduction so the mechanism follows from the reconstructed task.
+4. Rewrite contributions so each one maps to problem reformulation, core geometry, and rejectable evidence.
+5. Rename method subsections and figure captions so modules serve the concept rather than define it.
+6. Update result prose, table row names, sidecar result notes, and Mermaid diagrams to remove old-story residue.
+
+Do not leave a hybrid draft where the abstract claims a deep package but figures, tables, or conclusion still use the old module-stack story.
 
 ## Common Packaging Moves
 
@@ -59,6 +111,8 @@ When recommending a framing, avoid defensive alternatives like "if the core mech
 Recommended framing: [core mechanism] addresses [assumption failure].
 Evidence route: compare against [control A/B] to quantify the contribution of [core mechanism].
 ```
+
+The recommended framing should be phrased at the concept level. For example, if the raw move is `hyperbolic cost + UOT`, the package should not be `hyperbolic semantic transport` unless transport is truly the paper's deepest concept. A stronger package may be `normality acceptance`, where hyperbolic geometry defines the acceptance structure and UOT implements rejectable evidence.
 
 ## Naming Rules
 

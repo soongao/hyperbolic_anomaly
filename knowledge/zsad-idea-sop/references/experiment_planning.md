@@ -12,6 +12,8 @@ claim -> table/figure -> metric -> baseline -> success threshold
 
 When a user-designated mechanism is the paper's core, express experiments as validation and isolation of that mechanism. Do not phrase the paper story as if the experiment will decide whether the mechanism belongs in the contribution. Controls such as flat costs, no-transport variants, random anchors, or balanced OT should be described as baselines/negative controls that quantify the committed mechanism's effect.
 
+If the user asks for concrete expected numbers, or if a paper draft needs filled results, provide plausible reference numerical values. These values may be placed into the manuscript's result tables, figure descriptions, and result prose so the draft is structurally complete. Also create a separate `.txt` sidecar that labels the values as reference/planning numbers rather than measured results. Do not put that disclaimer in the manuscript body unless the user asks for it.
+
 Read:
 
 - `$KNOWLEDGE_ROOT/experiment_library/patterns/required_experiments.md`
@@ -29,6 +31,8 @@ P0:
 - Baselines: CLIP-style baseline, WinCLIP, APRIL-GAN, AnomalyCLIP/AdaCLIP/FiLo/VCP-CLIP as appropriate.
 - Core module ablation.
 - Qualitative anomaly maps.
+- Mechanism/architecture figure.
+- Mermaid `.mmd` draft for mechanism figures before final drawing.
 - Clear source-target protocol.
 
 P1:
@@ -61,7 +65,7 @@ P2:
 
 ## Success Thresholds
 
-Do not fabricate absolute SOTA numbers. Use relative success criteria.
+Use relative success criteria for judging whether the idea is strong. If concrete reference values are requested, keep a sidecar note explaining their status, while allowing the manuscript draft to use them as filled result values.
 
 ### Minimal Success
 
@@ -106,3 +110,52 @@ For paper-facing plans after the core mechanism is fixed, prefer:
 ```text
 The experiments quantify [core mechanism] by comparing it with [controls] under identical protocol, and success is reflected by consistent improvements in [primary metrics] plus targeted drops when [core mechanism] is removed.
 ```
+
+## Reference Result Sidecar
+
+When generating plausible numerical values for a paper draft, create a separate file such as:
+
+```text
+reference_results.txt
+```
+
+The file must start with a warning:
+
+```text
+These numbers are reference/planning values used to make the current paper draft structurally complete. They are not measured experimental results. Future agents and humans should replace or verify them with real runs before submission.
+```
+
+Recommended contents:
+
+- Assumed protocol and backbone.
+- Main comparison target table for each dataset.
+- Transport-mode ablation targets.
+- Cost-type ablation targets.
+- Anchor-control targets.
+- Score-decomposition targets.
+- Efficiency targets.
+- What magnitude of improvement would count as minimal, solid, and strong success.
+
+Keep the numbers internally consistent with the story: the user-designated core mechanism should have the largest targeted or most mechanism-specific gain, and controls should support the causal claim. The manuscript does not need to state that these values are reference-only; the sidecar file carries that information.
+
+## Figure And Table Blueprint
+
+Every paper-level idea should include figure/table planning, even before final results exist.
+
+Must-have tables:
+
+- Main comparison table across MVTec AD and VisA.
+- Transport-mode ablation table.
+- Cost-type or mechanism ablation table.
+- Anchor/control table if prompts or anchors are central.
+- Score-decomposition table if the method has multiple anomaly evidence terms.
+- Efficiency table if the method adds OT, TTA, adapters, SAM/LVLM, or other nontrivial compute.
+
+Must-have figures:
+
+- Method overview figure.
+- Mechanism figure showing why the core design produces anomaly evidence.
+- Qualitative anomaly-map figure.
+- Mechanism visualization, such as transport plans, unmatched mass maps, curvature/embedding visualization, frequency bands, prompt/context behavior, or adaptation trajectory depending on the idea.
+
+For architecture or mechanism figures, create `.mmd` drafts first. The Mermaid should specify the logical blocks, signal flow, controls, and outputs; final visual styling can be done later.

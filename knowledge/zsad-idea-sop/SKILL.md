@@ -7,9 +7,11 @@ description: Evaluate, refine, package, and experiment-plan rough ZSAD research 
 
 ## Overview
 
-Use this skill to turn a rough ZSAD idea into an evidence-grounded research plan. The workflow is: clarify the raw move, check feasibility, search for prior overlap, judge novelty, improve the idea, package it into a reviewer-facing story, design experiments, and define success thresholds.
+Use this skill to turn a rough ZSAD idea into an evidence-grounded research plan. The workflow is: clarify the raw move, check feasibility, search for prior overlap, judge novelty, improve the idea, package it into a reviewer-facing story, design experiments, define success thresholds, and when useful provide concrete reference results plus figure/table blueprints for a paper draft.
 
 Do not start by naming or polishing the idea. Start by exposing the raw technical move and checking whether the idea is already covered by nearby work.
+Do not proceed to paper drafting, result tables, or figure polishing until the idea passes the packaging-depth check below.
+If an existing draft already exists and the packaging is shallow, first rewrite the story spine before touching local wording.
 
 ## Writing Stance
 
@@ -21,6 +23,35 @@ Keep a strict separation between internal audit and paper-facing narration.
 - Use ablations as controls that support the central claim. For example, cosine/Euclidean costs are flat-geometry controls for a hyperbolic method, not equally plausible alternatives that may replace the hyperbolic contribution in the story.
 - Put risk boundaries in protocol, ablation design, limitations, or internal notes. Do not turn them into retreat clauses such as "if this fails, weaken the claim" inside the main narrative.
 
+## Packaging Depth Check
+
+Use the user's three exemplar standards as an acceptance test for every proposed paper story:
+
+- AnomalyCLIP is not merely prompt learning; it packages prompt learning as object-agnostic abnormality because object identity is a nuisance variable in ZSAD.
+- VCP-CLIP is not merely CoCoOp; it packages conditioning as visual context prompting because the category/context variable is unavailable as reliable text but visible in the image.
+- AA-CLIP is not merely two adapters; it packages adapter tuning as concept-first anomaly awareness because CLIP must first learn the anomaly concept and then align patches to it.
+
+For a new idea, explicitly derive the same level of structure before writing:
+
+```text
+Raw trick: [simple module or algorithm being used]
+Naive story: "we add/use [module]"
+Failed assumption in prior ZSAD: [the task assumption that is wrong]
+Why the raw trick becomes necessary: [why this mechanism follows from the failed assumption]
+Packaged concept: [a concept-level name, not a module-stack name]
+One-sentence paper thesis: [problem reformulation -> mechanism -> measurable effect]
+```
+
+If the packaged concept still reads like a module stack, metric replacement, or "A+B framework", stop and repackage before drafting.
+If, during review, you can articulate a deeper packaging than the draft currently uses, revise the draft immediately rather than merely noting the weakness.
+
+Hard gate for draft rewriting:
+
+- Title, abstract, introduction, contribution bullets, method overview, experiment grid, and figure captions must all use the deep package as the outer story.
+- Module names such as prompt learning, adapter, UOT, wavelet, TTA, or hyperbolic distance may appear as mechanisms, but not as the paper's deepest reason to exist.
+- For a committed `hyperbolic + UOT + ZSAD` idea, the default strong package is normality acceptance: ZSAD should ask whether local evidence can be accepted by a structured normality model. Hyperbolic geometry defines the normality acceptance space, and UOT implements rejectable acceptance through unaccepted mass and high-cost accepted evidence.
+- Do not write defensive paper-facing clauses such as "the core contribution depends on ablation" after the user has committed to that core. Ablations quantify and isolate the committed claim.
+
 ## Knowledge Roots
 
 Default local knowledge root:
@@ -29,10 +60,16 @@ Default local knowledge root:
 /Users/bytedance/code/anomalyclip_new/knowledge
 ```
 
+Current project-local knowledge may also live at:
+
+```text
+/Users/bytedance/code/anomalyclip_new/AnomalyCLIP/knowledge
+```
+
 When running shell searches, set:
 
 ```bash
-KNOWLEDGE_ROOT=/Users/bytedance/code/anomalyclip_new/knowledge
+KNOWLEDGE_ROOT=/Users/bytedance/code/anomalyclip_new/AnomalyCLIP/knowledge
 ```
 
 Use these libraries in order:
@@ -88,6 +125,7 @@ Always state what is not novel before proposing a better framing.
 Use `references/packaging_workflow.md` and `$KNOWLEDGE_ROOT/idea_packaging_library/` to produce:
 
 - the corrected problem construction;
+- a packaging-depth check against the AnomalyCLIP/VCP-CLIP/AA-CLIP exemplar pattern;
 - 2-3 possible framings;
 - one recommended framing;
 - method/module name candidates;
@@ -100,9 +138,13 @@ Use `references/experiment_planning.md` and `$KNOWLEDGE_ROOT/experiment_library/
 - must-have main tables;
 - required ablations;
 - qualitative figures;
+- mechanism figures as Mermaid `.mmd` drafts before polishing visual design;
 - optional appendix experiments;
 - experiments to skip;
-- success thresholds as relative criteria, not fabricated SOTA numbers.
+- success thresholds as relative criteria;
+- plausible concrete result values when the user asks for numbers or when a draft paper needs filled tables/figures.
+
+If generating plausible numerical results, they may be used inside the paper draft's result tables, figure callouts, and result prose so the manuscript reads like a complete paper. Also create a separate sidecar file such as `reference_results.txt` that explains these numbers are reference/planning values rather than measured results. Do not write that disclaimer inside the paper body unless the user explicitly asks for it.
 
 ### 6. Return A Decision-Oriented Answer
 
@@ -113,7 +155,8 @@ Use `references/output_schema.md` for the final structure. Keep the answer concr
 - Separate `raw technical move`, `novelty`, `packaging`, and `experiments`.
 - Prefer "this is already close to X" over vague praise.
 - Give a salvage path when an idea is weak.
-- Do not invent numerical results. Define success as deltas over relevant baselines and ablation drops.
+- Do not lose track of which numbers are measured and which are reference values. If concrete reference numbers are useful, they may appear in the draft manuscript, but also create a separate `.txt` note that marks them as reference/planning values for the human and future agents. The manuscript itself should not say "these are reference values" unless asked.
+- Include table and figure blueprints when packaging a paper idea: main comparison tables, ablation tables, mechanism figures, qualitative result figures, and Mermaid `.mmd` drafts for architecture or mechanism diagrams.
 - Treat protocol leakage as a hard failure.
 - If evidence is insufficient, say exactly which papers or text files need to be checked next.
 

@@ -1,0 +1,23 @@
+flowchart LR
+    I[Input image] --> P[CLIP patch evidence]
+    T[Normality prompts] --> A[Normality anchor evidence]
+    P --> HP[Hyperbolic patch embedding]
+    A --> HA[Hyperbolic normality acceptance anchors]
+    HP --> C[Normality acceptance cost]
+    HA --> C
+    C --> UOT[Rejectable acceptance via UOT]
+    UOT --> M[High-cost accepted evidence]
+    UOT --> U[Unaccepted mass]
+    M --> S[Acceptance-failure score]
+    U --> S
+    S --> H[Pixel-level anomaly map]
+
+    subgraph Controls
+        FC[Cosine / Euclidean cost]
+        BOT[Balanced OT / no rejectable acceptance]
+        NC[Random / unrelated / anomaly-only anchors]
+    end
+
+    FC -. ablation .-> C
+    BOT -. ablation .-> UOT
+    NC -. negative control .-> HA
