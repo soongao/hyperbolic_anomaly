@@ -1,0 +1,800 @@
+                                                 Hyperbolic Entailment Cones for Learning Hierarchical Embeddings
+
+
+                                                                    Octavian-Eugen Ganea 1 Gary Bécigneul 1 Thomas Hofmann 1
+
+
+                                                                 Abstract                                 Popular methods typically embed symbolic objects in low
+                                             Learning graph representations via low-                      dimensional Euclidean vector spaces using a strategy that
+                                             dimensional embeddings that preserve relevant                aims to capture semantic information such as functional
+                                             network properties is an important class of                  similarity. Symmetric distance functions are usually mini-
+
+
+
+
+arXiv:1804.01882v3 [cs.LG] 6 Jun 2018
+                                             problems in machine learning. We here present                mized between representations of correlated items during
+                                             a novel method to embed directed acyclic                     the learning process. Popular examples are word embedding
+                                             graphs. Following prior work, we first advocate              algorithms trained on corpora co-occurrence statistics which
+                                             for using hyperbolic spaces which provably                   have shown to strongly relate semantically close words and
+                                             model tree-like structures better than Euclidean             their topics (Mikolov et al., 2013; Pennington et al., 2014).
+                                             geometry. Second, we view hierarchical relations             However, in many fields (e.g. Recommender Systems, Ge-
+                                             as partial orders defined using a family of nested           nomics (Billera et al., 2001), Social Networks), one has to
+                                             geodesically convex cones. We prove that these               deal with data whose latent anatomy is best defined by non-
+                                             entailment cones admit an optimal shape with a               Euclidean spaces such as Riemannian manifolds (Bronstein
+                                             closed form expression both in the Euclidean and             et al., 2017). Here, the Euclidean symmetric models suf-
+                                             hyperbolic spaces, and they canonically define               fer from not properly reflecting complex data patterns such
+                                             the embedding learning process. Experiments                  as the latent hierarchical structure inherent in taxonomic
+                                             show significant improvements of our method                  data. To address this issue, the emerging trend of geometric
+                                             over strong recent baselines both in terms of                deep learning1 is concerned with non-Euclidean manifold
+                                             representational capacity and generalization.                representation learning.
+                                                                                                          In this work, we are interested in geometrical modeling
+                                                                                                          of hierarchical structures, directed acyclic graphs (DAGs)
+                                        1. Introduction
+                                                                                                          and entailment relations via low dimensional embeddings.
+                                        Producing high quality feature representations of data such       Starting from the same motivation, the order embeddings
+                                        as text or images is a central point of interest in artificial    method (Vendrov et al., 2015) explicitly models the partial
+                                        intelligence. A large line of research focuses on embedding       order induced by entailment relations between embedded
+                                        discrete data such as graphs (Grover & Leskovec, 2016;            objects. Formally, a vector x ∈ Rn represents a more gen-
+                                        Goyal & Ferrara, 2017) or linguistic instances (Mikolov           eral concept than any other embedding from the Euclidean
+                                        et al., 2013; Pennington et al., 2014; Kiros et al., 2015) into   entailment region Ox := {y | yi ≥ xi , ∀1 ≤ i ≤ n}. A first
+                                        continuous spaces that exhibit certain desirable geometric        concern is that the capacity of order embeddings grows only
+                                        properties. This class of models has reached state-of-the-        linearly with the embedding space dimension. Moreover,
+                                        art results for various tasks and applications, such as link      the regions Ox suffer from heavy intersections, implying
+                                        prediction in knowledge bases (Nickel et al., 2011; Bor-          that their disjoint volumes rapidly become bounded2 . As a
+                                        des et al., 2013) or in social networks (Hoff et al., 2002),      consequence, representing wide (with high branching fac-
+                                        text disambiguation (Ganea & Hofmann, 2017), word hyper-          tor) and deep hierarchical structures in a bounded region
+                                        nymy (Shwartz et al., 2016), textual entailment (Rocktäschel     of the Euclidean space would cause many points to end up
+                                        et al., 2015) or taxonomy induction (Fu et al., 2014).            undesirably close to each other. This also implies that Eu-
+                                             1
+                                                                                                          clidean distances would no longer be capable of reflecting
+                                             Department of Computer Science, ETH Zurich,                  the original tree metric.
+                                        Switzerland.      Correspondence to:   Octavian-Eugen
+                                        Ganea <octavian.ganea@inf.ethz.ch>,  Gary Bécigneul              Fortunately, the hyperbolic space does not suffer from the
+                                        <gary.becigneul@inf.ethz.ch>,    Thomas      Hofmann              aforementioned capacity problem because the volume of
+                                        <thomas.hofmann@inf.ethz.ch>.
+                                                                                                             1
+                                                                                                              http://geometricdeeplearning.com/
+                                        Proceedings of the 35 th International Conference on Machine         2
+                                                                                                              For example, in n dimensions, no n + 1 distinct regions Ox
+                                        Learning, Stockholm, Sweden, PMLR 80, 2018. Copyright 2018        can simultaneously have unbounded disjoint sub-volumes.
+                                        by the author(s).
+                                                      Hyperbolic Entailment Cones
+
+any ball grows exponentially with its radius, instead of poly-       We also compute an analytic closed-form expression for the
+nomially as in the Euclidean space. This exponential growth          exponential map in the n-dimensional Poincaré ball, allow-
+property enables hyperbolic spaces to embed any weighted             ing us to perform full Riemannian optimization (Bonnabel,
+tree while almost preserving their metric3 (Gromov, 1987;            2013) in the Poincaré ball, as opposed to the approximate
+Bowditch, 2006; Sarkar, 2011). The tree-likeness of hyper-           optimization method used by (Nickel & Kiela, 2017).
+bolic spaces has been extensively studied (Hamann, 2017).
+Moreover, hyperbolic spaces are used to visualize large              2. Mathematical preliminaries
+hierarchies (Lamping et al., 1995), to efficiently forward
+information in complex networks (Krioukov et al., 2009;              We now briefly visit some key concepts needed in our work.
+Cvetkovski & Crovella, 2009) or to embed heterogeneous,
+scale-free graphs (Shavitt & Tankel, 2008; Krioukov et al.,          Notations. We always use k · k to denote the Euclidean
+2010; Bläsius et al., 2016).                                        norm of a point (in both hyperbolic or Euclidean spaces).
+From a machine learning perspective, recently, hyperbolic            We also use h·, ·i to denote the Euclidean scalar product.
+spaces have been observed to provide powerful representa-
+tions of entailment relations (Nickel & Kiela, 2017). The            2.1. Differential geometry
+latent hierarchical structure surprisingly emerges as a sim-         For a rigorous reasoning about hyperbolic spaces, one needs
+ple reflection of the space’s negative curvature. However,           to use concepts in differential geometry, some of which we
+the approach of (Nickel & Kiela, 2017) suffers from a few            highlight here. For an in-depth introduction, we refer the
+drawbacks: first, their loss function causes most points to          reader to (Spivak, 1979) and (Hopper & Andrews, 2010).
+collapse on the border of the Poincaré ball, as exemplified
+in Figure 3. Second, the hyperbolic distance alone (being            Manifold. A manifold M of dimension n is a set that can
+symmetric) is not capable of encoding asymmetric relations           be locally approximated by the Euclidean space Rn . For
+needed for entailment detection, thus a heuristic score is cho-      instance, the sphere S2 and the torus T2 embedded in R3
+sen to account for concept generality or specificity encoded         are 2-dimensional manifolds, also called surfaces, as they
+in the embedding norm.                                               can locally be approximated by R2 . The notion of manifold
+We here inspire ourselves from hyperbolic embeddings                 is a generalization of the notion of surface.
+(Nickel & Kiela, 2017) and order embeddings (Vendrov
+et al., 2015). Our contributions are as follows:                     Tangent space. For x ∈ M, the tangent space Tx M
+                                                                     of M at x is defined as the n-dimensional vector-space
+  • We address the aforementioned issues of (Nickel &                approximating M around x at a first order. It can be defined
+    Kiela, 2017) and (Vendrov et al., 2015). We propose to           as the set of vectors v that can be obtained as v := c0 (0),
+    replace the entailment regions Ox of order-embeddings            where c : (−ε, ε) → M is a smooth path in M such that
+    by a more efficient and generic class of objects, namely         c(0) = x.
+    geodesically convex entailment cones. These cones are
+    defined on a large class of Riemannian manifolds and             Riemannian metric. A Riemannian metric g on M is a
+    induce a partial ordering relation in the embedding              collection (gx )x of inner-products gx : Tx M × Tx M → R
+    space.                                                           on each tangent space Tx M, depending smoothly on x.
+                                                                     Although it defines the geometry of M locally, it induces
+  • The optimal entailment cones satisfying four natural             a global distance function d : M × M → R+ by setting
+    properties surprisingly exhibit canonical closed-form            d(x, y) to be the infimum of all lengths of smooth curves
+    expressions in both Euclidean and hyperbolic geometry            joining x to y in M, where the length ` of a curve γ :
+    that we rigorously derive.                                       [0, 1] → M is defined as
+                                                                                          Z 1q
+  • An efficient algorithm for learning hierarchical em-
+                                                                                 `(γ) =          gγ(t) (γ 0 (t), γ 0 (t))dt.   (1)
+    beddings of directed acyclic graphs is presented. This                                0
+    learning process is driven by our entailment cones.
+                                                                     Riemannian manifold. A smooth manifold equipped
+  • Experimentally, we learn high quality embeddings and
+                                                                     with a Riemannian metric is called a Riemannian mani-
+    improve over experimental results in (Nickel & Kiela,
+                                                                     fold. Subsequently, due to their metric properties, we will
+    2017) and (Vendrov et al., 2015) on hypernymy link
+                                                                     only consider such manifolds.
+    prediction for word embeddings, both in terms of ca-
+    pacity of the model and generalization performance.
+                                                                     Geodesics. A geodesic (straight line) between two points
+   3
+       See end of Section 2.2 for a rigorous formulation.            x, y ∈ M is a smooth curve of minimal length joining x to
+                                                   Hyperbolic Entailment Cones
+
+y in M. Geodesics define shortest paths on the manifold.          tangent spaces), straight lines (geodesics), curve lengths or
+They are a generalization of lines in the Euclidean space.        volume elements. In the Poincaré ball model, the Euclidean
+                                                                  metric is changed by a simple scalar field, hence the model
+Exponential map. The exponential map expx : Tx M →                is conformal (i.e. angle preserving), yet distorts distances.
+M around x, when well-defined, maps a small perturba-
+tion of x by a vector v ∈ Tx M to a point expx (v) ∈ M,           Induced distance and norm. It is known (Nickel &
+such that t ∈ [0, 1] 7→ expx (tv) is a geodesic join-             Kiela, 2017) that the induced distance between 2 points
+ing x to expx (v). In Euclidean space, we simply have             x, y ∈ Dn is given by
+expx (v) = x + v. The exponential map is important, for in-
+                                                                                                     kx − yk2
+                                                                                                                       
+stance, when performing gradient-descent over parameters            dD (x, y) = cosh−1
+                                                                                         1+2                               .
+lying in a manifold (Bonnabel, 2013).                                                         (1 − kxk2 ) · (1 − kyk2 )
+                                                                                                                          (4)
+Conformality. A metric g̃ on M is said to be conformal
+to g if it defines the same angles, i.e. for all x ∈ M and        The Poincare norm is then defined as:
+u, v ∈ Tx M \ {0},
+                                                                             kxkD := dD (0, x) = 2 tanh−1 (kxk)             (5)
+             g̃x (u, v)             gx (u, v)
+       p           p          =p         p          .      (2)
+        g̃x (u, u) g̃x (v, v)   gx (u, u) gx (v, v)               Geodesics and exponential map. We derive parametric
+                                                                  expressions of unit-speed geodesics and exponential map
+This is equivalent to the existence of a smooth function          in the Poincaré ball. Geodesics in Dn are all intersections
+λ : M → (0, ∞) such that g̃x = λ2x gx , which is called the       of the Euclidean unit ball Dn with (degenerated) Euclidean
+conformal factor of g̃ (w.r.t. g).                                circles orthogonal to the unit sphere ∂Dn (equations are
+                                                                  derived below). We know from the Hopf-Rinow theorem
+2.2. Hyperbolic geometry                                          that the hyperbolic space is complete as a metric space.
+The hyperbolic space of dimension n ≥ 2 is a fundamen-            This guarantees that Dn is geodesically complete. Thus, the
+tal object in Riemannian geometry. It is (up to isometry)         exponential map is defined for each point x ∈ Dn and any
+uniquely characterized as a complete, simply connected Rie-       v ∈ Rn (= Tx Dn ). To derive its closed form expression, we
+mannian manifold with constant negative curvature (Can-           first prove the following.
+non et al., 1997). The other two model spaces of constant         Theorem 1. (Unit-speed geodesics) Let x ∈ Dn and
+sectional curvature are the flat Euclidean space Rn (zero         v ∈ Tx Dn (= Rn ) such that gxD (v, v) = 1. The unit-
+curvature) and the hyper-sphere Sn (positive curvature).          speed geodesic γx,v : R+ → Dn with γx,v (0) = x and
+                                                                  γ̇x,v (0) = v is given by
+The hyperbolic space has five models which are often in-
+sightful to work in. They are isometric to each other and                                                     
+                                                                               λx cosh(t) + λ2x hx, vi sinh(t) x + λx sinh(t)v
+conformal to the Euclidean space (Cannon et al., 1997;            γx,v (t) =
+                                                                                   1 + (λx − 1) cosh(t) + λ2x hx, vi sinh(t)
+Parkkonen, 2013)4 . We prefer to work in the Poincaré ball
+                                                                                                                             (6)
+model Dn for the same reasons as (Nickel & Kiela, 2017)
+and, additionally, because we can derive a closed form ex-
+                                                                  Proof. See appendix B.
+pression of geodesics and exponential map.
+                                                                  Corollary 1.1. (Exponential map) The exponential map at
+Poincaré metric tensor. The Poincaré ball model                 a point x ∈ Dn , namely expx : Tx Dn → Dn , is given by
+(Dn , g D ) is defined by the manifold Dn = {x ∈ Rn : kxk <
+1} equipped with the following Riemannian metric                     expx (v) =
+                                                                                                              
+                                                2                                             v
+                                                                       λx cosh(λx kvk) + hx, kvk i sinh(λx kvk)
+            gxD = λ2x g E ,   where λx :=            ,     (3)
+                                            1 − kxk2                                                   v                   x+
+                                                                   1 + (λx − 1) cosh(λx kvk) + λx hx, kvk i sinh(λx kvk)
+and g E is the Euclidean metric tensor with components In of                           1
+                                                                                      kvk sinh(λx kvk)
+the standard space Rn with the usual Cartesian coordinates.                                            v                   v
+                                                                   1 + (λx − 1) cosh(λx kvk) + λx hx, kvk i sinh(λx kvk)
+As the above model is a Riemannian manifold, its metric                                                                     (7)
+tensor is fundamental in order to uniquely define most of
+its geometric properties like distances, inner products (in       Proof. See appendix C.
+   4
+   https://en.wikipedia.org/wiki/
+Hyperbolic_space                                                  We also derive the following fact (useful for future proofs).
+                                                  Hyperbolic Entailment Cones
+
+Corollary 1.2. Given any arbitrary geodesic in Dn , all its        Conversely, any tree can be embedded with arbitrary low
+points are coplanar with the origin O.                             distortion into the Poincaré disk (with only 2 dimensions),
+                                                                   whereas this is not true for Euclidean spaces even when an
+Proof. See appendix D.                                             unbounded number of dimensions is allowed (Sarkar, 2011;
+                                                                   De Sa et al., 2018).
+Angles in hyperbolic space. It is natural to extend the            The difficulty in embedding trees having a branching factor
+Euclidean notion of an angle to any geodesically complete          at least 2 in a quasi-isometric manner comes from the fact
+Riemannian manifold. For any points A, B, C on such a              that they have an exponentially increasing number of nodes
+manifold, the angle ∠ABC is the angle between the initial          with depth. The exponential volume growth of hyperbolic
+tangent vectors of the geodesics connecting B with A, and B        metric spaces confers them enough capacity to embed trees
+with C, respectively. In the Poincaré ball, the angle between     quasi-isometrically, unlike the Euclidean space.
+two tangent vectors u, v ∈ Tx Dn is given by
+                           gxD (u, v)         hu, vi               3. Entailment Cones in the Poincaré Ball
+   cos(∠(u, v)) = p              p         =                (8)
+                       gx (u, u) gx (v, v)
+                        D            D       kukkvk
+                                                                   In this section, we define “entailment” cones that will be
+                                       D
+The second equality happens since g is conformal to g .     E      used to embed hierarchical structures in the Poincaré ball.
+                                                                   They generalize and improve over the idea of order embed-
+Hyperbolic trigonometry. The notion of angles and                  dings (Vendrov et al., 2015).
+geodesics allow definition of the notion of a triangle in
+the Poincaré ball. Then, the classic theorems in Euclidean
+geometry have hyperbolic formulations (Parkkonen, 2013).
+In the next section, we will use the following theorems.
+Let A, B, C ∈ Dn . Denote by ∠B := ∠ABC and by
+c = dD (B, A) the length of the hyperbolic segment BA
+(and others). Then, the hyperbolic laws of cosines and sines
+hold respectively
+                      cosh(a) cosh(c) − cosh(b)
+          cos(∠B) =                                         (9)
+                           sinh(a) sinh(c)
+                sin(∠A)    sin(∠B)     sin(∠C)
+                        =            =                     (10)
+                sinh(a)     sinh(b)     sinh(c)
+
+Embedding trees in hyperbolic vs Euclidean space.                  Figure 1. Convex cones in a complete Riemannian manifold.
+Finally, we briefly explain why hyperbolic spaces are better
+suited than Euclidean spaces for embedding trees. However,         Convex cones in a complete Riemannian manifold. We
+note that our method is applicable to any DAG.                     are interested in generalizing the notion of a convex cone to
+(Gromov, 1987) introduces a notion of δ-hyperbolicity in           any geodesically complete Riemannian manifold M (such
+order to characterize how ‘hyperbolic’ a metric space is.          as hyperbolic models). In a vector space, a convex cone
+For instance, the Euclidean space Rn for n ≥ 2 is not δ-           S (at the origin) is a set that is closed under non-negative
+                                                       n           linear combinations
+        √ for any δ ≥ 0, while the Poincaré ball D is
+hyperbolic
+log(1 + 2)-hyperbolic. This is formalized in the following
+theorem5 (section 6.2 of (Gromov, 1987), proposition 6.7             v1 , v2 ∈ S     =⇒ αv1 + βv2 ∈ S      (∀α, β ≥ 0) . (12)
+of (Bowditch, 2006)):
+                                                                   The key idea for generalizing this concept is to make use of
+Theorem: For any δ > 0, any δ-hyperbolic metric space              the exponential map at a point x ∈ M.
+(X, dX ) and any set of points x1 , ..., xn ∈ X, there exists a
+finite weighted tree (T, dT ) and an embedding f : T → X            expx : Tx M → M,         Tx M = tangent space at x (13)
+such that for all i, j,
+                                                                   We can now take any cone in the tangent space S ⊆ Tx M
+  |dT (f −1 (xi ), f −1 (xj )) − dX (xi , xj )| = O(δ log(n)).     at a fixed point x and map it into a set Sx ⊂ M, which we
+                                                            (11)   call the S-cone at x, via
+  5
+    https://en.wikipedia.org/wiki/
+Hyperbolic_metric_space                                                            Sx := expx (S) ,   S ⊆ Tx M .               (14)
+                                                   Hyperbolic Entailment Cones
+
+Note that, in the above definition, we desire that the ex-          3) Continuous cone aperture functions. We require the
+ponential map be injective. We already know that it is a            aperture ψ of our cones to be a continuous function. Us-
+local diffeomorphism. Thus, we restrict the tangent space           ing Eq. 19, it is equivalent to the continuity of ψ̃. This
+in Eq. 14 to the ball B n (O, r), where r is the injectivity        requirement seems reasonable and will be helpful in order
+radius of M at x. Note that for hyperbolic space models the         to prove uniqueness of the optimal entailment cones. When
+injectivity radius of the tangent space at any point is infinite,   optimization-based training is employed, it is also neces-
+thus no restriction is needed.                                      sary that this function be differentiable. Surprisingly, we
+                                                                    will show below that the optimal functions ψ̃ are actually
+Angular cones in the Poincaré ball. We are interested              smooth, even when only requiring continuity.
+in special types of cones in Dn that can extend in all space
+                                                                    4) Transitivity of nested angular cones. We want cones to
+directions. We want to avoid heavy cone intersections and
+                                                                    determine a partial order in the embedding space. The dif-
+to have capacity that scales exponentially with the space di-
+                                                                    ficult property is transitivity. We are interested in defining
+mension. To achieve this, we want the definition of cones to
+                                                                    a cone width function ψ(x) such that the resulting angu-
+exhibit the following four intuitive properties detailed below.
+                                                                    lar cones satisfy the transitivity property of partial order
+Subsequently, solely based on these necessary conditions,
+                                                                    relations, i.e. they form a nested structure as follows
+we formally prove that the optimal cones in the Poincaré
+ball have a closed form expression.                                                                              ψ(x0 )
+                                                                    ∀x, x0 ∈ Dn \ {0} :     x0 ∈ Sψ(x)
+                                                                                                  x    =⇒ Sx0             ⊆ Sψ(x)
+                                                                                                                             x    .
+                                          n
+1) Axial symmetry. For any x ∈ D \ {0}, we require                                                                            (20)
+circular symmetry with respect to a central axis of the cone
+Sx . We define this axis to be the spoke through x from x:          Closed form expression of the optimal ψ. We now an-
+                                                                    alyze the implications of the above necessary properties.
+                                       1
+     Ax := {x0 ∈ Dn : x0 = αx,            > α ≥ 1}          (15)    Surprisingly, the optimal form of the function ψ admits an
+                                      kxk                           interesting closed-form expression. We will see below that
+                                                                    mathematically ψ cannot be defined on the entire open ball
+Then, we fix anytangent vector
+                                with the same direction as x,      Dn . Towards these goals, we first prove the following.
+             −1 1+kxk                n
+e.g. x̄ = expx      2kxk x ∈ Tx D . One can verify using            Lemma 2. If transitivity holds, then
+Corollary 1.1 that x̄ generates the axis-oriented geodesic as:
+                                                                                                                π
+                                                                                   ∀x ∈ Dom(ψ) :       ψ(x) ≤     .            (21)
+                                                                                                                2
+      Ax = expx ({y ∈ Rn : y = αx̄, α > 0}) .               (16)    Proof. See appendix E.
+
+We next define the angle ∠(v, x̄) for any tangent vector            Note that so far we removed the origin 0 of Dn from our
+v ∈ Tx Dn as in Eq. 8. Then, the axial symmetry property            definitions. However, the above surprising lemma implies
+is satisfied if we define the angular cone at x to have a           that we cannot define a useful cone at the origin. To see
+non-negative aperture 2ψ(x) ≥ 0 as follows:                         this, we first note that the origin should “entail” the entire
+                                                                    space Dn , i.e. S0 = Dn . Second, similar with property
+          Sxψ(x) := {v ∈ Tx Dn : ∠(v, x̄) ≤ ψ(x)}           (17)    3, we desire the cone at 0 be a continuous deformation of
+          Sψ(x)
+           x    := expx (Sxψ(x) ).                                  the cones of any sequence of points (xn )n≥0 in Dn \ {0}
+                                                                    that converges to 0. Formally, limn→∞ Sxn = S0 when
+We further define the conic border (face):                          limn→∞ xn = 0. However, this is impossible because
+                                                                    Lemma 2 implies that the cone at each point xn can only
+ ∂S ψ := {v : ∠(v, x̄) = ψ(x)},        ∂Sψ            ψ
+                                         x := expx (∂Sx ).          cover at most half of Dn . We further prove the following:
+                                                       (18)         Theorem 3. If transitivity holds, then the function
+                                                                                                                 r
+2) Rotation invariance. We want the definition of cones             h : (0, 1) ∩ Dom(ψ̃) → R+ ,      h(r) :=          sin(ψ̃(r)),
+  ψ(x)                                                                                                         1 − r2
+Sx     to be independent of the angular coordinate of the                                                                    (22)
+apex x, i.e. to only depend on the (Euclidean) norm of x:
+                                                                    is non-increasing.
+ ψ(x) = ψ(x0 )      (∀x, x0 ∈ Dn \ {0}, s.t. kxk = kx0 k).
+                                                       (19)         Proof. See appendix F.
+
+This implies that there exists ψ̃ : (0, 1) → [0, π) s. t. for all   The above theorem implies that a non-zero ψ̃ cannot be
+x ∈ Dn \ {0} we have ψ(x) = ψ̃(kxk).                                defined on the entire (0, 1) because limr→0 h(r) = 0, for
+                                                      Hyperbolic Entailment Cones
+
+                                                                        Then, this angle equals
+                                                                                                                                      !
+                                                                                         hx, yi(1 + kxk2 ) − kxk2 (1 + kyk2 )
+                                                                          arccos                     p                                    ,
+                                                                                       kxk · kx − yk 1 + kxk2 kyk2 − 2hx, yi
+                                                                                                                                        (28)
+
+                                                                        Moreover, we have the following equivalent expression of
+                                                                        the Poincaré entailment cones satisfying Eq. 26:
+
+                                                                                                                    1 − kxk2
+                                                                                                                           
+                                                                          ψ(x)             n
+Figure 2. Poincaré angular cones satisfying Eq. 26 for K = 0.1.        Sx     = y ∈ D Ξ(x, y) ≤ arcsin K                       .
+Left: examples of cones for points with Euclidean norm varying                                                         kxk
+from 0.1 to 0.9. Right: transitivity for various points on the border                                                        (29)
+of their parent cones.
+                                                                        Proof. See appendix G.
+
+any function ψ̃. As a consequence, we are forced to restrict            Examples of 2-dimensional Poincaré cones corresponding
+Dom(ψ̃) to some [, 1), i.e. to leave the open ball B n (O, )          to apex points located at different radii from the origin are
+outside of the domain of ψ. Then, theorem 3 implies that                shown in Figure 2. This figure also shows that transitivity is
+                                    r                                  satisfied for some points on the border of the hypercones.
+   ∀r ∈ [, 1) :     sin(ψ̃(r))          ≤ sin(ψ̃())        .
+                                  1 − r2              1 − 2
+                                                            (23)        Euclidean entailment cones. One can easily adapt the
+                                                                        above proofs to derive entailment cones in the Euclidean
+Since we are interested in cones with an aperture as large as           space (Rn , g E ). The only adaptations are: i) replace the
+possible (to maximize model capacity), it is natural to set             hyperbolic cosine law by usual Euclidean cosine law, ii)
+all terms h(r) equal to K := h(), i.e. to make h constant:             geodesics are straight lines, and iii) the exponential map is
+                                                                        given by expx (v) = x + v. Thus, one similarly obtains that
+                                            r                           h(r) = r sin(ψ(r)) is non-decreasing, the optimal values
+           ∀r ∈ [, 1) :     sin(ψ̃(r))          = K,          (24)
+                                          1 − r2                        of ψ are obtained for constant h being equal to K ≤ ε and
+which gives both a restriction on  (in terms of K):                                 Sψ(x) = {y ∈ Rn | Ξ(x, y) ≤ ψ(x)},                 (30)
+                                                                                      x
+                                                   
+                                       2K                              where Ξ(x, y) now becomes
+ K≤              ⇐⇒        ∈         √          , 1 , (25)
+       1 − 2                    1 + 1 + 4K 2
+                                                                                             kyk2 − kxk2 − kx − yk2
+                                                                                                                   
+                                                                          Ξ(x, y) = arccos                            ,                 (31)
+as well as a closed form expression for ψ                                                        2kxk · kx − yk
+
+            ψ : Dn \ B n (O, ) → (0, π/2)                              for all x, y ∈ Rn \ B(O, ε). From a learning perspective,
+                 x 7→ arcsin(K(1 − kxk2 )/kxk),                (26)     there is no need to be concerned about the Riemannian
+                                                                        optimization described in Section 4.2, as the usual Euclidean
+which is also a sufficient condition for transitivity to hold:          gradient-step is used in this case.
+
+Theorem 4. If ψ is defined as in Eqs.25-26, then transitivity
+holds.                                                                  4. Learning with entailment cones
+                                                                        We now describe how embedding learning is performed.
+The above theorem has a proof similar to that of Thm. 3.
+So far, we have obtained a closed form expression for hyper-            4.1. Max-margin training on angles
+bolic entailment cones. However, we still need to understand
+                                                                        We learn hierarchical word embeddings from a dataset X
+how they can be used during embedding learning. For this
+                                                                        of entailment relations (u, v) ∈ X , also called hypernym
+goal, we derive an equivalent (and more practical) definition
+              ψ(x)                                                      links, defining that u entails v, or, equivalently, that v is a
+of the cone Sx :                                                        subconcept of u6 .
+Theorem 5. For any x, y ∈ Dn \ B n (O, ), we denote the
+                                                                        We choose to model the embedding entailment relation
+angle between the half-lines (xy and (0x as                                                                           ψ(u)
+                                                                        (u, v) as v belonging to the entailment cone Su .
+                    Ξ(x, y) := π − ∠Oxy,                       (27)        6
+                                                                               We prefer this notation over the one in (Nickel & Kiela, 2017)
+                                                    Hyperbolic Entailment Cones
+
+
+
+
+Figure 3. Two dimensional embeddings of two datasets: a toy uniform tree of depth 7 and branching factor 3, with root removed (left); the
+mammal subtree of WordNet with 4230 relations, 1165 nodes and top 2 nodes removed (right). (Nickel & Kiela, 2017) (each left side) has
+most of the nodes and edges collapsed on the space border, while our hyperbolic cones (each right side) nicely reveal the data structure.
+
+
+Our model is trained with a max-margin loss function simi-             our metric is conformal, i.e. g D = λ2 g E where g E = I
+lar to the one in (Vendrov et al., 2015):                              is the Euclidean metric (see Eq 3), this leads to a simple
+         X                  X                                          formulation
+  L=           E(u, v) +            max(0, γ − E(u0 , v 0 )),
+       (u,v)∈P              (u0 ,v 0 )∈N                                                   ∇R            2
+                                                                                            u L = (1/λu ) ∇u L.                     (36)
+                                                             (32)
+                                                                       Previous work (Nickel & Kiela, 2017) optimizing word
+for some margin γ > 0, where P and N define samples                    embeddings in the Poincaré ball used the retraction map
+of positive and negative edges respectively. The energy                Rx (v) := x + v as a first order approximation of expx (v).
+E(u, v) measures the penalty of a wrongly classified pair              Note that since we derived a closed-form expression of the
+(u, v), which in our case measures how far is point v from             exponential map in the Poincaré ball (Corollary 1.1), we are
+                 ψ(u)                                                  able to perform full Riemannian optimization in this model
+belonging to Su       expressed as the smallest angle of a
+                                      ψ(u)
+rotation of center u bringing v into Su :                              of the hyperbolic space.
+
+            E(u, v) := max(0, Ξ(u, v) − ψ(u)),               (33)      5. Experiments
+where Ξ(u, v) is defined in Eqs. 28 and 31. Note that (Ven-           We evaluate the representational and generalization power
+drov et al., 2015) use k max(0, v − u)k2 . This loss function         of hyperbolic entailment cones and of other baselines using
+encourages positive samples to satisfy E(u, v) = 0 and                data that exhibits a latent hierarchical structure. We follow
+negative ones to satisfy E(u, v) ≥ γ. The same loss is used           previous work (Nickel & Kiela, 2017; Vendrov et al., 2015)
+both in the hyperbolic and Euclidean cases.                           and use the full transitive closure of the WordNet noun
+                                                                      hierarchy (Miller et al., 1990). Our binary classification task
+4.2. Full Riemannian optimization                                     is link prediction for unseen edges in this directed acyclic
+                                                                      graph.
+As the parameters of the model live in the hyperbolic space,
+the back-propagated gradient is a Riemannian gradient. In-
+                                                                       Dataset splitting. Train and evaluation settings. We
+deed, if u is in the Poincaré ball, and if we compute the
+                                                                       remove the tree root since it carries little information and
+usual (Euclidean) gradient ∇u L of our loss, then
+                                                                       only has trivial edges to predict. Note that this implies that
+                       u ← u − η∇u L                         (34)      we co-embed the resulting subgraphs together to prevent
+                                                                       overlapping embeddings (see smaller examples in Figure 3).
+makes no sense as an operation in the Poincaré ball, since            The remaining WordNet dataset contains 82,114 nodes and
+the substraction operation is not defined in this manifold.            661,127 edges in the full transitive closure. We split it into
+Instead, one should compute the Riemannian gradient ∇R     uL          train - validation - test sets as follows. We first compute
+indicating a direction in the tangent space Tu Dn , and should         the transitive reduction7 of this directed acyclic graph, i.e.
+move u along the corresponding geodesic in Dn (Bonnabel,              “basic” edges that form the minimal edge set for which the
+2013):                                                                 original transitive closure can be fully recovered. These
+                                                                       edges are hard to predict, so we will always include them in
+                    u ← expu (−η∇R
+                                 u L),                       (35)      the training set. The remaining “non-basic” edges (578,477)
+where the Riemannian gradient is obtained by rescaling the               7
+                                                                           https://en.wikipedia.org/wiki/
+Euclidean gradient by the inverse of the metric tensor. As             Transitive_reduction
+                                                   Hyperbolic Entailment Cones
+
+                                             E MBEDDING D IMENSION = 5          E MBEDDING D IMENSION = 10
+                                          P ERCENTAGE OF T RANSITIVE C LOSURE (N ON - BASIC ) E DGES IN T RAINING
+                                            0%     10%      25%      50%       0%       10%        25%       50%
+           S IMPLE E UCLIDEAN E MB        26.8%     71.3%     73.8%      72.8%     29.4%      75.4%     78.4%     78.1%
+                P OINCAR É E MB          29.4%     70.2%     78.2%      83.6%     28.9%      71.4%     82.0%     85.3%
+                  O RDER E MB             34.4%     70.2%     75.9%      81.7%     43.0%      69.7%     79.4%     84.1%
+           O UR E UCLIDEAN C ONES         28.5%     69.7%     75.0%      77.4%     31.3%      81.5%     84.5%     81.6%
+           O UR H YPERBOLIC C ONES        29.2%     80.1%     86.0%      92.8%     32.2%      85.9%     91.0%     94.4%
+
+Table 1. Test F1 results for various models. Simple Euclidean Emb and Poincaré Emb are the Euclidean and hyperbolic methods proposed
+by (Nickel & Kiela, 2017), Order Emb is proposed by (Vendrov et al., 2015).
+
+
+are split into validation (5%), test (5%) and train (fraction        scores of positive and negative validation pairs.
+of the rest).
+We augment both the validation and the test parts with sets          Training details. For all methods except Order embed-
+of negative pairs as follows: for each true (positive) edge          dings, we observe that initialization is very important. Being
+(u, v), we randomly sample five (u0 , v) and five (u, v 0 ) neg-     able to properly disentangle embeddings from different sub-
+ative corrupted pairs that are not edges in the full transitive      parts of the graph in the initial learning stage is essential in
+closure. These are then added to the respective negative set.        order to train qualitative models. We conjecture that initial-
+Thus, ten times as many negative pairs as positive pairs are         ization is hard because these models are trained to minimize
+used. They are used to compute standard classification met-          highly non-convex loss functions. In practice, we obtain our
+rics associated with these datasets: precision, recall, F1. For      best results when initializing the embeddings corresponding
+the training set, negative pairs are dynamically generated as        to the hyperbolic cones using the Poincaré embeddings pre-
+explained below.                                                     trained for 100 epochs. The embeddings for the Euclidean
+                                                                     cones are initialized using Simple Euclidean embeddings
+We make the task harder in order to understand the gener-            pre-trained also for 100 epochs. For the Simple Euclidean
+alization ability of various models when differing amounts           embeddings and Poincaré embeddings, we find the burn-in
+of transitive closure edges are available during training. We        strategy of (Nickel & Kiela, 2017) to be essential for a good
+generate four training sets that include 0%, 10%, 25%, or            initial disentanglement. We also observe that the Poincaré
+50% of the non-basic edges, selected randomly. We then               embeddings are heavily collapsed to the unit ball border (as
+train separate models using each of these four sets after            also pictured in Fig. 3) and so we rescale them by a factor
+being augmented with the basic edges.                                of 0.7 before starting the training of the hyperbolic cones.
+
+Baselines. We compare against the strong hierarchical                Each model is trained for 200 epochs after the initialization
+embedding methods of Order embeddings (Vendrov et al.,               stage, except for order embeddings which were trained for
+2015) and Poincaré embeddings (Nickel & Kiela, 2017).               500 epochs. During training, 10 negative edges are gener-
+Additionally, we also use Simple Euclidean embeddings, i.e.          ated per positive edge by randomly corrupting one of its end
+the Euclidean version of the method presented in (Nickel &           points. We use batch size of 10 for all models. For both
+Kiela, 2017) (one of their baselines). We note that Poincaré        cone models we use a margin of γ = 0.01.
+and Simple Euclidean embeddings were trained using a                All Euclidean models and baselines are trained using
+symmetric distance function, and thus cannot be directly            stochastic gradient descent. For the hyperbolic models, we
+used to evaluate asymmetric entailment relations. Thus,             do not find significant empirical improvements when using
+for these baselines we use the heuristic scoring function           full Riemannian optimization instead of approximating it
+proposed in (Nickel & Kiela, 2017):                                 with a retraction map as done in (Nickel & Kiela, 2017). We
+                                                                    thus use the retraction approximation since it is faster. For
+      score(u, v) = (1 + α(kuk − kvk))d(u, v)               (37)
+                                                                    the cone models, we always project outside of the  ball cen-
+and tune the parameter α on the validation set. For all the         tered on the origin during learning as constrained by Eq. 26
+other methods (our proposed cones and order embeddings),            and its Euclidean version. For both we use  = 0.1. A learn-
+we use the energy penalty E(u, v), e.g. Eq. 33 for hyper-           ing rate of 1e-4 is used for both Euclidean and hyperbolic
+bolic cones. This scoring function is then used at test time        cone models.
+for binary classification as follows: if it is lower than a
+threshold, we predict an edge; otherwise, we predict a non-          Results and discussion. Table 1 shows the obtained re-
+edge. The optimal threshold is chosen to achieve maximum             sults. For a fair comparison, we use models with the same
+F1 on the validation set by passing over the sorted array of         number of dimensions. We focus on the low dimensional
+                                                Hyperbolic Entailment Cones
+
+setting (5 and 10 dimensions) which is more informative.          cient embedding of scale-free graphs in the hyperbolic
+It can be seen that our hyperbolic cones are better than all      plane. In LIPIcs-Leibniz International Proceedings in In-
+the baselines in all settings, except in the 0% setting for       formatics, volume 57. Schloss Dagstuhl-Leibniz-Zentrum
+which order embeddings are better. However, once a small          fuer Informatik, 2016.
+percentage of the transitive closure edges becomes available
+during training, we observe significant improvements of our     Bonnabel, S. Stochastic gradient descent on riemannian
+method, sometimes by more than 8% F1 score. Moreover,             manifolds. IEEE Transactions on Automatic Control, 58
+hyperbolic cones have the largest growth when transitive          (9):2217–2229, 2013.
+closure edges are added at train time. We further note that,    Bordes, A., Usunier, N., Garcia-Duran, A., Weston, J., and
+while mathematically not justified8 , if embeddings of our        Yakhnenko, O. Translating embeddings for modeling
+proposed Euclidean cones model are initialized with the           multi-relational data. In Advances in neural information
+Poincaré embeddings instead of the Simple Euclidean ones,        processing systems, pp. 2787–2795, 2013.
+then they perform on par with the hyperbolic cones.
+                                                                Bowditch, B. H. A course on geometric group theory. 2006.
+6. Conclusion                                                   Bronstein, M. M., Bruna, J., LeCun, Y., Szlam, A., and Van-
+                                                                  dergheynst, P. Geometric deep learning: going beyond
+Learning meaningful graph embeddings is relevant for many
+                                                                  euclidean data. IEEE Signal Processing Magazine, 34(4):
+important applications. Hyperbolic geometry has proven
+                                                                  18–42, 2017.
+to be powerful for embedding hierarchical structures. We
+here take one step forward and propose a novel model based      Cannon, J. W., Floyd, W. J., Kenyon, R., Parry, W. R., et al.
+on geodesically convex entailment cones and show its the-         Hyperbolic geometry. Flavors of geometry, 31:59–115,
+oretical and practical benefits. We empirically discover          1997.
+that strong embedding methods can vary a lot with the per-
+centage of the taxonomy observable during training and          Cvetkovski, A. and Crovella, M. Hyperbolic embedding and
+demonstrate that our proposed method benefits the most            routing for dynamic graphs. In INFOCOM 2009, IEEE,
+from increasing size of the training data. As future work,        pp. 1647–1655. IEEE, 2009.
+it would be interesting to understand if the proposed entail-
+                                                                De Sa, C., Gu, A., Ré, C., and Sala, F. Representation
+ment cones can be used to embed more complex data such
+                                                                  tradeoffs for hyperbolic embeddings. arXiv preprint
+as sentences or images.
+                                                                  arXiv:1804.03329, 2018.
+Our code is publicly available9 .
+                                                                Fu, R., Guo, J., Qin, B., Che, W., Wang, H., and Liu, T.
+                                                                  Learning semantic hierarchies via word embeddings. In
+Acknowledgements                                                  Proceedings of the 52nd Annual Meeting of the Associ-
+We would like to thank Maximilian Nickel, Colin Evans,            ation for Computational Linguistics (Volume 1: Long
+Chris Waterson, Marius Pasca, Xiang Li and Vered Shwartz          Papers), volume 1, pp. 1199–1209, 2014.
+for helpful discussions about related work and evaluation       Ganea, O.-E. and Hofmann, T. Deep joint entity disam-
+settings.                                                         biguation with local neural attention. arXiv preprint
+This research is funded by the Swiss National Science Foun-       arXiv:1704.04920, 2017.
+dation (SNSF) under grant agreement number 167176. Gary
+                                                                Goyal, P. and Ferrara, E. Graph embedding techniques,
+Bécigneul is also funded by the Max Planck ETH Center
+                                                                  applications, and performance: A survey. arXiv preprint
+for Learning Systems.
+                                                                  arXiv:1705.02801, 2017.
+
+References                                                      Gromov, M. Hyperbolic groups. In Essays in group theory,
+                                                                  pp. 75–263. Springer, 1987.
+Billera, L. J., Holmes, S. P., and Vogtmann, K. Geometry
+  of the space of phylogenetic trees. Advances in Applied       Grover, A. and Leskovec, J. node2vec: Scalable feature
+  Mathematics, 27(4):733–767, 2001.                               learning for networks. In Proceedings of the 22nd ACM
+                                                                  SIGKDD international conference on Knowledge discov-
+                                                                  ery and data mining, pp. 855–864. ACM, 2016.
+Bläsius, T., Friedrich, T., Krohmer, A., and Laue, S. Effi-
+   8                                                            Hamann, M. On the tree-likeness of hyperbolic spaces.
+     Indeed, mathematically, hyperbolic embeddings cannot be
+considered as Euclidean points.                                  Mathematical Proceedings of the Cambridge Philo-
+   9
+     https://github.com/dalab/hyperbolic_                         sophical Society, pp. 117, 2017.    doi: 10.1017/
+cones.                                                            S0305004117000238.
+                                                Hyperbolic Entailment Cones
+
+Hoff, P. D., Raftery, A. E., and Handcock, M. S. Latent          Sarkar, R. Low distortion delaunay embedding of trees in
+  space approaches to social network analysis. Journal of          hyperbolic plane. In International Symposium on Graph
+  the american Statistical association, 97(460):1090–1098,         Drawing, pp. 355–366. Springer, 2011.
+  2002.
+                                                                 Shavitt, Y. and Tankel, T. Hyperbolic embedding of internet
+Hopper, C. and Andrews, B. The ricci flow in riemannian            graph for distance estimation and overlay construction.
+  geometry, 2010.                                                  IEEE/ACM Transactions on Networking (TON), 16(1):
+                                                                   25–36, 2008.
+Kiros, R., Zhu, Y., Salakhutdinov, R. R., Zemel, R., Urtasun,
+  R., Torralba, A., and Fidler, S. Skip-thought vectors. In      Shwartz, V., Goldberg, Y., and Dagan, I. Improving hyper-
+  Advances in neural information processing systems, pp.           nymy detection with an integrated path-based and dis-
+  3294–3302, 2015.                                                 tributional method. In Proceedings of the 54th Annual
+                                                                   Meeting of the Association for Computational Linguis-
+Krioukov, D., Papadopoulos, F., Boguñá, M., and Vahdat,          tics (Volume 1: Long Papers), volume 1, pp. 2389–2398,
+  A. Greedy forwarding in scale-free networks embedded             2016.
+  in hyperbolic metric spaces. ACM SIGMETRICS Perfor-
+  mance Evaluation Review, 37(2):15–17, 2009.                    Spivak, M. A comprehensive introduction to differential
+                                                                   geometry. volume four. 1979.
+Krioukov, D., Papadopoulos, F., Kitsak, M., Vahdat, A., and
+  Boguná, M. Hyperbolic geometry of complex networks.           Vendrov, I., Kiros, R., Fidler, S., and Urtasun, R. Order-
+  Physical Review E, 82(3):036106, 2010.                           embeddings of images and language. arXiv preprint
+                                                                   arXiv:1511.06361, 2015.
+Lamping, J., Rao, R., and Pirolli, P. A focus+ context tech-
+  nique based on hyperbolic geometry for visualizing large
+  hierarchies. In Proceedings of the SIGCHI conference on
+  Human factors in computing systems, pp. 401–408. ACM
+  Press/Addison-Wesley Publishing Co., 1995.
+
+Mikolov, T., Sutskever, I., Chen, K., Corrado, G. S., and
+ Dean, J. Distributed representations of words and phrases
+ and their compositionality. In Advances in neural infor-
+ mation processing systems, pp. 3111–3119, 2013.
+
+Miller, G. A., Beckwith, R., Fellbaum, C., Gross, D., and
+ Miller, K. J. Introduction to wordnet: An on-line lexical
+ database. International journal of lexicography, 3(4):
+ 235–244, 1990.
+
+Nickel, M. and Kiela, D. Poincaré embeddings for learn-
+  ing hierarchical representations. In Advances in Neural
+  Information Processing Systems, pp. 6341–6350, 2017.
+
+Nickel, M., Tresp, V., and Kriegel, H.-P. A three-way model
+  for collective learning on multi-relational data. 2011.
+
+Parkkonen, J. Hyperbolic geometry. 2013.
+
+Pennington, J., Socher, R., and Manning, C. D. Glove:
+  Global vectors for word representation. In EMNLP, vol-
+  ume 14, pp. 1532–43, 2014.
+
+Robbin, J. W. and Salamon, D. A. Introduction to differen-
+  tial geometry. ETH, Lecture Notes, preliminary version,
+  January, 2011.
+
+Rocktäschel, T., Grefenstette, E., Hermann, K. M., Kočiskỳ,
+  T., and Blunsom, P. Reasoning about entailment with
+  neural attention. arXiv preprint arXiv:1509.06664, 2015.
+                                                    Hyperbolic Entailment Cones
+
+A. Geodesics in the Hyperboloid Model                              One can sanity check that indeed the formula from theorem
+                                                                   1 satisfies the conditions:
+The hyperboloid model is (Hn , h·, ·i1 ), where Hn := {x ∈
+Rn,1 : hx, xi1 = −1, x0 > 0}. The hyperboloid model can
+be viewed from the extrinsically as embedded in the pseudo-           • dD (γ(0), γ(t)) = t,    ∀t ∈ [0, 1]
+Riemannian manifold Minkowski space (Rn,1 , h·, ·i1 ) and
+                                                      n,1
+inducing its metric. The Minkowski metric tensor g R of
+signature (n, 1) has the components                                   • γ(0) = x
+                                          
+                           −1 0 . . . 0
+                  n,1     0 1 . . . 0
+                gR =     0 0 . . . 0
+                                           
+                                                                      • γ̇(0) = v
+                           0 0 ... 1
+
+Pn associated inner-product is hx, yi1 := −x0 y0 +
+The                                                                   • limt→∞ γ(t) := γ(∞) ∈ ∂Dn
+   i=1 xi yi . Note that the hyperboloid model is a Rieman-
+nian manifold because the quadratic form associated with
+g H is positive definite.                                          C. Proof of Corollary 1.1
+In the extrinsic view, the tangent space at Hn can be de-          Proof. Denote u = √ D1         v. Using the notations from
+                                                                                           gx (v,v)
+scribed as Tx Hn = {v ∈ Rn,1 : hv, xi1 = 0}. See Robbin                                              p
+                                                                   Thm. 1, one has expx (v) = γx,u ( gxD (v, v)). Using Eq. 3
+& Salamon (2011); Parkkonen (2013).                                and 6, one derives the result.
+
+Geodesics of Hn are given by the following theorem (Eq             D. Proof of Corollary 1.2
+(6.4.10) in Robbin & Salamon (2011)):
+Theorem 6. Let x ∈ Hn and v ∈ Tx Hn such that hv, vi =             Proof. For any geodesic γx,v (t), consider the plane spanned
+1. The unique unit-speed geodesic φx,v : [0, 1] → Hn with          by the vectors x and v. Then, from Thm. 1, this plane
+φx,v (0) = x and φ̇x,v (0) = v is                                  contains all the points of γx,v (t), i.e.
+
+             φx,v (t) = x cosh(t) + v sinh(t).              (38)
+                                                                           {γx,v (t) : t ∈ R} ⊆ {ax + bv : a, b ∈ R}       (41)
+B. Proof of Theorem 1
+Proof. From theorem 6, appendix A, we know the expres-
+sion of the unit-speed geodesics of the hyperboloid model
+Hn . We can use the Egregium theorem to project the                E. Proof of Lemma 2
+geodesics of Hn to the geodesics of Dn . We can do that            Proof. Assume the contrary and let x ∈ Dn \ {0} s.t.
+because we know an isometry ψ : Dn → Hn between the                ψ(kxk) > π2 . We will show that transitivity implies that
+two spaces:
+                                                     x0                                                            π
+  ψ(x) := (λx − 1, λx x),      ψ −1 (x0 , x0 ) =            (39)                  ∀x0 ∈ ∂Sψ(x)
+                                                                                          x    :      ψ(kx0 k) ≤           (42)
+                                                   1 + x0                                                          2
+
+Formally, let x ∈ Dn , v ∈ Tx Dn with g D (v, v) = 1. Also,
+                                                                   If the above is true, by moving x0 on any arbitrary (continu-
+let γ : [0, 1] → Dn be the unique unit-speed geodesic in Dn                                             ψ(x)
+                                                                   ous) curve on the cone border ∂Sx         that ends in x, one
+with γ(0) = x and γ̇(0) = v. Then, by Egregium theorem,
+                                                                   will get a contradiction due to the continuity of ψ(k · k).
+φ := ψ ◦ γ is also a unit-speed geodesic in Hn . From
+theorem 6, we have that φ(t) = x0 cosh(t) + v 0 sinh(t), for       We now prove the remaining fact, namely Eq. 42. Let
+some x0 ∈ Hn , v 0 ∈ Tx0 Hn . One derives their expression:                                ψ(x)
+                                                                   any arbitrary x0 ∈ ∂Sx . Also, let y ∈ ∂Sx
+                                                                                                                   ψ(x)
+                                                                                                                        be any
+ x0 = ψ ◦ γ(0) = (λx − 1, λx x)                             (40)   arbitrary point on the geodesic half-line connecting x with
+                                                                   x0 starting from x0 (i.e. excluding the segment from x to
+                                               λ2x hx, vi
+                                                             
+                 ∂ψ(y0 , y)                                        x0 ). Moreover, let z be any arbitrary point on the spoke
+ v 0 = φ̇(0) =                   γ̇(0) = 2
+                   ∂y       γ(0)
+                                         λx hx, vix + λx v         through x0 radiating from x0 , namely z ∈ Ax0 (notation
+                                                                   from Eq. 15). Then, based on the properties of hyperbolic
+Inverting once again, γ(t) = ψ −1 ◦φ(t), one gets the closed-      angles discussed before (based on Eq. 8), the angles ∠yx0 z
+form expression for γ stated in the theorem.                       and ∠zx0 x are well-defined.
+                                               Hyperbolic Entailment Cones
+
+                                                                Further, let b ∈ ∂Dn be the intersection of the spoke through
+                                                                x with the border of Dn . Following the same argument as
+                                                                in the proof of lemma 2, one proves Eq. 45 which gives:
+
+                                                                                         ∠yx0 z ≥ ψ(x0 )                   (49)
+
+                                                                In addition, the angle at x0 between the geodesics xy and
+                                                                Oz can be written in two ways:
+
+                                                                                        ∠Ox0 x = ∠yx0 z                    (50)
+                                                                                ψ(x)
+                                                                Since x0 ∈ ∂Sx         , one proves
+
+                                                                             ∠Oxx0 = π − ∠x0 xb = π − ψ(x)                 (51)
+
+                                                                We apply hyperbolic law of sines (Eq. 10) in the hyperbolic
+From Cor. 1.2 we know that the points O, x, x0 , y, z are       triangle Oxx0 :
+coplanar. We denote this plane by P. Furthermore, the
+metric of the Poincaré ball is conformal with the Euclidean                  sin(∠Oxx0 )         sin(∠Ox0 x)
+                                                                                              =                            (52)
+metric. Given these two facts, we derive that                               sinh(dD (O, x0 ))   sinh(dD (O, x))
+
+             ∠yx0 z + ∠zx0 x = ∠(yx0 x) = π              (43)   Putting together Eqs. 48,49,50,51,52, and using the fact
+                                                                that sin(·) is an increasing function on [0, π2 ], we derive the
+thus                                                            conclusion of this helper lemma.
+                                          π
+                min(∠yx0 z, ∠zx0 x) ≤                    (44)
+                                          2
+                                                                We now return to the proof of our theorem. Consider any
+                                                                arbitrary r, r0 ∈ (0, 1) ∩ Dom(ψ) with r < r0 . Then, we
+It only remains to prove that
+                                                                claim that is enough to prove that
+          ∠yx0 z ≥ ψ(x0 )       & ∠zx0 x ≥ ψ(x0 )        (45)     ∃x ∈ Dn , x0 ∈ ∂Sψ(x)        s.t. kxk = r, kx0 k = r0 (53)
+                                                                                   x
+
+                                                                Indeed, if the above is true, then one can use the fact 5, i.e.
+Indeed, assume w.l.o.g. that ∠yx0 z < ψ(x0 ). Since
+∠yx0 z < ψ(x0 ), there exists a point t in the plane P such
+                                                                                                    
+                                                                                                 1+r            2r
+that                                                                sinh(kxkD ) = sinh ln                 =              (54)
+                                                                                                 1−r         1 − r2
+
+   ∠Oxt < ∠Oxy        & ψ(x0 ) ≥ ∠tx0 z > ∠yx0 z         (46)   and apply lemma 7 to derive
+
+                       ψ(x0 )                  ψ(x)                                       h(r0 ) ≤ h(r)                    (55)
+Then, clearly, t ∈ Sx0 , and also t ∈       / Sx      , which
+contradicts the transitivity property (Eq. 20).                 which is enough for proving the non-increasing property of
+                                                                function h.
+F. Proof of Theorem 3
+                                                                We are only left to prove the fact 53. Let any arbitrary
+Proof. We first need to prove the following fact:
+                                                                x ∈ Dn s.t. kxk = r. Also, consider any arbitrary geodesic
+                                                                                 ψ(x)
+Lemma 7. Transitivity implies that for all x ∈ Dn \ {0},        γx,v : R+ → ∂Sx that takes values on the cone border,
+        ψ(x)
+∀x0 ∈ ∂Sx :                                                     i.e. ∠(v, x) = ψ(x). We know that
+
+                                                                                    kγx,v (0)k = kxk = r                   (56)
+ sin(ψ(kx0 k)) sinh(kx0 kD ) ≤ sin(ψ(kxk)) sinh(kxkD ).
+                                                    (47)        and that this geodesic ”ends” on the ball’s border ∂Dn , i.e.
+
+                                                                                       k lim γx,v (t)k = 1                 (57)
+Proof. We will use the exact same figure and notations of                                t→∞
+points y, z as in the proof of lemma 2. In addition, we
+                                                                Thus, because the function kγx,v (·)k is continuous, we ob-
+assume w.l.o.g that
+                                                                tain that for any r0 ∈ (r, 1) there exists an t0 ∈ R+ s.t.
+                                                                                                                    ψ(x)
+                                    π                           kγx,v (t0 )k = r0 . By setting x0 := γx,v (t0 ) ∈ ∂Sx    we
+                       ∠yx0 z ≤                          (48)
+                                    2                           obtain the desired result.
+                                                 Hyperbolic Entailment Cones
+
+G. Proof of Theorem 5
+                        ψ(x)
+Proof. For any y ∈ Sx , the axial symmetry property
+implies that π − ∠Oxy ≤ ψ(x). Applying the hyperbolic
+cosine law in the triangle Oxy and writing the above angle
+inequality in terms of the cosines of the two angles, one gets
+
+              − cosh(kykD ) + cosh(kxkD ) cosh(dD (x, y))
+cos ∠Oxy =
+                      sinh(kxkD ) sinh(dD (x, y))
+                                                    (58)
+
+Eq. 28 is then derived from the above by an algebraic refor-
+mulation.
+

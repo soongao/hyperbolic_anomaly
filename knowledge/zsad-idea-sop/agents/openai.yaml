@@ -1,0 +1,4 @@
+interface:
+  display_name: "ZSAD Idea SOP"
+  short_description: "Triage, package, and test ZSAD ideas"
+  default_prompt: "Use $zsad-idea-sop to evaluate and package this rough ZSAD idea, then design experiments."

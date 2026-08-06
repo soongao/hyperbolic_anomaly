@@ -1,0 +1,612 @@
+                                                A Zero-/Few-Shot Anomaly Classification and Segmentation Method for
+                                                         CVPR 2023 VAND Workshop Challenge Tracks 1&2:
+                                                       1st Place on Zero-shot AD and 4th Place on Few-shot AD
+
+                                                                           Xuhai Chen1 * Yue Han1 * Jiangning Zhang2 * †
+                                                                           1                                       2
+                                                                               APRIL Lab, Zhejiang University          Youtu Lab, Tencent
+                                                                     {22232044, 22132041}@zju.edu.cn, vtzhang@tencent.com
+
+
+
+
+arXiv:2305.17382v3 [cs.CV] 11 Oct 2023
+                                                                   Abstract                                   it is difficult to collect a large number of training images for
+                                                                                                              each category. As a result, the zero/few-shot setting plays a
+                                            In this technical report, we briefly introduce our solution       crucial role in bringing AD to practical applications.
+                                         for the Zero/Few-shot Track of the Visual Anomaly and Nov-
+                                         elty Detection (VAND) 2023 Challenge. For industrial vi-                WinCLIP [8], built on the open-source vision-language
+                                         sual inspection, building a single model that can be rapidly         model CLIP [3, 13], is a model that can be rapidly adapted
+                                         adapted to numerous categories without or with only a few            to abundant categories without or with only a handful of
+                                         normal reference images is a promising research direction.           normal images. It assumes that language is able to aid
+                                         This is primarily because of the vast variety of the product         zero/few-shot AD and proposes a window-based strategy to
+                                         types. For the zero-shot track, we propose a solution based          perform segmentation. Taking inspiration from it, we also
+                                         on the CLIP model by adding extra linear layers. These lay-          followed the pattern of language guided AD and employed
+                                         ers are used to map the image features to the joint embed-           CLIP as our baseline.
+                                         ding space, so that they can compare with the text features
+                                         to generate the anomaly maps. Besides, when the reference               Specifically, we adhere to the overall framework of CLIP
+                                         images are available, we utilize multiple memory banks to            for zero-shot classification and employ a combination of
+                                         store their features and compare them with the features of           state and template ensembles to craft our text prompts. In
+                                         the test images during the testing phase. In this challenge,         order to locate the abnormal regions, we introduce extra
+                                         our method achieved first place in the zero-shot track, espe-        linear layers to map the image features extracted from the
+                                         cially excelling in segmentation with an impressive F1 score         CLIP image encoder to the linear space where the text fea-
+                                         improvement of 0.0489 over the second-ranked participant.            tures are located. Then, we make similarity comparison be-
+                                         Furthermore, in the few-shot track, we secured the fourth            tween the mapped image features and the text features, so
+                                         position overall, with our classification F1 score of 0.8687         as to obtain the corresponding anomaly maps. For the few-
+                                         ranking first among all participating teams1 .                       shot case, we retain the extra linear layers of the zero-shot
+                                                                                                              phase and maintain their weights. In addition, we use the
+                                                                                                              image encoder to extract the features of the reference im-
+                                         1. Introduction                                                      ages and save them to the memory bank for comparison
+                                                                                                              with the features of the test images during the test phase.
+                                            In the field of computer vision, unsupervised anomaly             Note that, to fully take advantage of the shallow and deep
+                                         detection (AD) [5, 9, 14, 16, 17] aims to identify abnormal          features, we leverage features from different stages for both
+                                         images and locate anomalous regions using a model trained            the zero and few shot settings.
+                                         solely on anomaly-free images. It is widely used in in-
+                                         dustrial defect detection [1, 2, 12]. Most previous methods              Our method demonstrates strong competitiveness in both
+                                         have centered on training dedicated models for each cate-            zero-shot and few-shot anomaly classification and segmen-
+                                         gory, relying on a vast collection of normal images as ref-          tation. In the zero-shot track of the VAND Challenge, we
+                                         erences [15, 18]. In real-world applications, however, there         achieve the first rank, surpassing the second-ranked ap-
+                                         are a wide variety of industrial products to be detected, and        proach by 0.0633 in overall score and 0.0489 in segmen-
+                                           * Equal contribution.
+                                                                                                              tation F1 score. In the few-shot track, we rank fourth over-
+                                           † Project Leader.                                                  all, but our classification F1 score of 0.8687 places us first,
+                                           1 https://github.com/ByChelsea/VAND-APRIL-GAN                      surpassing the second-ranked approach by 0.0207.
+
+
+                                                                                                          1
+2. Methodology                                                        whole process is represented in the blue dashed box in
+                                                                      Fig. 1. Taking the transformer based architecture ViT [7]
+    Our approach is based on the CLIP [13] model, an open-            as an example, we empirically divide all layers into four
+source vision-language model that inherently possesses the            stages and use a linear layer for each stage to map the out-
+capability for zero-shot classification. This implies that            put features into the joint embedding space,
+CLIP may be directly applicable to zero-shot anomaly clas-
+sification. Furthermore, we made slight modifications to                                   Fns ′ = k n Fns + bn ,                (2)
+this model to enable its usage in anomaly segmentation and
+extended its applicability to the few-shot domain.                    where Fns here refers to the features of the patch tokens, and
+                                                                      k n and bn represent weights and bias of the corresponding
+2.1. Zero-shot AD Setting                                             linear layer respectively. To obtain the anomaly maps for
+Anomaly Classification. We employ a binary zero-shot                  different stages, we make similarity comparison between
+anomaly classification framework proposed by [8], which               the adjusted features Fns ′ ∈ RHW ×C and the text features
+necessitates descriptions for both normal and abnormal ob-            Ft stage by stage. The final anomaly map M can be ob-
+jects. We further improve the detection accuracy by utiliz-           tained by adding up the results for all the stages,
+ing a text prompt ensemble strategy, including both state
+                                                                                                 softmax(Fns ′ Ft T ).
+                                                                                            X
+and template-level. For the state-level, we adapt generic                             M=                                          (3)
+text to describe the normal and abnormal objects (e.g., flaw-                                n
+less, damaged), rather than providing excessively detailed
+                                                                      As to the CLIP model based on the CNN architecture, the
+descriptions such as “chip around edge and corner”. For the
+                                                                      anomaly maps need to be upsampled to the same resolution
+template-level, we screen the 85 templates in CLIP for Im-
+                                                                      before they are added together.
+ageNet [6] and remove some templates that are not suitable
+                                                                      Losses. In our approach, the parameters of the CLIP model
+for AD, such as “a photo of the weird [obj.]”.
+                                                                      are frozen, but the linear layers used to map the image fea-
+   We combine templates with the states of objects and
+                                                                      tures to the joint embedding space require training. Thus,
+mean the text features extracted by the text encoder as the
+                                                                      we supervise the anomaly map prediction with the linear
+final text features Ft ∈ R2×C , where C represents the num-
+                                                                      combination of the focal loss [10] and dice loss [11].
+ber of channels of the feature. Let Fc ∈ R1×C represent the
+image features used for classification, and the relative prob-        2.2. Few-shot AD Setting
+abilities s of the object image being classified as normal or
+abnormal can be represented as,                                       Anomaly Classification. For the few shot setting, the
+                                                                      anomaly score of the image comes from two parts. The first
+                   s = softmax(Fc Ft T ),                  (1)        part is guided by the text prompt, which is the same as the
+                                                                      zero-shot setting. The second part follows the conventional
+we use the probability corresponding to the anomaly as the            approach used in many AD methods, where the maximum
+anomaly score for the image.                                          value of the anomaly map is considered. We add the two
+Anomaly Segmentation. The structure of the image en-                  parts together as the final anomaly score.
+coder of CLIP model can be based on either transformer or             Anomaly Segmentation. In the few-shot AD setting, only
+CNN. Although not used in the classification task, both ar-           a few (e.g., 1, 5, 10) normal images are available. Memory
+chitectures are capable of extracting features that preserve          bank-based approach [8, 14] is a promising solution to this
+spacial information. These features can be represented as             problem, making full use of all available normal images in
+Fns ∈ RH×W ×Cs , where n indicates that the features are              an intuitive way. As shown in the orange dotted line box
+extracted by the n-th stage in the image encoder.                     in Fig. 1, we use the image encoder of CLIP to extract the
+   It is a natural idea to obtain the anomaly maps by cal-            features of the reference images and store them in the fea-
+culating the similarity between the image features Fns and            ture memory banks Mn , where n indicates that the memory
+the text features. However, since the CLIP model is de-               bank stores the output features of stage n. In order to make
+signed for classification, image features other than those            a comprehensive comparison and improve the detection ac-
+used for classification are not mapped to the joint embed-            curacy, we save multi-layer features of the encoder. For
+ding space. That is, these features cannot be compared di-            the purpose of distinction, we denote the features extracted
+rectly to the text features in that space. As a result, we pro-       from the reference images as F̃sn . It is noteworthy that fea-
+pose to map these image features into the joint embedding             tures stored in the memory banks in few-shot come from
+space by adding an additional linear layer, and then com-             the exact same stages as the features used to calculate the
+pare them with the text features.                                     anomaly maps in zero-shot, unless otherwise noted.
+   In addition, we leverage the distinct features offered by             During the test phase, we use the same image encoder
+the shallow and deep layers of the image encoder. The                 to extract the features of different stages of the test image,
+
+                                                                  2
+                              Zero-shot Mode                                                                                       Text
+
+                                                                                                                          𝐹(
+                                                                                                                                                Zero-shot Anomaly Score
+                             𝐹!&                     𝐹!#                    𝐹!$                    𝐹!%                    𝐹!"
+
+
+
+       Test images
+                                           Linear                  Linear                 Linear                 Linear
+                                    𝐹'
+                                    Text                    Text                   Text                   Text
+
+                                                                                                                                                Zero-shot Anomaly Map
+
+
+
+                              Few-shot Mode
+
+
+
+
+                                           Memory                  Memory                 Memory                 Memory
+
+
+
+
+                                                                                                                                          Max
+                                                                                                                                                Few-shot Anomaly Map
+
+
+                             𝐹"!&                    𝐹"!#                   𝐹"!$                   𝐹"!%                   𝐹"!"                  Few-shot Anomaly Score
+
+     Reference images
+
+                                    Frozen          Element-wise Addition                  Matrix Multiplication                 Cosine Similarity
+
+
+Figure 1. Overall diagram of our solution. 1) The blue dashed box represents the pipeline for the zero-shot settiing. The “Linear”
+components denote additional linear layers and “Text” indicates the corresponding text features. Note that “Text” in this Figure is used to
+represent the same value. 2) The orange dashed box represents the pipeline for the few-shot setting. The “memory” components represent
+the memory banks. The symbol with a letter C inside a circle denotes the calculation of cosine similarity.
+
+
+and then compare them with the reference features in the                                   of VisA [19]. Moreover, as the training of the newly in-
+memory bank of the corresponding stage to get the anomaly                                  troduced linear layers relies on the ground-truth anomaly
+maps. The comparison is based on the cosine similarity.                                    maps, we solely use the test set of the MVTec AD [2]
+Next, we add all the anomaly maps together to get the result                               dataset. 2) In the few-shot track, we incorporate the linear
+Mf . Mathematically,                                                                       layers without any additional fine-tuning using the reference
+                      X                                                                    images, as discussed in Sec. 2.2.
+        Mf (i, j) =      minn (1 − ⟨Fns (i, j), f ⟩).    (4)                                   To thoroughly demonstrate the effectiveness of our ap-
+                             f ∈M
+                         n
+                                                                                           proach, we also conducted experiments on the standard
+Finally, the anomaly map Mf obtained by feature compar-                                    MVTec AD [2] and VisA [19] dataset. For the zero-shot
+ison is added with the anomaly map M obtained by zero-                                     setting, when testing on the MVTec AD, we trained the lin-
+shot as the final result. It is worth noting that we do not                                ear layers using the test set of VisA. Conversely, when test-
+fine-tune the linear layers with the reference images in the                               ing on VisA, we trained the linear layers using the test set
+few-shot setting, but instead directly utilize the weights ob-                             of MVTec AD. For the few-shot setting, we did not perform
+tained in the zero-shot setting.                                                           any extra fine-tuning on the linear layers either.
+                                                                                           Metrics. In VAND Challenge, for both classification and
+3. Experiments                                                                             segmentation, the evaluation metric is the F1-max score,
+                                                                                           i.e., F1 score at the optimal threshold. For each category,
+3.1. Setup
+                                                                                           the harmonic mean between the classification F1-max and
+Datasets. The organizers of the VAND Challenge utilize a                                   segmentation F1-max are chosen as the summary metric.
+modified VisA [19] dataset to evaluate the effectiveness of                                The final metric to compare different models is the arith-
+different models, and we refer to this dataset as the VAND                                 metic mean over all categories. For the standard MVTec
+test set. 1) In the zero-shot track, according to the chal-                                AD and VisA dataset, we additionally employ the Area Un-
+lenge regulations, models can be trained and pre-trained on                                der the Receiver Operating Curve (AUROC), Average Pre-
+any permitted datasets, except for the train and test sets                                 cision (AP) and per-region-overlap (PRO) as the evaluation
+
+
+                                                                                      3
+image
+
+
+
+
+zero-shot
+
+
+
+
+1-shot
+
+
+
+
+5-shot
+
+
+
+
+10-shot
+
+
+
+ Figure 2. Results visualizations on zero-/few-shot settings. The first row shows the original image, the second row displays the zero-shot
+ results, and the third to fifth rows present the results for 1-shot, 5-shot, and 10-shot, respectively.
+
+
+ Table 1. Quantitative results of the top five participating teams on       Table 2. Quantitative results of the top five participating teams on
+ the zero-shot track leaderboard of the VAND 2023 Challenge.                the few-shot track leaderboard of the VAND 2023 Challenge.
+
+  Team Name                  F1-max F1-max-segm F1-max-cls Rank             Team Name                   F1-max F1-max-segm F1-max-cls Rank
+  AaxJIjQ                     0.2788    0.2019       0.7742      5          VAND-Organizer (WinCLIP) 0.5323        0.4118       0.8114      5
+  MediaBrain                  0.2880    0.1866       0.7945      4          PatchCore+               0.5742        0.4542       0.8423      3
+  Variance Vigilance Vanguard 0.3217    0.2197       0.7928      3          MediaBrain               0.5763        0.4515       0.8480      2
+  SegmentAnyAnomaly           0.3956    0.2942       0.7517      2          Scortex                  0.5909        0.4706       0.8399      1
+  APRIL-GAN (Ours)           0.4589     0.3431       0.7782      1          APRIL-GAN (Ours)            0.5629     0.4264       0.8687      4
+
+ metrics. The AUROC and AP metrics can be used for both                     only need to train for 3 epochs with a batch size of 16 on
+ classification and segmentation, while PRO is specifically                 a single GPU (NVIDIA GeForce RTX 3090). For the stan-
+ applicable to the segmentation evaluation.                                 dard VisA dataset, we employ the same training strategies.
+ Backbone for feature extraction. By default, we use the                    However, for the MVTec AD dataset, the training epochs is
+ CLIP model with ViT-L/14 and the image resolution is 336.                  set to 15, while keeping the other strategies unchanged.
+ It consists of a total of 24 layers, which we arbitrarily divide
+ into 4 stages, with each stage containing 6 layers. There-                 3.2. Qualitative results for VAND
+ fore, we require four additional linear layers to map the                      We provide qualitative results for both the zero-/few-shot
+ image features from the four stages to the joint embedding                 tracks. As shown in the second row of Fig. 2, in the zero-
+ space. In the few-shot track, we separately store the features             shot setting, thanks to the newly introduced linear layers,
+ of reference images from these four stages.                                our method is capable of detecting anomalies with relatively
+ Training. We utilize a resolution of 518 × 518 for the im-                 high accuracy. Particularly for categories such as the can-
+ ages, incorporating a proposed data augmentation approach.                 dle, chewing gum, and pipe fryum, our model not only accu-
+ Specifically, we concatenate four images of the same cate-                 rately localizes anomalies, but also has minimal false detec-
+ gory from the MVTec AD dataset with a 20% probability                      tions in the background. However, when it comes to more
+ to create a new composite image. This is because the VisA                  complex categories like macaroni and PCBs, our model,
+ dataset contains many instances where a single image in-                   while able to pinpoint the exact locations of anomalies,
+ cludes multiple objects of the same category, which is not                 sometimes misclassifies certain normal regions as anoma-
+ present in the MVTec AD. We employ the Adam optimizer                      lies. For instance, some normal components on the PCBs
+ with a fixed learning rate of 1e−3 . Our training process is               are also identified as anomalies. This could be inevitable
+ highly efficient. To enable the model to recognize both nor-               since, in the zero-shot setting, the model lacks prior knowl-
+ mal and abnormal objects while preventing overfitting, we                  edge of the specific components and their expected posi-
+
+
+                                                                        4
+Figure 3. Visualization results on the MVTec AD [2] dataset under       Figure 4. Visualization results on the VisA [19] dataset under the
+the zero-shot setting.                                                  zero-shot setting.
+
+tions, making it challenging to accurately determine what               definition of the PRO metric. PRO essentially calculates
+should be considered abnormal. Reference images are nec-                the proportion of pixels successfully detected as anoma-
+essary in these cases.                                                  lies within each connected component of anomalies. When
+    As illustrated in the last three rows of Fig. 2, for simple         the identified anomaly regions can completely cover the
+categories, our method can effectively maintain the perfor-             ground truth, or even exceed it, the PRO metric tends to be
+mance achieved in the zero-shot setting and achieve precise             high. However, if the identified anomaly region is relatively
+anomaly localization in the few-shot setting. For complex               small, even if its position is correct, the PRO metric may be
+categories, our method, when combined with reference im-                lower. As shown in Fig. 3, our method tends to identify a
+ages, significantly reduces false detection rates. For exam-            precise anomaly region, which is often slightly smaller than
+ple, in the case of macaroni in the 7th column, the extent of           the ground truth, despite being in the correct location. This
+the anomalous region is narrowed down. Similarly, for PCB               could be attributed to training the linear layers on the VisA
+in the 10th column, the anomaly scores for normal compo-                dataset, as compared to the MVTec AD dataset, anomalies
+nents are greatly reduced.                                              in VisA tend to be smaller in size. As to anomaly classifi-
+                                                                        cation, our method slightly lags behind WinCLIP.
+3.3. Quantitative results for VAND                                          In the few-shot setting, our method achieves slightly
+   Due to the unavailability of the ground-truth anomaly                lower results compared to WinCLIP on most metrics, but
+maps for the VAND test set, we present the top 5 results                significantly outperforms other comparison methods. Fur-
+from the leaderboard for both tracks.                                   thermore, in contrast to the zero-shot setting, our PRO met-
+Zero-shot setting. As shown in the Tab. 1, our method                   ric surpasses that of WinCLIP, which can be attributed to
+achieved F1 scores of 0.3431 for anomaly segmentation                   the design of our multiple memory banks.
+and 0.7782 for anomaly classification in the zero-shot track,               Additionally, the detailed results for each category in
+ranking first overall. Specifically, our method ranked first in         the MVTec AD dataset under the zero-shot, 1-shot, 2-shot,
+the anomaly segmentation and fifth in the anomaly classifi-             and 4-shot settings are recorded in Tab. 5, Tab. 6, Tab. 7
+cation individually. Notebaly, our method significantly out-            and Tab. 8, respectively.
+performs the second-ranked team in terms of segmentation,
+with a large margin of 0.0489.
+                                                                        3.5. Quantitative and qualitative results for VisA
+Few-shot setting. As to the few-shot track, although we                     Tab. 4 presents the comparative results of our method
+only ranked fourth in the Tab. 2, it is notable that we                 and other approaches on the VisA dataset. In the zero-shot
+ranked first in the anomaly classification with an F1 score of          setting, our method significantly outperforms WinCLIP [8]
+0.8687. This score also considerably surpasses the second-              in metrics AUROC-segm (14.6↑), F1-max-segm (17.5↑),
+ranked team, exceeding them by 0.0207.                                  and PRO-segm (30↑). The visualization results are pre-
+                                                                        sented in Fig. 4. In this section, we trained on the MVTec
+3.4. Quantitative and qualitative results for MVTec
+                                                                        AD dataset and tested on the VisA dataset. As the anoma-
+    Tab. 3 presents the comparative results of our method               lies in MVTec AD tend to be larger overall, the detected
+and other approaches on the MVTec AD dataset. In the                    anomaly regions on VisA also tend to be slightly larger
+zero-shot setting, our method outperforms WinCLIP [8] by                than the ground truth, resulting in higher PRO scores. This
+a large margin in terms of AUROC-segm (2.5↑) and F1-                    is consistent with the discussion in Sec. 3.4. Although it
+max-segm (11.6↑) metrics, but it achieves a lower PRO met-              slightly lags behind in anomaly classification, the difference
+ric. We believe that this phenomenon may be related to the              is minimal, and in fact, our method even achieves a slightly
+
+
+                                                                    5
+Table 3. Quantitative comparisons on the MVTec AD [2] dataset. We report the mean and standard deviation over 5 random seeds for each
+measurement. Bold indicates the best performance, while underline denotes the second-best result.
+
+    Setting        Method        AUROC-segm F1-max-segm     AP-segm        PRO-segm      AUROC-cls     F1-max-cls       AP-cls
+                WinCLIP [8]         85.1        31.7           -              64.6          91.8           92.9          96.5
+    zero-shot
+                   Ours             87.6        43.3          40.8            44.0          86.1           90.4          93.5
+                  SPADE [4]       92.0±0.3    44.5±1.0          -           85.7±0.7      82.9±2.6      91.1±1.0       91.7±1.2
+                  PaDiM [5]       91.3±0.7    43.7±1.5          -           78.2±1.8      78.9±3.1      89.2±1.1       89.3±1.7
+    1-shot      PatchCore [14]    93.3±0.6    53.0±1.7          -           82.3±1.3      86.3±3.3      92.0±1.5       93.8±1.7
+                 WinCLIP [8]      95.2±0.5    55.9±2.7          -           87.1±1.2      93.1±2.0      93.7±1.1       96.5±0.9
+                     Ours         95.1±0.1    54.2±0.0      51.8±0.1        90.6±0.2      92.0±0.3      92.4±0.2       95.8±0.2
+                  SPADE [4]       91.2±0.4    42.4±1.0          -           83.9±0.7      81.0±2.0      90.3±0.8       90.6±0.8
+                  PaDiM [5]       89.3±0.9    40.2±2.1          -           73.3±2.0      76.6±3.1      88.2±1.1       88.1±1.7
+    2-shot      PatchCore [14]    92.0±1.0    50.4±2.1          -           79.7±2.0      83.4±3.0      90.5±1.5       92.2±1.5
+                 WinCLIP [8]      96.0±0.3    58.4±1.7          -           88.4±0.9      94.4±1.3      94.4±0.8       97.0±0.7
+                     Ours         95.5±0.0    55.9±0.5      53.4±0.4        91.3±0.1      92.4±0.3      92.6±0.1       96.0±0.2
+                  SPADE [4]       92.7±0.3    46.2±1.3          -           87.0±0.5      84.8±2.5      91.5±0.9       92.5±1.2
+                  PaDiM [5]       92.6±0.7    46.1±1.8          -           81.3±1.9      80.4±2.5      90.2±1.2       90.5±1.6
+    4-shot      PatchCore [14]    94.3±0.5    55.0±1.9          -           84.3±1.6      88.8±2.6      92.6±1.6       94.5±1.5
+                 WinCLIP [8]      96.2±0.3    59.5±1.8          -           89.0±0.8      95.2±1.3      94.7±0.8       97.3±0.6
+                     Ours         95.9±0.0    56.9±0.1      54.5±0.2        91.8±0.1      92.8±0.2      92.8±0.1       96.3±0.1
+
+
+Table 4. Quantitative comparisons on the VisA [19] dataset. We report the mean and standard deviation over 5 random seeds for each
+measurement. Bold indicates the best performance, while underline denotes the second-best result.
+
+    Setting        Method        AUROC-segm F1-max-segm     AP-segm        PRO-segm      AUROC-cls     F1-max-cls       AP-cls
+                WinCLIP [8]         79.6        14.8           -              56.8          78.1           79.0          81.2
+    zero-shot
+                   Ours             94.2        32.3          25.7            86.8          78.0           78.7          81.4
+                  SPADE [4]       95.6±0.4    35.5±2.2          -           84.1±1.6      79.5±4.0      80.7±1.9       82.0±3.3
+                  PaDiM [5]       89.9±0.8    17.4±1.7          -           64.3±2.4      62.8±5.4      75.3±1.2       68.3±4.0
+    1-shot      PatchCore [14]    95.4±0.6    38.0±1.9          -           80.5±2.5      79.9±2.9      81.7±1.6       82.8±2.3
+                 WinCLIP [8]      96.4±0.4    41.3±2.3          -           85.1±2.1      83.8±4.0      83.1±1.7       85.1±4.0
+                     Ours         96.0±0.0    38.5±0.3      30.9±0.3        90.0±0.1      91.2±0.8      86.9±0.6       93.3±0.8
+                  SPADE [4]       96.2±0.4    40.5±3.7          -           85.7±1.1      80.7±5.0      81.7±2.5       82.3±4.3
+                  PaDiM [5]       92.0±0.7    21.1±2.4          -           70.1±2.6      67.4±5.1      75.7±1.8       71.6±3.8
+    2-shot      PatchCore [14]    96.1±0.5    41.0±3.9          -           82.6±2.3      81.6±4.0      82.5±1.8       84.8±3.2
+                 WinCLIP [8]      96.8±0.3    43.5±3.3          -           86.2±1.4      84.6±2.4      83.0±1.4       85.8±2.7
+                     Ours         96.2±0.0    39.3±0.2      31.6±0.3        90.1±0.1      92.2±0.3      87.7±0.3       94.2±0.3
+                  SPADE [4]       96.6±0.3    43.6±3.6          -           87.3±0.8      81.7±3.4      82.1±2.1       83.4±2.7
+                  PaDiM [5]       93.2±0.5    24.6±1.8          -           72.6±1.9      72.8±2.9      78.0±1.2       75.6±2.2
+    4-shot      PatchCore [14]    96.8±0.3    43.9±3.1          -           84.9±1.4      85.3±2.1      84.3±1.3       87.5±2.1
+                 WinCLIP [8]      97.2±0.2    47.0±3.0          -           87.6±0.9      87.3±1.8      84.2±1.6       88.8±1.8
+                     Ours         96.2±0.0    40.0±0.1      32.2±0.1        90.2±0.1      92.6±0.4      88.4±0.5       94.5±0.3
+
+
+
+higher AP metric compared to WinCLIP.                                  4. Conclusion
+    In the few-shot setting, our method falls slightly behind
+WinCLIP in terms of anomaly segmentation, but achieves                     In reality, due to the diverse range of industrial products,
+a higher PRO metric. It is worth noting that our method                it is not feasible to collect a large number of training images
+significantly outperforms WinCLIP and other methods in                 or train specialized models for each category. Thus, design-
+all metrics related to anomaly classification.                         ing joint models for zero/few-shot settings is a promising re-
+                                                                       search direction. We made slight modifications to the CLIP
+   Additionally, the detailed results for each category in the         model by adding extra linear layers, enabling it to perform
+VisA dataset under the zero-shot, 1-shot, 2-shot, and 4-shot           zero-shot segmentation while still being capable of zero-
+settings are recorded in Tab. 9, Tab. 10, Tab. 11 and Tab. 12,         shot classification. Moreover, we further improved the per-
+respectively.                                                          formance by incorporating memory banks along with a few
+
+
+                                                                 6
+reference images. Our approach achieved first place in the               [11] Fausto Milletari, Nassir Navab, and Seyed-Ahmad Ahmadi.
+zero-shot track and fourth place in the few-shot track of the                 V-net: Fully convolutional neural networks for volumetric
+VAND Challenge.                                                               medical image segmentation. In 2016 fourth international
+Acknowledgments. This work is support by the Youtu                            conference on 3D vision (3DV), pages 565–571. Ieee, 2016.
+Lab, Tencent, and we appreciate the constructive advice and                   2
+guidance provided by Yabiao Wang (Researcher in Youtu                    [12] Pankaj Mishra, Riccardo Verk, Daniele Fornasier, Claudio
+                                                                              Piciarelli, and Gian Luca Foresti. Vt-adl: A vision trans-
+Lab, Tencent), Chengjie Wang (Researcher in Youtu Lab,
+                                                                              former network for image anomaly detection and localiza-
+Tencent), and Yong Liu (Prof. in APRIL Lab, Zhejiang                          tion. In 2021 IEEE 30th International Symposium on Indus-
+University).                                                                  trial Electronics (ISIE), pages 01–06. IEEE, 2021. 1
+                                                                         [13] Alec Radford, Jong Wook Kim, Chris Hallacy, Aditya
+References                                                                    Ramesh, Gabriel Goh, Sandhini Agarwal, Girish Sastry,
+ [1] Paul Bergmann, Kilian Batzner, Michael Fauser, David Sat-                Amanda Askell, Pamela Mishkin, Jack Clark, et al. Learning
+     tlegger, and Carsten Steger. Beyond dents and scratches:                 transferable visual models from natural language supervi-
+     Logical constraints in unsupervised anomaly detection and                sion. In International conference on machine learning, pages
+     localization. International Journal of Computer Vision,                  8748–8763. PMLR, 2021. 1, 2
+     130(4):947–969, 2022. 1                                             [14] Karsten Roth, Latha Pemula, Joaquin Zepeda, Bernhard
+ [2] Paul Bergmann, Michael Fauser, David Sattlegger, and                     Schölkopf, Thomas Brox, and Peter Gehler. Towards to-
+     Carsten Steger. Mvtec ad–a comprehensive real-world                      tal recall in industrial anomaly detection. In Proceedings of
+     dataset for unsupervised anomaly detection. In CVPR, pages               the IEEE/CVF Conference on Computer Vision and Pattern
+     9592–9600, 2019. 1, 3, 5, 6, 8, 9                                        Recognition, pages 14318–14328, 2022. 1, 2, 6
+ [3] Mehdi Cherti, Romain Beaumont, Ross Wightman, Mitchell              [15] Mohammadreza Salehi, Niousha Sadjadi, Soroosh
+     Wortsman, Gabriel Ilharco, Cade Gordon, Christoph Schuh-                 Baselizadeh, Mohammad H Rohban, and Hamid R Ra-
+     mann, Ludwig Schmidt, and Jenia Jitsev. Reproducible scal-               biee. Multiresolution knowledge distillation for anomaly
+     ing laws for contrastive language-image learning. arXiv                  detection.      In Proceedings of the IEEE/CVF confer-
+     preprint arXiv:2212.07143, 2022. 1                                       ence on computer vision and pattern recognition, pages
+                                                                              14902–14912, 2021. 1
+ [4] Niv Cohen and Yedid Hoshen. Sub-image anomaly detec-
+     tion with deep pyramid correspondences. arXiv preprint              [16] Yue Wang, Jinlong Peng, Jiangning Zhang, Ran Yi,
+     arXiv:2005.02357, 2020. 6                                                Yabiao Wang, and Chengjie Wang. Multimodal indus-
+                                                                              trial anomaly detection via hybrid fusion. arXiv preprint
+ [5] Thomas Defard, Aleksandr Setkov, Angelique Loesch, and
+                                                                              arXiv:2303.00601, 2023. 1
+     Romaric Audigier. Padim: a patch distribution modeling
+     framework for anomaly detection and localization. In Pat-           [17] Jiawei Yu, Ye Zheng, Xiang Wang, Wei Li, Yushuang Wu,
+     tern Recognition. ICPR International Workshops and Chal-                 Rui Zhao, and Liwei Wu. Fastflow: Unsupervised anomaly
+     lenges: Virtual Event, January 10–15, 2021, Proceedings,                 detection and localization via 2d normalizing flows. arXiv
+     Part IV, pages 475–489. Springer, 2021. 1, 6                             preprint arXiv:2111.07677, 2021. 1
+ [6] Jia Deng, Wei Dong, Richard Socher, Li-Jia Li, Kai Li,              [18] Vitjan Zavrtanik, Matej Kristan, and Danijel Skočaj. Draem-
+     and Li Fei-Fei. Imagenet: A large-scale hierarchical image               a discriminatively trained reconstruction embedding for sur-
+     database. In 2009 IEEE conference on computer vision and                 face anomaly detection. In Proceedings of the IEEE/CVF
+     pattern recognition, pages 248–255. Ieee, 2009. 2                        International Conference on Computer Vision, pages 8330–
+                                                                              8339, 2021. 1
+ [7] Alexey Dosovitskiy, Lucas Beyer, Alexander Kolesnikov,
+     Dirk Weissenborn, Xiaohua Zhai, Thomas Unterthiner,                 [19] Yang Zou, Jongheon Jeong, Latha Pemula, Dongqing Zhang,
+     Mostafa Dehghani, Matthias Minderer, Georg Heigold, Syl-                 and Onkar Dabeer. Spot-the-difference self-supervised pre-
+     vain Gelly, et al. An image is worth 16x16 words: Trans-                 training for anomaly detection and segmentation. In Com-
+     formers for image recognition at scale. arXiv preprint                   puter Vision–ECCV 2022: 17th European Conference, Tel
+     arXiv:2010.11929, 2020. 2                                                Aviv, Israel, October 23–27, 2022, Proceedings, Part XXX,
+                                                                              pages 392–408. Springer, 2022. 3, 5, 6, 9, 10
+ [8] Jongheon Jeong, Yang Zou, Taewan Kim, Dongqing Zhang,
+     Avinash Ravichandran, and Onkar Dabeer. Winclip: Zero-
+     /few-shot anomaly classification and segmentation. arXiv
+     preprint arXiv:2303.14814, 2023. 1, 2, 5, 6
+ [9] Yufei Liang, Jiangning Zhang, Shiwei Zhao, Runze Wu,
+     Yong Liu, and Shuwen Pan. Omni-frequency channel-
+     selection representations for unsupervised anomaly detec-
+     tion. arXiv preprint arXiv:2203.00259, 2022. 1
+[10] Tsung-Yi Lin, Priya Goyal, Ross Girshick, Kaiming He, and
+     Piotr Dollár. Focal loss for dense object detection. In Pro-
+     ceedings of the IEEE international conference on computer
+     vision, pages 2980–2988, 2017. 2
+
+
+                                                                     7
+                            Table 5. Quantitative results of the zero-shot setting on the MVTec AD [2] dataset.
+
+                                Object       AUROC- F1-max- AP-segm        PRO-      AUROC- F1-max-   AP-cls
+                                              segm   segm                  segm        cls    cls
+                                carpet        98.4    65.7     67.5         48.5      99.5    98.3     99.8
+                                bottle        83.4    53.4     53.0         45.6      92.0    92.8     97.7
+                                hazelnut      96.1    50.5     49.7         70.3      89.6    87.7     94.8
+                                leather       99.1    50.0     52.3         72.4      99.7    98.9     99.9
+                                cable         72.3    23.9     18.2         25.7      88.4    84.6     93.1
+                                capsule       92.0    33.1     29.7         51.3      79.9    91.6     95.5
+                                grid          95.8    40.7     36.6         31.6      86.3    89.1     94.9
+                                pill          76.2    27.7     23.6         65.4      80.5    91.6     96.0
+                                transistor    62.4    19.0     11.7         21.3      80.8    73.1     77.5
+                                metal nut     65.4    28.1     25.9         38.4      68.4    89.4    91.9
+                                screw         97.8    41.7     33.7         67.1      84.9    89.3     93.6
+                                toothbrush    95.8    48.1     43.2         54.5      53.8    83.3     71.5
+                                zipper        91.1    40.5     38.7         10.7      89.6    90.8     97.1
+                                tile          92.7    66.5     66.3         26.7      99.9    99.4    100.0
+                                wood          95.8    60.3     61.8         31.1      99.0    96.8    99.7
+                                Mean          87.6    43.3     40.8         44.0      86.1    90.4     93.5
+
+
+
+
+Table 6. Quantitative results of the 1-shot setting on the MVTec AD [2] dataset. We report the mean and standard deviation over 5 random
+seeds for each measurement.
+
+            Object       AUROC-segm F1-max-segm        AP-segm        PRO-segm          AUROC-cls     F1-max-cls    AP-cls
+            carpet        98.7±0.0       71.6±0.2      71.6±0.1           96.5±0.2       99.9±0.0      99.0±0.2    100.0±0.0
+            bottle        96.4±0.1       71.6±0.8      73.7±0.7           92.7±0.1       92.8±0.3      92.3±1.1     97.8±0.1
+            hazelnut      97.6±0.1       59.2±1.2      59.3±1.2           92.1±0.3       98.5±0.1      96.8±0.3     99.3±0.0
+            leather       99.5±0.0       51.6±0.3      55.9±0.1           99.0±0.1       99.9±0.1      99.6±0.2    100.0±0.0
+            cable         90.8±0.5       36.3±1.4      31.6±0.8           81.5±1.3       74.7±1.2      78.2±0.4     84.8±0.9
+            capsule       97.1±0.3       37.0±4.2      36.3±3.8           95.6±0.7       92.0±2.2      92.8±0.4     98.3±0.6
+            grid          96.9±0.3       47.7±1.2      41.8±0.9           90.2±0.7       99.0±0.3      98.1±0.8     99.6±0.1
+            pill          94.8±0.5       54.4±1.1      46.4±1.3           96.6±0.2       84.6±0.7      92.4±0.2     97.0±0.2
+            transistor    80.4±1.4       35.5±2.6      25.5±1.9           64.8±1.4       83.4±1.2      75.0±1.5     76.1±2.6
+            metal nut     89.6±0.9       54.1±2.0      53.1±2.0           88.2±0.8       88.5±1.2      90.6±0.6     97.4±0.3
+            screw         98.2±0.0       42.1±0.7      34.4±0.5           92.6±0.2       79.8±0.6      88.4±0.2     91.1±0.4
+            toothbrush    98.4±0.3       55.3±1.2      55.1±1.8           93.4±1.1       94.3±2.1      93.0±1.5     97.8±0.8
+            zipper        96.1±0.2       56.3±0.9      54.6±1.0           87.2±0.7       94.3±0.3      94.6±0.7     98.3±0.1
+            tile          95.4±0.2       72.0±0.5      69.4±0.5           92.3±0.3       98.9±0.1      97.4±0.3     99.6±0.0
+            wood          96.1±0.1       67.9±0.3      69.0±0.5           95.9±0.1       98.5±0.1      97.5±0.0     99.5±0.0
+            Mean          95.1±0.1       54.2±0.0      51.8±0.1           90.6±0.2       92.0±0.3      92.4±0.2    95.8±0.2
+
+
+
+
+                                                                      8
+Table 7. Quantitative results of the 2-shot setting on the MVTec AD [2] dataset. We report the mean and standard deviation over 5 random
+seeds for each measurement.
+
+            Object       AUROC-segm F1-max-segm        AP-segm           PRO-segm         AUROC-cls      F1-max-cls    AP-cls
+            carpet        98.7±0.0      71.7±0.1       71.7±0.1              96.7±0.1       99.9±0.0      99.0±0.2    100.0±0.0
+            bottle        96.9±0.1      73.3±0.7       75.6±0.6              93.6±0.2      94.0±0.4       93.2±0.4     98.2±0.1
+            hazelnut      97.7±0.1      60.6±0.3       60.8±0.7              92.5±0.2      98.7±0.1       97.1±0.4     99.4±0.1
+            leather       99.5±0.0      51.5±0.2       56.0±0.1              99.0±0.1      100.0±0.0      99.8±0.2    100.0±0.0
+            cable         91.2±0.8      38.9±0.9       33.1±0.7              82.9±0.8      74.9±1.0       78.2±0.9     85.1±0.8
+            capsule       97.1±0.3      39.2±4.9       38.2±4.5              96.0±0.9      92.1±2.1       92.9±0.5     98.4±0.5
+            grid          96.9±0.2      48.7±0.6       42.2±0.4              90.9±0.8      99.0±0.1       97.7±0.4     99.6±0.0
+            pill          95.0±0.3      55.2±0.8       47.0±0.9              96.7±0.2      84.1±0.2       92.4±0.2     96.9±0.1
+            transistor    82.5±0.5      38.5±1.5       27.9±1.0              66.5±0.6      83.8±0.7       74.8±1.8     77.5±1.7
+            metal nut     92.1±0.5      62.5±2.3       60.7±2.0              90.5±0.4       90.5±0.3      91.9±0.6     97.8±0.0
+            screw         98.3±0.1      43.2±0.4       36.2±1.1              93.1±0.6       82.0±2.2      88.8±0.3     92.4±1.4
+            toothbrush    98.5±0.2      55.6±0.7       55.9±1.3              93.8±0.5      94.8±1.3       93.3±0.5     98.0±0.5
+            zipper        96.4±0.1      59.2±0.7       57.2±0.6              88.7±0.5      94.7±0.5       94.7±0.5     98.4±0.2
+            tile          95.8±0.1      72.3±0.2       69.9±0.3              92.3±0.3      99.0±0.1       97.7±0.0     99.6±0.0
+            wood          96.1±0.1      67.7±0.3       68.8±0.3              96.0±0.1      98.7±0.3       97.5±0.0     99.6±0.1
+            Mean          95.5±0.0      55.9±0.5       53.4±0.4              91.3±0.1      92.4±0.3       92.6±0.1    96.0±0.2
+
+Table 8. Quantitative results of the 4-shot setting on the MVTec AD [2] dataset. We report the mean and standard deviation over 5 random
+seeds for each measurement.
+
+            Object       AUROC-segm F1-max-segm        AP-segm           PRO-segm         AUROC-cls      F1-max-cls    AP-cls
+            carpet        98.7±0.0      71.8±0.1       71.8±0.1              96.6±0.2       99.9±0.0      99.0±0.2    100.0±0.0
+            bottle        97.2±0.1      74.1±0.6       76.5±0.5              94.3±0.3      94.2±0.2       93.3±0.4     98.3±0.0
+            hazelnut      97.7±0.1      60.5±0.4       60.7±0.5              92.6±0.2      98.8±0.1       97.1±0.4     99.4±0.1
+            leather       99.5±0.0      51.5±0.1       55.9±0.1              98.9±0.1      100.0±0.0      99.9±0.2    100.0±0.0
+            cable         91.8±0.7      41.2±0.7       34.5±0.5              84.0±0.8      76.7±0.8       79.0±0.5     86.5±0.5
+            capsule       97.5±0.2      42.2±0.6       41.0±0.5              96.6±0.3      93.5±0.8       93.3±0.6     98.7±0.2
+            grid          97.6±0.3      49.0±0.9       43.4±1.0              92.0±0.8      99.2±0.2       98.1±0.3     99.7±0.1
+            pill          95.5±0.2      56.3±0.2       48.2±0.5              96.7±0.1      84.1±0.9       92.3±0.1     96.9±0.2
+            transistor    83.7±1.0      40.0±2.2       29.2±1.8              67.7±1.4      84.1±1.0       74.4±0.5     78.1±1.5
+            metal nut     93.1±0.7      66.7±3.0       64.2±2.4              91.7±0.7       91.0±0.4      92.2±0.6     97.9±0.1
+            screw         98.5±0.2      43.7±1.2       37.7±2.2              93.7±0.3       83.7±2.3      89.5±0.7     93.2±1.7
+            toothbrush    98.8±0.1      55.7±0.8       56.8±1.0              94.8±0.9      93.2±0.7       92.6±0.6     97.3±0.3
+            zipper        96.6±0.1      60.2±1.0       58.2±0.9              89.2±0.5      95.4±0.4       95.7±0.8     98.6±0.1
+            tile          96.0±0.1      72.5±0.2       70.2±0.2              92.4±0.2      99.1±0.0       97.8±0.2     99.6±0.0
+            wood          96.2±0.0      67.7±0.2       69.0±0.2              96.1±0.2      98.7±0.2       97.5±0.0     99.6±0.1
+            Mean          95.9±0.0      56.9±0.1       54.5±0.2              91.8±0.1      92.8±0.2       92.8±0.1    96.3±0.1
+
+                              Table 9. Quantitative results of the zero-shot setting on the VisA [19] dataset.
+
+                               Object       AUROC- F1-max- AP-segm             PRO-     AUROC- F1-max-    AP-cls
+                                             segm   segm                       segm       cls    cls
+                               candle        97.8      39.4       29.9          92.5     83.8     77.8     86.9
+                               capsules      97.5      48.5       40.0          86.7     61.2     77.6     74.3
+                               cashew        86.0      22.9       15.1          91.7     87.3     84.8     94.1
+                               chewinggum    99.5      78.5       83.6          87.3     96.4     93.7     98.4
+                               fryum         92.0      29.7       22.1          89.7     94.3     91.7     97.2
+                               macaroni1     98.8      35.5       24.8          93.2     71.6     71.1     70.9
+                               macaroni2     97.8      13.7        6.8          82.3     64.6     69.1     63.2
+                               pcb1          92.7      12.5        8.4          87.5     53.4     66.9     57.2
+                               pcb2          89.7      23.4       15.4          75.6     71.8     70.1     73.8
+                               pcb3          88.4      21.7       14.1          77.8     66.8     66.7     70.7
+                               pcb4          94.6      31.3       24.9          86.8     95.0     87.3     95.1
+                               pipe fryum    96.0      30.4       23.6          90.9     89.9     87.7     94.8
+                               Mean          94.2      32.3       25.7          86.8     78.0     78.7     81.4
+
+
+
+                                                                         9
+Table 10. Quantitative results of the 1-shot setting on the VisA [19] dataset. We report the mean and standard deviation over 5 random
+seeds for each measurement.
+
+           Object       AUROC-segm F1-max-segm        AP-segm       PRO-segm     AUROC-cls      F1-max-cls      AP-cls
+           candle        98.7±0.1       42.4±0.3      29.7±1.4        96.4±0.2     90.9±0.5      84.3±0.9      91.6±0.7
+           capsules      98.0±0.0       51.8±0.2      45.3±0.4        88.4±0.1     92.7±1.0      90.2±1.0      95.8±0.7
+           cashew        90.8±0.1       30.9±0.5      23.1±0.5        94.2±0.2     93.4±1.0      90.7±0.9      97.1±0.5
+           chewinggum    99.7±0.0       78.8±0.3      82.2±0.5        92.1±0.2     97.3±0.1      97.1±0.4      99.0±0.0
+           fryum         93.6±0.1       33.5±0.2      25.9±0.2        91.5±0.3     93.4±0.7      91.9±0.8      97.3±0.3
+           macaroni1     99.3±0.0       37.2±0.2      26.5±0.5        95.3±0.1     89.7±0.6      82.5±0.8      92.0±0.4
+           macaroni2     98.4±0.1       22.5±1.9      11.5±1.2        85.6±0.7     79.2±3.8      72.9±2.2      83.4±3.2
+           pcb1          95.3±0.1       20.6±1.6      15.8±0.8        90.4±0.6     89.0±7.3      81.6±6.0      90.2±5.5
+           pcb2          92.5±0.1       31.5±0.9      20.5±1.4        79.2±0.3     85.4±6.5      79.8±3.5      87.1±7.8
+           pcb3          93.2±0.0       38.5±1.1      28.1±1.7        81.3±0.2     87.8±1.2      82.0±1.3      89.4±1.2
+           pcb4          95.8±0.1       37.6±0.9      32.6±1.3        89.3±0.3     97.5±0.3      93.7±0.7      97.0±0.5
+           pipe fryum    97.3±0.0       36.6±0.3      29.6±0.5        96.1±0.1     98.3±0.4      96.3±0.6      99.2±0.2
+           Mean          96.0±0.0       38.5±0.3      30.9±0.3        90.0±0.1     91.2±0.8      86.9±0.6      93.3±0.8
+
+
+
+
+Table 11. Quantitative results of the 2-shot setting on the VisA [19] dataset. We report the mean and standard deviation over 5 random
+seeds for each measurement.
+
+           Object       AUROC-segm F1-max-segm        AP-segm       PRO-segm     AUROC-cls      F1-max-cls      AP-cls
+           candle        98.6±0.1       42.4±0.3      29.5±1.6        96.5±0.2     91.3±0.5      84.3±0.4      91.9±0.6
+           capsules      98.0±0.0       52.2±0.2      45.7±0.3        89.1±0.3     93.4±0.3      90.4±0.7      96.3±0.2
+           cashew        90.8±0.1       31.4±0.4      23.4±0.5        94.1±0.2     93.4±0.6      91.6±0.5      97.2±0.3
+           chewinggum    99.7±0.0       78.8±0.3      82.4±0.3        92.1±0.3     97.1±0.1      96.9±0.4      98.9±0.0
+           fryum         93.6±0.0       34.0±0.1      26.3±0.1        91.6±0.1     93.1±0.4      91.5±0.7      97.2±0.1
+           macaroni1     99.3±0.0       37.0±0.4      26.3±0.7        95.2±0.1     90.0±0.4      82.5±0.4      92.1±0.2
+           macaroni2     98.4±0.0       24.2±0.8      12.3±0.6        85.4±0.2     81.0±1.0      74.1±1.1      85.1±0.9
+           pcb1          95.8±0.2       24.2±3.2      18.9±2.4        90.6±0.2     90.9±1.3      83.8±0.8      91.6±0.9
+           pcb2          92.8±0.1       32.6±0.4      21.6±0.3        79.7±0.3     89.2±1.5      83.3±1.7      91.3±1.2
+           pcb3          93.5±0.0       40.5±0.8      30.6±1.0        81.5±0.5     90.9±0.8      84.5±1.2      92.2±0.7
+           pcb4          95.9±0.1       38.3±0.5      33.0±0.8        89.5±0.3     97.9±0.5      93.1±1.1      97.8±0.6
+           pipe fryum    97.3±0.0       36.8±0.2      29.8±0.3        96.1±0.3     98.4±0.2      96.2±0.6      99.3±0.1
+           Mean          96.2±0.0       39.3±0.2      31.6±0.3        90.1±0.1     92.2±0.3      87.7±0.3      94.2±0.3
+
+
+
+
+Table 12. Quantitative results of the 4-shot setting on the VisA [19] dataset. We report the mean and standard deviation over 5 random
+seeds for each measurement.
+
+           Object       AUROC-segm F1-max-segm        AP-segm       PRO-segm     AUROC-cls      F1-max-cls      AP-cls
+           candle        98.7±0.0       42.4±0.2      29.6±1.0        96.3±0.1     91.4±0.5      85.1±0.5      92.0±0.6
+           capsules      98.1±0.0       52.4±0.3      46.0±0.5        89.0±0.4     93.7±0.1      90.6±0.4      96.5±0.1
+           cashew        90.8±0.1       31.6±0.3      23.7±0.3        94.1±0.2     94.3±0.3      92.2±0.5      97.6±0.2
+           chewinggum    99.7±0.0       78.8±0.3      82.0±0.2        92.2±0.3     97.2±0.2      97.2±0.2      99.0±0.0
+           fryum         93.7±0.0       34.2±0.0      26.4±0.0        91.5±0.1     93.5±0.5      92.3±1.2      97.4±0.2
+           macaroni1     99.3±0.0       37.3±0.4      27.2±0.5        95.2±0.1     90.1±0.4      82.7±0.7      92.4±0.3
+           macaroni2     98.4±0.0       24.6±0.4      12.5±0.4        85.8±0.2     82.5±0.5      76.2±0.8      86.3±0.3
+           pcb1          96.0±0.0       27.7±1.1      21.7±0.7        90.6±0.1     91.2±1.5      85.2±1.8      91.8±1.0
+           pcb2          93.0±0.1       32.4±0.6      21.8±0.4        80.2±0.3     89.2±0.7      82.6±1.7      91.3±0.7
+           pcb3          93.7±0.1       41.9±0.4      31.4±0.6        81.5±0.3     91.6±0.4      85.7±0.7      92.7±0.3
+           pcb4          96.0±0.0       39.2±0.3      34.1±0.3        89.7±0.1     98.2±0.3      94.1±0.3      98.0±0.3
+           pipe fryum    97.4±0.0       36.8±0.3      30.0±0.3        95.9±0.2     98.5±0.4      96.8±0.7      99.4±0.2
+           Mean          96.2±0.0       40.0±0.1      32.2±0.1        90.2±0.1     92.6±0.4      88.4±0.5      94.5±0.3
+
+
+
+
+                                                                 10
+

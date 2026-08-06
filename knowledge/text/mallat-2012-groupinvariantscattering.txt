@@ -1,0 +1,3689 @@
+                                                               Group Invariant Scattering
+
+
+
+
+arXiv:1101.2286v3 [math.FA] 15 Apr 2012
+                                                                     Stéphane Mallat
+                                                        CMAP, Ecole Polytechnique, Palaiseau, France
+                                                             IHES, Bures-sur-Yvette, France ∗
+
+
+
+
+                                                                                  Abstract
+                                                        This paper constructs translation invariant operators on L2 (Rd ),
+                                                    which are Lipschitz continuous to the action of diffeomorphisms. A
+                                                    scattering propagator is a path ordered product of non-linear and
+                                                    non-commuting operators, each of which computes the modulus of a
+                                                    wavelet transform. A local integration defines a windowed scattering
+                                                    transform, which is proved to be Lipschitz continuous to the action of
+                                                    C2 diffeomorphisms. As the window size increases, it converges to a
+                                                    wavelet scattering transform which is translation invariant. Scattering
+                                                    coefficients also provide representations of stationary processes. Ex-
+                                                    pected values depend upon high order moments and can discriminate
+                                                    processes having the same power spectrum. Scattering operators are
+                                                    extended on L2 (G), where G is a compact Lie group, and are invari-
+                                                    ant under the action of G. Combining a scattering on L2 (Rd ) and on
+                                                    L2 (SO(d)) defines a translation and rotation invariant scattering on
+                                                    L2 (Rd ).
+
+
+                                          1         Introduction
+                                          Symmetry and invariants, which play a major role in physics [6], are mak-
+                                          ing their way into signal information processing. The information content of
+                                          sounds or images is typically not affected under the action of finite groups
+                                              ∗
+                                                  This work was supported by the ANR-10-BLAN-0126 grant.
+
+
+
+                                                                                      1
+such as translations or rotations, and it is stable to the action of small diffeo-
+morphisms that deform signals [21]. This motivates the study of translation-
+invariant representations of L2 (Rd ) functions, which are Lipschitz continuous
+to the action of diffeomorphisms, and which keep high-frequency information
+to discriminate different types signals. Invariance to the action of compact
+Lie groups and rotations are then studied.
+    We first concentrate on translation invariance. Let Lc f (x) = f (x − c)
+denote the translation of f ∈ L2 (Rd ) by c ∈ Rd . An operator Φ from L2 (Rd )
+to a Hilbert space H is translation-invariant if Φ(Lc f ) = Φ(f ) for all f ∈
+L2 (Rd ) and c ∈ Rd . Canonical translation invariant operators satisfy Φ(f ) =
+La f for some a ∈ Rd which depends upon f [15]. The modulus of the Fourier
+transform of f is an example of non-canonical translation invariant operator.
+However, these translation invariant operators are not Lipschitz continuous
+to the action of diffeomorphisms. Instabilities to deformations are well-known
+to appear at high frequencies [10]. The major difficulty is to maintain the
+Lipschitz continuity over high frequencies.
+    To preserve stability in L2 (Rd ) we want Φ to be nonexpansive:
+
+               ∀(f, h) ∈ L2 (Rd )2 , kΦ(f ) − Φ(h)kH ≤ kf − hk.
+
+It is then sufficient to verify its Lipschitz continuity relatively to the action
+of small diffeomorphisms close to translations. Such a diffeomorphism trans-
+forms x ∈ Rd into x − τ (x), where τ (x) ∈ Rd is the displacement field. Let
+Lτ f (x) = f (x − τ (x)) denote the action of the diffeomorphism 1 − τ on f .
+Lipschitz stability means that kΦ(f ) − Φ(Lτ f )k is bounded by the “size” of
+the diffeomorphism and hence by the distance between the 1 −τ and 1, up to
+a multiplicative constant multiplied by kf k. Let |τ (x)| denote the Euclidean
+norm in Rd , |∇τ (x)| the sup norm of the matrix ∇τ (x), and |Hτ (x)| the
+sup norm of the Hessian tensor. The weak topology on C2 diffeomorphisms
+defines a distance between 1 − τ and 1, over any compact subset Ω of Rd ,
+by:
+            dΩ (1, 1 − τ ) = sup |τ (x)| + sup |∇τ (x)| + sup |Hτ (x)|.       (1)
+                            x∈Ω             x∈Ω          x∈Ω
+
+A translation invariant operator Φ is said to be Lipschitz continuous to the
+action of C2 diffeomorphisms if for any compact Ω ⊂ Rd there exists C such
+that for all f ∈ L2 (Rd ) supported in Ω and all τ ∈ C2 (Rd )
+                                                                
+         kΦ(f ) − Φ(Lτ f )kH ≤ C kf k sup |∇τ (x)| + sup |Hτ (x)| .      (2)
+                                        x∈Rd            x∈Rd
+
+
+                                        2
+Since Φ is translation invariant, the Lipschitz upper bound does not depend
+upon the maximum translation amplitude supx |τ (x)| of the diffeomorphism
+metric (1). The Lipschitz continuity (2) implies that Φ is invariant to global
+translations, but it is much stronger. Φ is almost invariant to “local transla-
+tions” by τ (x), up to the first and second order deformation terms.
+    High frequency instabilities to deformations can be avoided by grouping
+frequencies into dyadic packets in Rd , with a wavelet transform. However, a
+wavelet transform is not translation invariant. A translation invariant oper-
+ator is constructed with a scattering procedure along multiple paths, which
+preserves the Lipschitz stability of wavelets to the action of diffeomorphisms.
+A scattering propagator is first defined as a path ordered product of non-
+linear and non-commuting operators, each of which computes the modulus of
+a wavelet transform [13]. This cascade of convolutions and modulus can also
+be interpreted as a convolutional neural-network [11]. A windowed scattering
+transform is a nonexpansive operator which locally integrates the scattering
+propagator output. For appropriate wavelets, the main theorem in Section
+2 prove that a windowed scattering preserves the norm: kΦ(f )kH = kf k for
+all f ∈ L2 (Rd ), and it is Lipschitz continuous to C2 diffeomorphisms.
+    When the window size increases, windowed scattering transforms con-
+verge to a translation invariant scattering transform, defined on a path set
+P ∞ which is not countable. Section 3 introduces a measure µ and a metric on
+P ∞ , and proves that scattering transforms of functions in L2 (Rd ) belong to
+L2 (P ∞ , dµ). A scattering transform has striking similarities with a Fourier
+transform modulus, but a different behavior relatively to the action of dif-
+feomorphisms. Numerical examples are shown. An open conjecture remains
+on conditions for strong convergence in L2 (Rd ).
+    The representation of stationary processes with the Fourier power spec-
+trum results from the translation invariance of the Fourier modulus. Simi-
+larly, Section 4 defines an expected scattering transform which maps station-
+ary processes to an l2 space. Scattering coefficients depend upon high order
+moments of stationary processes, and can thus discriminate processes having
+same second-order moments. As opposed to the Fourier spectrum, a scat-
+tering representation is Lipschitz continuous to random deformations up to
+a log term. For large classes of ergodic processes, it is numerically observed
+that the scattering transform of a single realization provides a mean-square
+consistent estimator of the expected scattering transform.
+    Section 5 extends scattering operators to build invariants to actions of
+compact Lie groups G. The left action of g ∈ G on f ∈ L2 (G) is denoted
+
+                                      3
+Lg f (r) = f (g −1r). An operator Φ on L2 (G) is invariant to the action of
+G if Φ(Lg f ) = Φ(f ) for all f ∈ L2 (G) and all g ∈ G. Invariant scattering
+operators are constructed on L2 (G) with a scattering propagator which iter-
+ates on a wavelet transform defined on L2 (G), and a modulus operator which
+removes complex phases. A translation and rotation invariant scattering on
+L2 (Rd ) is obtained by combining a scattering on L2 (Rd ) and a scattering on
+L2 (SO(d)).
+     A software package is available at www.cmap.polytechnique.fr/scattering,
+to reproduce numerical experiments. Applications to audio and image clas-
+sification can be found in [1, 3, 4, 18].
+     Notations: kτ k∞ = supx∈Rd |τ (x)|, k∆τ k∞ = sup(x,u)∈R2d |τ (x) − τ (u)|,
+k∇τ k∞ = supx∈Rd |∇τ (x)| and kHτ k∞ = supx∈Rd |Hτ (x)| where |Hτ (x)| is
+the norm of the Hessian tensor. The inner product of (x, y) ∈R R2d is x·y. The
+norm of f in a Hilbert space is kf k and in L2 (Rd ): kf k2 = |f (x)|2 dx. The
+                             R                                 R
+norm in L1 (Rd ) is kf k1 = |f (x)| dx. We denote fˆ(ω) = f (x) e−ix·ω dω
+the Fourier transform of f . We denote g ◦ f (x) = f (gx) the action of a
+group element g ∈ G. An operator R parametrized by p is denoted R[p] and
+R[Ω] = {R[p]}p∈Ω . The sup norm of a linear operator A in L2 (Rd ) is denoted
+kAk and the commutator of two operators is [A , B] = AB − BA.
+
+
+2     Finite Path Scattering
+To avoid high frequency instabilities under the action of diffeomorphisms,
+Section 2.2 introduces scattering operators, which iteratively apply wavelet
+transforms and remove complex phases with a modulus. Section 2.3 proves
+that a scattering is nonexpansive and preserves L2 (Rd ) norms. Translation
+invariance and Lipschitz continuity to deformations are proved in Section 2.4
+and 2.5.
+
+2.1    From Fourier to Littlewood-Paley Wavelets
+The Fourier transform modulus Φ(f ) = |fˆ| is translation-invariant. Indeed
+                                                            d
+for c ∈ Rd , the translation Lc f (x) = f (x − c) satisfies Lc f (ω) = e
+                                                                        −ic.ω ˆ
+                                                                             f (ω)
+             d         ˆ
+and hence |Lc f | = |f |. However, deformations lead to well-known instabili-
+ties at high frequencies [10]. This is illustrated with a small scaling operator,
+Lτ f (x) = f (x − τ (x)) = f ((1 − s)x), for τ (x) = sx and k∇τ k∞ = |s| < 1. If
+f (x) = eiξ·x θ(x) then scaling by 1 − s translates the central frequency ξ to
+
+                                        4
+(1 − s)ξ. If θ is regular with a fast decay then
+
+                   d
+                 k|L         b
+                    τ f | − |f |k ∼ |s| |ξ| kθk = k∇τ k∞ |ξ| kf k .         (3)
+
+Since |ξ| can be arbitrarily large, Φ(f ) = |fˆ| does not satisfy the Lipschitz
+continuity condition (2) when scaling high frequencies. The frequency dis-
+placement from ξ to (1 − s) ξ has a small impact if sinusoidal waves are
+replaced by localized functions having a Fourier support which is wider at
+high frequencies. This is achieved by a wavelet transform [7, 14], whose
+properties are briefly reviewed in this section.
+    A wavelet transform is constructed by dilating a wavelet ψ ∈ L2 (Rd )
+with a scale sequence {aj }j∈Z for a > 1. For image processing, usually
+a = 2 [3, 4]. Audio processing requires a better frequency resolution with
+typically a ≤ 21/8 [1]. To simplify notations, we normalize a = 2, with no
+loss of generality. Dilated wavelets are also rotated with elements of a finite
+rotation group G, which also includes the reflection −1 with respect to 0:
+−1x = −x. If d is even then G is a subgroup of SO(d), and if d is odd then
+G is a finite subgroup of O(d). A mother wavelet ψ is dilated by 2−j and
+rotated by r ∈ G
+                            ψ2j r (x) = 2dj ψ(2j r −1 x).                   (4)
+Its Fourier transform is ψ̂2j r (ω) = ψ̂(2−j r −1 ω). A scattering transform is
+computed with wavelets that can be written
+
+              ψ(x) = eiη·x θ(x) and hence ψ̂(ω) = θ̂(ω − η) ,               (5)
+
+where θ̂(ω) is a real function concentrated in a low frequency ball centered
+at ω = 0, whose radius is of the order of π. It results that ψ̂(ω) is real
+and concentrated in a frequency ball of same radius, but centered at ω = η.
+To simplify notations we denote λ = 2j r ∈ 2Z × G, with |λ| = 2j . After
+dilation and rotation, ψ̂λ (ω) = θ̂(λ−1 ω − η) covers a ball centered at λη with
+a radius proportional to |λ| = 2j . The index λ thus specifies the frequency
+localization and spread of ψ̂λ .
+    As opposed to wavelet bases, a Littlewood-Paley wavelet transform [7, 14]
+is a redundant representation which computes convolution values at all x ∈
+Rd , without subsampling:
+                                                 Z
+                d
+         ∀x ∈ R , W [λ]f (x) = f ⋆ ψλ (x) = f (u) ψλ (x − u) du .            (6)
+
+
+                                         5
+Its Fourier transform is
+                    \
+                    W [λ]f (ω) = fˆ(ω) ψ̂λ (ω) = fˆ(ω) ψ̂(λ−1 ω) .
+
+If f is real then fˆ(−ω) = fˆ∗ (ω) and if ψ̂(ω) is real then W [−λ]f = W [λ]f ∗ .
+Let G+ denote the quotient of G with {−1 , 1}, where two rotations r and
+−r are equivalent. It is sufficient to compute W [2j r]f for “positive” rotations
+r ∈ G+ . If f is complex then W [2j r]f must be computed for all r ∈ G =
+G+ × {−1, 1}.
+    A wavelet transform at a scale 2J only keeps wavelets of frequencies
+2j > 2−J . The low frequencies which are not covered by these wavelets
+are provided by an averaging over a spatial domain proportional to 2J :
+
+                AJ f = f ⋆ φ2J with φ2J (x) = 2−dJ φ(2−J x) .                        (7)
+                                                  n                               o
+If f is real then the wavelet transform WJ f = AJ f , W [λ]f                          is
+                                                                             λ∈ΛJ
+indexed by ΛJ = {λ = 2j r : r ∈ G+ , 2j > 2−J }. Its norm is
+                                        X
+                  kWJ f k2 = kAJ f k2 +     kW [λ]f k2 .                             (8)
+                                              λ∈ΛJ
+
+                             n
+If J = ∞ then W∞ f = W [λ]f }λ∈Λ∞ with Λ∞ = 2Z × G+ . Its norm is
+          P
+kW∞ f k2 = λ∈Λ∞ kW [λ]f k2 . For complex-valued
+                                    n       functions
+                                                      fo, all rotations
+in G are included by defining WJ f = AJ f , W [λ]f λ∈Λ            and W∞ f =
+                                                             J
+n                                                         −λ∈ΛJ
+
+  W [λ]f } λ∈Λ∞ . The following proposition gives a standard Littlewood-Paley
+          −λ∈Λ∞
+condition [7] so that WJ is unitary.
+
+Proposition 2.1 For any J ∈ Z or J = ∞, WJ is unitary in the spaces of
+real-valued or complex-valued functions in L2 (Rd ) if and only if for almost
+all ω ∈ Rd
+      ∞ X
+      X                                                 0
+                                                        X X
+                    −j −1    2                   2
+  β              |ψ̂(2 r ω)| = 1 and |φ̂(ω)| = β                  |ψ̂(2−j r −1 ω)|2 ,
+      j=−∞ r∈G                                         j=−∞ r∈G
+                                                                                     (9)
+where β = 1 for complex functions and β = 1/2 for real functions.
+
+
+                                          6
+   Proof: If f is complex, β = 1 and one can verify that (9) is equivalent to
+                                     X
+              ∀J ∈ Z , |φ̂(2J ω)|2 +       |ψ̂(2−j r −1 ω)|2 = 1 .       (10)
+                                         j>−J,r∈G
+
+
+Since W\  [2j r]f (ω) = fˆ(ω) ψ̂2j r (ω), multiplying (10) by |fˆ(ω)|2, and applying
+the Plancherel formula proves that kWJ f k2 = kf k2 . For J = ∞ the same
+result is obtained by letting J go to ∞.
+    Conversely, if kWJ f k2 = kf k2 then (10) is satisfied for almost all ω.
+Otherwise, one can construct a function f 6= 0 where fˆ has a support in the
+domain of ω where (10) is not valid. With the Plancherel formula we verify
+that kWJ f k2 6= kf k2 , which contradicts the hypothesis.
+    If f is real then |fˆ(ω)| = |fˆ(−ω)| so kW [2j r]f k = kW [−2j r]f k. Hence √
+kWJ f k remains the same if r is restricted to G+ and ψ is multiplied by 2,
+which yields condition (9) with β = 1/2. 
+    In all the following, ψ̂ is a real function
+                                           R        which satisfies the unitary con-
+dition (9). It implies that ψ̂(0) = ψ(x) dx = 0 and |φ̂(rω)| = |φ̂(ω)| for
+all r ∈ G. We choose φ̂(ω) to be real and symmetric so that φ is also real
+and symmetric and φ(rx) = φ(x) for all r ∈ G. We also suppose that φ and
+ψ are twice differentiable and that their decay as well as the decay of their
+partial derivatives of order 1 and 2 is O((1 + |x|)−d−2 ).
+    A change of variable in the wavelet transform integral shows that if f is
+scaled and rotated, 2l g ◦ f = f (2l gx) with 2l g ∈ 2Z × G, then the wavelet
+transform is scaled and rotated according to:
+
+                         W [λ](2l g ◦ f ) = 2l g ◦ W [2−l gλ]f .                  (11)
+
+Since φ is invariant to rotations in G we verify that AJ commutes with
+rotations in G: AJ (g ◦ f ) = g ◦ AJ f for all g ∈ G.
+   In dimension d = 1, G = {−1, 1}. According to (5), to build a complex
+wavelet ψ concentrated on a single frequency band, we set ψ̂(ω) = 0 for
+ω < 0. Following (9), WJ is unitary if and only if
+
+              X                                          0
+                                                         X
+                        −j    2                  2
+          β         |ψ̂(2 |ω|)| = 1 and |φ̂(ω)| = β            |ψ̂(2−j |ω|)|2 .   (12)
+              j∈Z                                       j=−∞
+
+
+If ψ̃ is a real wavelet which generates a dyadic orthonormal basis of L2 (R)
+[14] then ψ̂ = 2 ψb̃ 1   satisfies (9). Numerical examples in the paper are
+                        ω>0
+
+
+                                           7
+computed with a complex wavelet ψ calculated from a cubic-spline orthogonal
+Battle-Lemarié wavelet ψ̃ [14].
+    In any dimension d ≥ 2, ψ̂ ∈ L2 (Rd ) can be defined as a separable product
+in frequency polar coordinates ω = |ω| η, with η in the unit sphere Sd of Rd :
+
+               ∀(|ω|, η) ∈ R+ × Sd , ψ̂(|ω| η) = ψ̂(|ω|) γ(η) .
+
+The one-dimensional function ψ̂(|ω|) is chosen to satisfy (12). The Littlewood-
+Paley condition (9) is then equivalent to
+                                   X
+                       ∀η ∈ Sd ,        |γ(r −1 η)|2 = 1 .
+                                     r∈G
+
+
+2.2    Path Ordered Scattering
+Convolutions with wavelets defines operators which are Lipschitz continuous
+to the action of diffeomorphisms, because wavelets are regular and localized
+functions. However, a wavelet transform is not invariant to translations, and
+W [λ]f = f ⋆ ψλ translates when f is translated. The main difficulty is to
+compute translation invariant coefficients, which remain stable to the ac-
+tion of diffeomorphisms, and retain high frequency information provided by
+wavelets. A scattering operator computes such a translation invariant rep-
+resentation. We first explain how to build translation invariant coefficients
+from a wavelet transform, while maintaining stability to the action of diffeo-
+morphisms. Scattering operators are then defined, and their main properties
+are summarized.
+    If U[λ] is an operator defined onRL2 (Rd ), not necessarily linear but which
+commutes with translations, then U[λ]f (x) dx is translation  R      invariant, if
+finite. WR[λ]f = f ⋆ ψλ commutes with translations but W [λ]f (x) dx = 0
+because ψ(x) dx = 0. More generally, one can verify that any linear trans-
+formation of W [λ]f , which is translation invariant, is necessarily zero. To get
+a non-zero invariant, we set U[λ]f = M[λ]W [λ]f where M[λ] is a non-linear
+“demodulation” which maps W [λ]f to a lower frequency function having
+a non-zero integral. The choice of M[λ] must also preserve the Lipschitz
+continuity to diffeomorphism actions.
+    If ψ(x) = eiη·x θ(x) then ψλ (x) = eiλη·x θλ (x), and hence
+                                        
+                        iλη·x
+         W [λ]f (x) = e        f ⋆ θλ (x) with f λ (x) = e−iλη·x f (x) .
+                                λ
+                                                                             (13)
+
+
+                                        8
+The convolution f λ ⋆ θλ is a low-frequency filtering because θ̂λ (ω) = θ̂(λ−1 ω)
+covers a frequency ball centered at ω = 0, of radius proportional to |λ|. A
+non-zero invariant can thus be obtained by canceling the modulation term
+eiλη·x with M[λ]. A simple example is:
+
+                         M[λ]h(x) = e−iλη·x e−iΦ(ĥ(λη)) h(x)                         (14)
+
+where Φ(ĥ(λη)) is the complex phase of ĥ(λη). This non-linear phase reg-
+istration guarantees
+          R          that M[λ] commutes with translations. It results from
+(13) that M[λ]W [λ]f (x) dx = |fˆ(λη)| |θ̂(0)|. It recovers the Fourier modu-
+lus representation, which is translation invariant but not Lipschitz continuous
+to diffeomorphisms as shown in (3). Indeed, the demodulation operator M[λ]
+in (14) commutes with translations but does not commute with the action of
+diffeomorphisms, and in particular with dilations. The commutator norm of
+M[λ] with a dilation is equal to 2, even for arbitrarily small dilations, which
+explains the resulting instabilities.
+    Lipschitz continuity under the action of diffeomorphisms is preserved if
+M[λ] commutes with the action of diffeomorphisms. For L2 (Rd ) stability,
+we also impose that M[λ] is nonexpansive. One can prove [4] that M[λ] is
+then necessarily a pointwise operator, which means that M[λ]h(x) only de-
+pends on the value of h at x. We further impose that kM[λ]hk = khk for all
+h ∈ L2 (Rd ), which then implies that |M[λ]h| = |h|. The most regular func-
+tions are obtained with M[λ]h = |h|, which eliminates all phase variations.
+We derive from (13) that this modulus maps W [λ]f into a lower frequency
+envelop:
+                     M[λ]W [λ]f = |W [λ]f | = |f λ ⋆ θλ | .
+Lower frequencies created by a modulus result from interferences. For exam-
+ple, if f (x) = cos(ξ1 · x) + a cos(ξ2 · x) where ξ1 and ξ2 are in the frequency
+band covered by ψ̂λ then |f ⋆ ψλ (x)| = 2−1 |ψ̂λ (ξ1 ) + a ψ̂λ (ξ2 ) ei(ξ2 −ξ1 )·x | oscil-
+lates at the interference frequency |ξ2 − ξ1 |, which is smaller than |ξ1| and
+|ξ2 |.                 R                 R
+     The integration U[λ]f (x) dx = |f ⋆ ψλ (x)| dx is translation invariant
+but it removes all the high frequencies of |f ⋆ ψλ (x)|. To recover these high
+frequencies, a scattering also computes the wavelet coefficients of each U[λ]f :
+{U[λ]f ⋆ ψλ′ }λ′ . Translation invariant coefficients are again
+                                                             R      obtained with a
+modulus U[λ′ ]U[λ]f = |U[λ]f ⋆ ψλ′ | and an integration U[λ′ ]U[λ]f (x) dx. If
+f (x) = cos(ξ1 · x) + a cos(ξ2 · x) with a < 1, |ξ2 − ξ1 | ≪ |λ| and |ξ2 − ξ1 | in the
+support of ψ̂λ′ then U[λ′ ]U[λ]f is proportional to a |ψλ (ξ1 )| |ψλ′ (|ξ2 − ξ1 |)|.
+
+                                            9
+The second wavelet ψ̂λ′ captures the interferences created by the modulus,
+between the frequency components of f in the support of ψ̂λ . We now intro-
+duce the scattering propagator, which extends these decompositions.
+
+Definition 2.2 An ordered sequence p = (λ1 , ..., λm ) with λk ∈ Λ∞ = 2Z ×
+G+ is called a path. The empty path is denoted p = ∅. Let U[λ]f = |f ⋆ ψλ |
+for f ∈ L2 (Rd ). A scattering propagator is a path ordered product of non-
+commutative operators defined by
+
+                          U[p] = U[λm ] ... U[λ2 ] U[λ1 ] ,                        (15)
+
+with U[∅] = Id.
+
+    The operator U[p] is well defined on L2 (Rd ) because kU[λ]f k ≤ kψλ k1 kf k
+for all λ ∈ Λ∞ . The scattering propagator is a cascade of convolutions and
+modulus:
+                   U[p]f = | |f ⋆ ψλ1 | ⋆ ψλ2 | · · · | ⋆ ψλm | .          (16)
+Each U[λ] filters the frequency component in the band covered by ψ̂λ , and
+maps it to lower frequencies with the modulus. The index sequence p =
+(λ1 , ..., λm ) is thus a frequency path variable. The scaling and rotation by
+2l g ∈ 2Z × G of a path p is written 2l g p = (2l gλ1, ..., 2l gλm ). The concate-
+nation of two paths is denoted p + p′ = (λ1 , ..., λm , λ′1 , ..., λ′m′ ), in particular
+p + λ = (λ1 , ..., λm , λ). It results from (15) that
+
+                              U[p + p′ ] = U[p′ ] U[p] .                           (17)
+
+    Section 2.1 explains that if f is complex valued then its wavelet transform
+is W∞ f = {W [λ]f } λ∈Λ∞ whereas if f is real then W∞ f = {W [λ]f }λ∈Λ∞ .
+                         −λ∈Λ∞
+If f is complex then at the next iteration U[λ1 ]f = |W [λ1 ]f | is real so next
+stage wavelet transforms are computed only for λk ∈ Λ∞ . The scattering
+propagator of a complex function is thus defined over “positive” paths p =
+(λ1 , λ2 , ..., λm ) ∈ Λm
+                        ∞ and “negative” paths denoted −p = (−λ1 , λ2 , ..., λm ).
+This is analogous to the positive and negative frequencies of a Fourier trans-
+form. If f is real then W [−λ1 ]f = W [λ1 ]f ∗ so U[−λ1 ]f = U[λ1 ]f and hence
+U[−p]f = U[p]f . To simplify explanations, all results are proved on real
+functions with scattering propagators restricted to positive paths. These
+results apply to complex functions by including negative paths.
+
+
+                                          10
+Definition 2.3 Let P∞ be the set of all finite paths. The scattering trans-
+form of f ∈ L1 (Rd ) is defined for any p ∈ P∞ by
+                         Z                        Z
+                      1
+           Sf (p) =         U[p]f (x) dx with µp = U[p]δ(x) dx .       (18)
+                     µp
+    A scattering is a translation-invariant operator which transforms f ∈
+L (Rd ) into a function of the frequency path variable p. The normalization
+ 1
+
+factor µp results from a path measure introduced in Section 3. Conditions
+are given so that µp does not vanish. This transform is then well-defined for
+any f ∈ L1 (Rd ) and any p of finite length m. Indeed kψλ k1 = kψk1 so (16)
+implies that kU[p]f k1 ≤ kf k1 kψkm 1 . We shall see that a scattering transform
+has similarities with Fourier transform modulus, where the path p plays the
+role of a frequency variable. However, as opposed to a Fourier modulus, a
+scattering transform is stable to the action of diffeomorphisms, because it is
+computed by iterating on wavelet transforms and modulus operators, which
+are stable. For complex-valued functions, Sf is also defined on negative
+paths, and Sf (−p) = Sf (p) if f is real.
+    If p 6= ∅ then Sf (p) is non-linear but it preserves amplitude factors:
+                      ∀µ ∈ R , S(µf )(p) = |µ| Sf (p).                     (19)
+A scattering has similar scaling and rotation covariance properties as a
+Fourier transform. If f is scaled and rotated, 2l g ◦ f (x) = f (2l gx), then
+(11) implies that U[λ](2l g ◦ f ) = 2l g ◦ U[2−l gλ]f and cascading this result
+shows that
+                ∀p ∈ P∞ , U[p](2l g ◦ f ) = 2l g ◦ U[2−l gp]f .            (20)
+Inserting this result in the definition (18) proves that
+                       S(2l g ◦ f )(p) = 2−dl Sf (2−l g p) .               (21)
+Rotating f thus rotates identically its scattering, whereas if f is scaled by 2l
+then the frequency paths p is scaled by 2−l . The extension of the scattering
+transform in L2 (Rd ) is done as a limit of windowed scattering transforms,
+that we now introduce.
+Definition 2.4 Let J ∈ Z and PJ be the set of finite paths p = (λ1 , ..., λm )
+with λk ∈ ΛJ and hence |λk | = 2jk > 2−J . A windowed scattering transform
+is defined for all p ∈ PJ by
+                                          Z
+           SJ [p]f (x) = U[p]f ⋆ φ2J (x) = U[p]f (u) φ2J (x − u) du .    (22)
+
+
+                                        11
+   The convolution with φ2J (x) = 2−dJ φ(2−J x) localizes the scattering trans-
+form over spatial domains of size proportional to 2J :
+              SJ [p]f (x) = | |f ⋆ ψλ1 | ⋆ ψλ2 | · · · | ⋆ ψλm | ⋆ φ2J (x) .
+It defines an infinite family of functions indexed by PJ , denoted
+                             SJ [PJ ]f = {SJ [p]f }p∈PJ .
+For complex-valued functions, negative paths are also included in PJ , and
+SJ [−p]f = SJ [p]f if f is real.                               P
+    Section 2.3 proves that for appropriate wavelets, kf k2 = p∈PJ kSJ [p]f k2 .
+However, the signal energy is mostly concentrated on a much smaller set of
+frequency-decreasing paths p = (λk )k≤m for which |λk+1| ≤ |λk |. Indeed,
+the propagator U[λ] progressively pushes the energy towards lower frequen-
+cies. The main theorem of Section 2.5 proves that a windowed scattering is
+Lipschitz continuous to the action of diffeomorphisms.
+    Since φ(x) is continuous at 0, if f ∈ L1 (Rd ) then its windowed scattering
+transform converges pointwise to its scattering transform when the scale 2J
+goes to ∞:
+                                         Z
+          d         dJ
+   ∀x ∈ R , lim 2 SJ [p]f (x) = φ(0) U[p]f (u) du = φ(0) µp S(p) . (23)
+             J→∞
+
+However, when J increases, the path set PJ also increases. Section 3 shows
+that {PJ }J∈Z defines a multiresolution path approximation of a much larger
+set P ∞ including paths of infinite length. This path set is not countable as
+opposed to each PJ , and Section 3 introduces a measure µ and a metric on
+P ∞.
+     Section 3.2 extends the scattering transform Sf (p) to all f ∈ L2 (Rd ) and
+to all p ∈ P ∞ , and proves that Sf ∈ L2 (P ∞ , dµ). A sufficient condition is
+given to guarantee a strong convergence of SJ f to Sf , and it is conjectured
+that it is valid on L2 (Rd ). Numerical examples illustrate this convergence
+and show that a scattering transform has strong similarities with a Fourier
+transforms modulus, when mapping the path p to a frequency variable ω ∈
+Rd .
+
+2.3    Scattering Propagation and Norm Preservation
+We prove that a windowed scattering SJ is nonexpansive, and preserves the
+L2 (Rd ) norm. Family of operators indexed by a path set Ω are written
+SJ [Ω] = {SJ [p]}p∈Ω and U[Ω] = {U[p]}p∈Ω .
+
+                                           12
+   A windowed scattering can be computed by iterating on the one-step
+propagator defined by
+
+                         UJ f = {AJ f, (U[λ]f )λ∈ΛJ } ,
+
+with AJ f = f ⋆ φ2J and U[λ]f = |f ⋆ ψλ |. After calculating UJ f , applying
+again UJ to each U[λ]f yields a larger infinite family of functions. The
+decomposition is further iterated by recursively applying UJ to each U[p]f .
+Since U[λ]U[p] = U[p + λ] and AJ U[p] = SJ [p], it results that
+
+                   UJ U[p]f = {SJ [p]f , (U[p + λ]f )λ∈ΛJ } .               (24)
+
+Let Λm                                        0
+     J be the set of paths of length m, with ΛJ = {∅}. It is propagated into
+
+                    UJ U[Λm            m         m+1
+                          J ]f = {SJ [ΛJ ]f , U[ΛJ   ]f } .                 (25)
+
+Since PJ = ∪m∈N Λm
+                 J , one can compute SJ [PJ ]f from f = U[∅]f by iteratively
+                 m
+computing UJ U[ΛJ ]f for m going from 0 to ∞, as illustrated in Figure 1.
+
+
+
+
+Figure 1: A scattering propagator UJ applied to f computes each U[λ1 ]f =
+|f ⋆ ψλ1 | and outputs SJ [∅]f = f ⋆ φ2J . Applying UJ to each U[λ1 ]f computes
+all U[λ1 , λ2 ]f and outputs SJ [λ1 ] = U[λ1 ] ⋆ φ2J . Applying iteratively UJ to
+each U[p]f outputs SJ [p]f = U[p]f ⋆ φ2J and computes the next path layer.
+
+    Scattering calculations follow the general architecture of convolution neural-
+networks introduced by LeCun [11]. Convolution networks cascade convolu-
+tions and a “pooling” non-linearity, which is here the modulus of a complex
+number. Convolution networks typically use kernels that are not predefined
+
+                                       13
+functions such as wavelets, but which are learned with backpropagation algo-
+rithms. Convolution network architectures have been successfully applied to
+number of recognition tasks [11] and are studied as models for visual percep-
+tion [2, 17]. Relations between scattering operators and path formulations
+of quantum field physics are also studied in [9].
+    The propagator UJ f = {AJ f, (|W [λ]f |)λ∈ΛJ } is nonexpansive because the
+wavelet transform WJ is unitary and a modulus is nonexpansive in the sense
+that ||a| − |b|| ≤ |a − b| for any (a, b) ∈ C2 . This is valid whether f is real or
+complex. As a consequence
+                                                 X
+       kUJ f − UJ hk2 = kAJ f − AJ hk2 +             k|W [λ]f | − |W [λ]h|k2
+                                                    λ∈ΛJ
+
+                        ≤ kWJ f − WJ hk ≤ kf − hk2 .
+                                                2
+                                                                              (26)
+
+Since WJ is unitary, setting h = 0 also proves that kUJ f k = kf k, so UJ
+preserves the norm.
+   For any path set Ω the norms of SJ [Ω]f and U[Ω]f are
+                      X                             X
+        kSJ [Ω]f k2 =   kSJ [p]f k2 and kU[Ω]f k2 =    kU[p]f k2 .
+                       p∈Ω                                 p∈Ω
+
+
+Since SJ [PJ ] iterates on UJ which is nonexpansive, the following proposition
+derives that SJ [PJ ] is also nonexpansive.
+
+Proposition 2.5 The scattering transform is nonexpansive:
+
+            ∀(f, h) ∈ L2 (Rd )2 , kSJ [PJ ]f − SJ [PJ ]hk ≤ kf − hk .         (27)
+
+.
+     Proof: Since UJ is nonexpansive, it results from (25) that
+              m     2                               2
+kU[Λm
+    J ]f − U[ΛJ ]hk   ≥ kUJ U[Λm              m
+                                 J ]f − UJ U[ΛJ ]hk
+                      = kSJ [Λm            m   2      m+1
+                              J ]f − SJ [ΛJ ]hk + kU[ΛJ   ]f − U[Λm+1
+                                                                  J   ]hk2 .
+
+Summing these equations for m going from 0 to ∞ proves that
+                                ∞
+                                X
+                         2
+    kSJ [PJ ]f − SJ [PJ ]hk =         kSJ [Λm           m    2         2
+                                            J ]f − SJ [ΛJ ]hk ≤ kf − hk .  (28)
+                                m=0
+
+
+
+                                           14
+    Section 2.2 explains that each U[λ]f = |f ⋆ ψλ | captures the frequency
+energy of f over a frequency band covered by ψ̂λ and propagates this en-
+ergy towards lower frequencies. The following theorem proves this result by
+showing that the whole scattering energy ultimately reaches the minimum
+frequency 2−J and is trapped by the low-pass filter φ2J . The propagated scat-
+tering energy thus goes to zero as the path length increases, and the theorem
+derives that kSJ [PJ ]f k = kf k. This result also applies to complex-valued
+functions by incorporating negative paths (−λ1 , λ2 , ..., λm ) in PJ .
+
+Theorem 2.6 A scattering wavelet ψ is said to be admissible if there exists
+η ∈ Rd and ρ ≥ 0, with |ρ̂(ω)| ≤ |φ̂(2ω)| and ρ̂(0) = 1, such that the function
+                                     +∞ 
+                                     X                         
+                                         2        −k         2
+               Ψ̂(ω) = |ρ̂(ω − η)| −   k 1 − |ρ̂(2 (ω − η))|                              (29)
+                                               k=1
+
+satisfies
+                             +∞ X
+                             X
+              α=       inf                   Ψ̂(2−j r −1 ω) |ψ̂(2−j r −1 ω)|2 > 0 .       (30)
+                   1≤|ω|≤2
+                             j=−∞ r∈G
+
+If the wavelet is admissible then
+                                                               ∞
+                                                               X
+               2
+      ∀f ∈ L (R ) ,d
+                             lim   kU[Λm     2
+                                       J ]f k =          lim         kSJ [ΛnJ ]f k2 = 0   (31)
+                             m→∞                        m→∞
+                                                               n=m
+
+and
+                                    kSJ [PJ ]f k = kf k .                                 (32)
+
+    Proof:PWe first prove that limm→∞ kU[Λm    J ]f k = 0 is equivalent to having
+           ∞          n   2
+limm→∞ n=m kSJ [ΛJ ]f k = 0 and to kSJ [PJ ]f k = kf k. Since kUJ hk = khk
+for any h ∈ L2 (Rd ) and UJ U[ΛnJ ]f = {SJ [ΛnJ ]f , U[Λn+1
+                                                        J ]},
+
+            kU[ΛnJ ]f k2 = kUJ U[ΛnJ ]f k2 = kSJ [ΛnJ ]f k2 + kU[Λn+1   2
+                                                                  J ]f k .                (33)
+
+Summing for
+          Pm    ≤ n < ∞ proves that limm→∞ kU[Λm
+                                               J ]f k = 0 is equivalent
+             ∞         n   2                   0
+to limm→∞ n=m kSJ [ΛJ ]f k = 0. Since f = U[ΛJ ]f , summing (33) for
+0 ≤ n < m also proves that
+                                 m−1
+                                 X
+                       kf k2 =           kSJ [ΛnJ ]f k2 + kU[Λm     2
+                                                              J ]f k ,                    (34)
+                                   n=0
+
+
+                                                  15
+                   P
+so kSJ [PJ ]f k2 = ∞           n     2      2                            m
+                     n=0 kSJ [ΛJ ]f k = kf k if and only if limm→∞ kU[ΛJ ]k =
+0.
+    We now prove that condition (29) implies that limm→∞ kU[Λm         2
+                                                                 J ]f k = 0. It
+relies on the following lemma, which gives a lower bound of |f ⋆ ψλ | convolved
+with a positive function.
+
+Lemma 2.7 If h ≥ 0 then for any f ∈ L2 (Rd )
+
+          |f ⋆ ψλ | ⋆ h ≥ sup |f ⋆ ψλ ⋆ hη | with hη (x) = h(x) eiηx .    (35)
+                         η∈Rd
+
+
+   The lemma is proved by computing
+                        Z Z
+     |f ⋆ ψλ | ⋆ h(x) =       f (v)ψλ (u − v) dv h(x − u) du
+                        Z Z
+                      =       f (v)ψλ (u − v) eiη(x−u) h(x − u) dv du
+                         Z Z
+                      ≥       f (v)ψλ (u − v) h(x − u) eiη(x−u) dv du
+                         Z       Z
+                                                             ′
+                      =    f (v) ψλ (x − v − u′ ) h(u′) eiηu du′dv
+                         Z
+                      =    f (v)ψλ ⋆ hη (x − v)dv = |f ⋆ ψλ ⋆ hη | ,
+
+which finishes the lemma’s proof.
+   Appendix A uses this lemma to show that the scattering energy propa-
+gates progressively towards lower frequencies, and proves the following lemma.
+
+Lemma 2.8 If (30) is satisfied and
+                                ∞ X
+                                X
+                    kf k2w =               j kW [2j r]f k2 < ∞            (36)
+                                j=0 r∈G+
+
+
+then
+                α
+                  kU[PJ ]f k2 ≤ max(J + 1, 1) kf k2 + kf k2w .            (37)
+                2
+
+
+
+
+                                           16
+    The class of function for which kf kw < ∞ is a logarithmic Sobolev
+class, corresponding to functions having an average modulus of continuity
+in L2 (Rd ). Since
+                                     +∞
+                                     X
+                       kU[PJ ]f k2 =    kU[Λm      2
+                                             J ]f k ,
+                                         m=0
+
+if kf kw < ∞ then (37) implies that limm→∞ kU[Λm       J ]f k = 0. This result is ex-
+tended in L (R ) by density. Since φ ∈ L (R ) and φ̂(0) = 1, any f ∈ L2 (Rd )
+              2  d                           1    d
+
+satisfies limn→−∞ kf −fn k = 0, where fn = f ⋆φ2n and φ2n (x) = 2−nd φ(2−n x).
+We prove that limm→∞ kU[Λm          2
+                             J ]fn k = 0 by showing that kfn kw < ∞. Indeed
+                              Z
+                   j     2
+             kW [2 r]fn k =      |fˆ(ω)|2 |φ̂(2n ω)|2 |ψ̂(2−j r −1 ω)|2 dω
+                                          Z
+                           ≤ C2   −2n−2j
+                                              |fˆ(ω)|2 dω,
+
+because ψ has a vanishing moment so |ψ̂(ω)| = O(|ω|), and the derivatives
+of φ are in L1 (Rd ) so |ω| |φ̂(ω)| is bounded. It results that kfn kw < ∞.
+    Since U[Λm ] is nonexpansive kU[Λm               m
+                                          J ]f − U[ΛJ ]fn k ≤ kf − fn k so
+
+                      kU[Λm                        m
+                          J ]f k ≤ kf − fn k + kU[ΛJ ]fn k.
+
+Since limn→−∞ kf − fn k = 0 and limm→∞ kU[Λm         J ]fn k = 0 it results that
+limm→∞ kU[Λm   J ]f k 2
+                        = 0 for any f ∈ L2
+                                           (R d
+                                                ). 
+    The proof shows that the scattering energy propagates progressively to-
+wards lower frequencies. The energy of U[p]f is mostly concentrated along
+frequency-decreasing paths p = (λk )k≤m for which |λk+1 | < |λk |. For exam-
+ple, if f = δ then paths of length 1 have an energy kU[2j r]δk2 = kψ2j r k2 =
+2−dj kψk2 . This energy is then propagated among all paths p ∈ PJ . For a
+cubic spline wavelet in dimension d = 1, over 99.5% of this energy is con-
+centrated along frequency-decreasing paths. Numerical implementations of
+scattering transforms thus limits computations to these frequency decreas-
+ing paths. The scattering transform of a signal of size N is computed along
+all frequency-decreasing paths, with O(N log N) operations, by using a filter
+bank implementation P∞ [13].
+    The decay of n=m kSJ [ΛnJ ]f k2 implies that we can neglect all paths of
+length larger than some m > 0. The numerical decay of kSJ [ΛnJ ]f k2 appears
+to be exponential in image and audio processing applications. The path
+length is limited to m = 3 in classification applications [1, 3].
+
+                                         17
+   Theorem 2.6 requires a unitary wavelet transform and
+                                                    P hence an admissible
+wavelet which satisfies Littlewood-Paley condition β (j,r)∈Z×G |ψ̂(2j rω)|2 =
+    P must alsoj exist2 ρ ≥
+1. There                          0 and η ∈ Rd with |ρ̂(ω)| ≤ |φ̂(2ω)| such
+that (j,r)∈Z×G |ψ̂(2 rω)| |ρ̂(2j rω − η)|2 is sufficiently large so that α > 0.
+This can be obtained if according to (5), ψ(x) = eiηx θ(x) and hence ψ̂(ω) =
+θ̂(ω − η), where θ̂ and ρ̂ have their energy concentrated over nearly the
+same low frequency domains. For example, an analytic cubic spline Battle-
+Lemarié wavelet is admissible in one dimension with η = 3π/2. This is
+verified by choosing ρ to be a positive cubic box spline, in which case a
+numerical evaluation of (30) gives α = 0.2766 > 0.
+
+2.4    Translation Invariance
+We show that the scattering distance kSJ [P J ]f − SJ [P J ]hk is non-increasing
+when J increases, and thus converges when J goes to ∞. It defines a limit
+distance which is proved to be translation invariant. Section 3 studies the
+convergence of SJ [PJ ]f when J goes to ∞, to the translation invariant scat-
+tering transform Sf .
+
+Proposition 2.9 For all (f, h) ∈ L2 (Rd )2 and J ∈ Z
+
+           kSJ+1 [PJ+1 ]f − SJ+1 [PJ+1 ]hk ≤ kSJ [PJ ]f − SJ [PJ ]hk .      (38)
+
+    Proof: Any p′ ∈ PJ+1 can uniquely be written as an extension of a path
+p ∈ PJ where p is the longest prefix of p′ which belongs to PJ , and p′ = p + q
+for some q ∈ PJ+1 . The set of all extensions of p ∈ PJ in PJ+1 is
+                    p
+                   PJ+1 = {p} ∪ {p + 2J r + p′′ }r∈G+ , p′′ ∈PJ +1 .        (39)
+                                                             p
+It defines a non-intersecting partition of PJ+1 = ∪p∈PJ PJ+1     . We shall prove
+that such extensions are nonexpansive:
+              X
+                   kSJ+1 [p′ ]f − SJ+1 [p′ ]hk2 ≤ kSJ [p]f − SJ [p]hk2 .     (40)
+            p′ ∈PJp+1
+
+
+To later prove Proposition 3.3, we also verify that it preserves energy
+                       X
+                            kSJ+1 [p′ ]f k2 = kSJ [p]f k2 .                 (41)
+                        p′ ∈PJp+1
+
+
+                                          18
+Summing (40) on all p ∈ PJ proves (38).
+  Appendix A proves in (128) that for all g ∈ L2 (Rd )
+                               X
+              kg ⋆ φ2J +1 k2 +   kg ⋆ ψ2J r k2 = kg ⋆ φ2J k2 .
+                                  r∈G+
+
+Applying it to g = U[p]f − U[p]h together with U[p]f ⋆ φ2J = SJ [p]f and
+U[p]f ⋆ ψ2J r = U[p + 2J r]f gives
+
+        kSJ [p]f − SJ [p]hk2 = kSJ+1 [p]f − SJ+1 [p]hk2                           (42)
+                                 X
+                               +      kU[p + 2J r]f − U[p + 2J r]hk2
+                                       r∈G+
+
+Since SJ+1 [PJ+1 ]U[p + 2J r]f = {SJ+1 [p + 2J r + p′′ ]}p′′ ∈PJ +1 , and SJ+1 [PJ+1 ]f
+is nonexpansive, it implies
+
+      kSJ [p]f − SJ [p]hk2 ≥ kSJ+1 [p]f − SJ+1 [p]hk2
+               X X
+          +              kSJ+1 [p + 2J r + p′′ ]f − SJ+1 [p + 2J r + p′′ ]hk2 ,
+             p′′ ∈PJ +1 r∈G+
+
+which proves (40). Since SJ [PJ+1 ]f preserves the norm, setting h = 0 in (42)
+gives
+                                     X X
+      kSJ [p]f k2 = kSJ+1 [p]f k2 +           kSJ+1 [p + 2J r + p′′ ]f k2 ,
+                                       p′′ ∈PJ +1 G+
+
+which proves (41). 
+    This proposition proves that kSJ [PJ ]f − SJ [PJ ]hk is positive and non-
+increasing when J increases, and thus converges. Since SJ [PJ ] is nonexpan-
+sive, the limit metric is also nonexpansive
+
+         ∀(f, h) ∈ L2 (Rd )2 ,    lim kSJ [PJ ]f − SJ [PJ ]hk ≤ kf − hk .
+                                  J→∞
+
+For admissible scattering wavelets which satisfy (30), Theorem 2.6 proves
+that kSJ [PJ ]f k = kf k so limJ→∞ kSJ [PJ ]f k = kf k. The following theorem
+proves that the limit metric is translation invariant.
+
+Theorem 2.10 For admissible scattering wavelets
+
+          ∀f ∈ L2 (Rd ) ∀c ∈ Rd , lim kSJ [PJ ]f − SJ [PJ ]Lc f k = 0 .
+                                     J→∞
+
+
+                                          19
+   Proof: Since SJ [PJ ] Lc = Lc SJ [PJ ] and SJ [PJ ]f = AJ U[PJ ]f
+
+          kSJ [PJ ]Lc f − SJ [PJ ]f k = kLc AJ U[PJ ]f − AJ U[PJ ]f k
+                                      ≤ kLc AJ − AJ k kU[PJ ]f k .                 (43)
+
+Lemma 2.11 There exists C such that for all τ ∈ C2 (Rd ) with k∇τ k∞ ≤
+1/2 we have
+               kLτ AJ f − AJ f k ≤ C kf k 2−J kτ k∞ .              (44)
+
+This lemma is proved in Appendix B. Applying it to τ = c and hence kτ k∞ =
+|c| proves that
+                        kLc AJ − AJ k ≤ C 2−J |c| .                    (45)
+Inserting this in (43) gives
+
+                kLc SJ [PJ ]f − SJ [PJ ]f k ≤ C 2−J |c| kU[PJ ]f k .               (46)
+
+   Since the admissibility condition (30) is satisfied, Lemma 2.8 proves in
+(37) that for J > 1
+                      α
+                        kU[PJ ]f k2 ≤ (J + 1) kf k2 + kf k2w .                     (47)
+                      2
+If kf kw < ∞ then it results from (46) that
+
+    kLc SJ [PJ ]f − SJ [PJ ]f k2 ≤ ((J + 1) kf k2 + kf k2w ) C 2 2 α−1 2−2J |c|2
+
+so limJ→∞ kLc SJ [PJ ]f − SJ [PJ ]f k = 0.
+    We then prove that limJ→∞ kLc SJ [PJ ]f −SJ [PJ ]f k = 0 for all f ∈ L2 (Rd ),
+with a similar density argument as in the proof of Theorem 2.6. Any f ∈
+L2 (Rd ) can be written as a limit of {fn }n∈N with kfn kw < ∞, and since
+SJ [PJ ] is nonexpansive and Lc unitary, one can verify that
+
+     kLc SJ [PJ ]f − SJ [PJ ]f k ≤ kLc SJ [PJ ]fn − SJ [PJ ]fn k + 2 kf − fn k .
+
+Letting n go to ∞ proves that limJ→∞ kLc SJ [PJ ]f − SJ [PJ ]f k = 0, which
+finishes the proof.
+
+
+
+
+                                         20
+2.5     Lipschitz Continuity to Actions of Diffeomorphisms
+This section proves that a windowed scattering is Lipschitz continuous to
+the action of diffeomorphisms. A diffeomorphism of Rd sufficiently close to a
+translation maps x to x − τ (x) where τ (x) is a displacement field such that
+k∇τ k∞ < 1. The diffeomorphism action on f ∈ L2 (Rd ) is Lτ f (x) = f (x −
+τ (x)). The maximum increment of τ is denoted k∆τ k∞ = sup(x,u)∈R2d |τ (x)−
+τ (u)|. Let SJ be a windowed scattering operator computed with an admis-
+sible scattering wavelet which satisfies (30). The following theorem com-
+putes an upper bound of kSJ [PJ ]Lτ f − SJ [PJ ]f k as a function of a mixed
+(l1 , L2 (Rd )) scattering norm:
+                                           +∞
+                                           X
+                           kU[PJ ]f k1 =         kU[Λm
+                                                     J ]f k .                      (48)
+                                           m=0
+
+We denote PJ,m the subset of PJ of paths of length strictly smaller than m,
+and (a ∨ b) = max(a, b).
+
+Theorem 2.12 There exists C such that all f ∈ L2 (Rd ) with kU[PJ ]f k1 <
+∞ and all τ ∈ C2 (Rd ) with k∇τ k∞ ≤ 1/2 satisfy
+
+                 kSJ [PJ ]Lτ f − SJ [PJ ]f k ≤ C kU[PJ ]f k1 K(τ )                 (49)
+
+with
+                                                 k∆τ k∞
+           K(τ ) = 2−J kτ k∞ + k∇τ k∞ (log              ∨ 1) + kHτ k∞ ,            (50)
+                                                 k∇τ k∞
+and for all m ≥ 0
+
+                 kSJ [PJ,m ]Lτ f − SJ [PJ,m ]f k ≤ C m kf k K(τ ) .                (51)
+
+   Proof: Let [SJ [PJ ], Lτ ] = SJ [PJ ] Lτ − Lτ SJ [PJ ],
+
+ kSJ [PJ ]Lτ f − SJ [PJ ]f k ≤ kLτ SJ [PJ ]f − SJ [PJ ]f k + k[SJ [PJ ] , Lτ ]f k . (52)
+
+Similarly to (43) the first term on the right satisfies
+
+             kLτ SJ [PJ ]f − SJ [PJ ]f k ≤ kLτ AJ − AJ k kU[PJ ]f k .              (53)
+
+Since                                               !1/2
+                               +∞
+                               X                               +∞
+                                                               X
+              kU[PJ ]f k =           kU[Λm
+                                         J ]f k
+                                                2
+                                                           ≤         kU[Λm
+                                                                         J ]f k
+                               m=0                             m=0
+
+
+                                           21
+it results that
+             kLτ SJ [PJ ]f − SJ [PJ ]f k ≤ kLτ AJ − AJ k kU[PJ ]f k1 .                        (54)
+Since SJ [PJ ] iterates on UJ which is nonexpansive, Appendix D proves the
+following upper bound on scattering commutators.
+Lemma 2.13 For any operator L on L2 (Rd )
+                     k[SJ [PJ ] , L]f k ≤ kU[PJ ]f k1 k[UJ , L]k .                            (55)
+   The operator L = Lτ also satisfies
+                              k[UJ , Lτ ]k ≤ k[WJ , Lτ ]k .                                   (56)
+Indeed, UJ = M WJ , where M{hJ , (hλ )λ∈ΛJ } = {hJ , (|hλ |)λ∈ΛJ } is a nonex-
+pansive modulus operator. Since MLτ = Lτ M
+                   k[UJ , Lτ ]k = kMJ [WJ , Lτ ]k ≤ k[WJ , Lτ ]k .                            (57)
+Inserting (55) with (56) and (54) in (52) gives
+                                                                       
+  kSJ [PJ ]Lτ f − SJ [PJ ]f k ≤ kU[PJ ]f k1 kLτ AJ − AJ k + k[WJ , Lτ ]k . (58)
+
+Lemma 2.11 proves that kLτ AJ − AJ k ≤ C 2−J kτ k∞ . This inequality and
+(58) imply that
+                                                                      
+   kSJ [PJ ]Lτ f − SJ [PJ ]f k ≤ C kU[PJ ]f k1 2−J kτ k∞ + k[WJ , Lτ ]k . (59)
+
+To prove (49), the main difficulty is to compute an upper bound of k[WJ , Lτ ]k,
+and hence of k[WJ , Lτ ]k2 = k[WJ , Lτ ]∗ [WJ , Lτ ]k, where A∗ is the adjoint of
+an operator A. The wavelet commutator applied to f is
+                  [WJ , Lτ ]f = {[AJ , Lτ ]f , ([W [λ], Lτ ]f )λ∈ΛJ } ,
+whose norm is
+                                                     X
+              k[WJ , Lτ ]f k2 = k[AJ , Lτ ]f k2 +           k[W [λ], Lτ ]f k2 .               (60)
+                                                    λ∈ΛJ
+
+It results that
+                                                         X
+     [WJ , Lτ ]∗ [WJ , Lτ ] = [AJ , Lτ ]∗ [AJ , Lτ ] +          [W [λ], Lτ ]∗ [W [λ], Lτ ].
+                                                         λ∈ΛJ
+
+The operator [WJ , Lτ ]∗ [WJ , Lτ ] has a singular kernel along the diagonal but
+Appendix E proves that its norm is bounded.
+
+                                            22
+Lemma 2.14 There exists C > 0 such that all J ∈ Z and all τ ∈ C2 (Rd )
+with k∇τ k∞ ≤ 1/2 satisfy
+                                       k∆τ k∞              
+           k[WJ , Lτ ]k ≤ C k∇τ k∞ (log        ∨ 1) + kHτ k∞ .           (61)
+                                        k∇τ k∞
+
+   Inserting the wavelet commutator bound (61) in (59) proves the theorem
+inequality (49). One can verify that (49) remains valid when replacing PJ by
+the subset of paths of length smaller than m: PJ,m = ∪n<m ΛnJ , if we replace
+kU[PJ ]f k1 by kU[PJ,m ]f k1 . The inequality (51) results from
+                                    m−1
+                                    X
+                  kU[PJ,m ]f k1 =         kU[ΛnJ ]f k ≤ m kf k .         (62)
+                                    n=0
+
+This is obtained by observing that
+
+                      kU[ΛnJ ]f k ≤ kU[ΛJn−1 ]f k ≤ kf k ,               (63)
+
+because U[ΛnJ ]f is computed in (24) by applying the norm-preserving oper-
+ator UJ on U[ΛJn−1 ]f . 
+    The condition k∇τ k∞ ≤ 1/2 can be replaced by k∇τ k∞ < 1 if C is re-
+placed by C (1 − k∇τ k∞ )−d . Indeed kSJ [PJ ]f k = kf k and kSJ [PJ ]Lτ f k ≤
+kf k(1 − k∇τ k∞ )−d . This remark applies to all subsequent theorems where
+the condition k∇τ k∞ ≤ 1/2 appears. The theorem proves that the dis-
+tance kSJ [PJ ]Lτ f − SJ [PJ ]f k produced by the diffeomorphism action Lτ
+is bounded by a translation term proportional to 2−J kτ k∞ and a deforma-
+tion error proportional to k∇τ k∞ . This deformation term results from the
+wavelet transform commutator [WJ , Lτ ]. The term log(k∆τ k∞ /k∇τ k∞ ) can
+also be replaced by max(J, 1) in the proof of Theorem 2.12. For compactly
+supported functions f , Corollary 2.15 replaces this term by the log of the
+support radius.
+    If f ∈ L2 (Rd ) has a weak form of regularity such as an average mod-
+ulus of continuity in L2 (Rd ) then Lemma 2.8 proves that kU[PJ ]f k2 =
+P  ∞        n    2                                                        n
+   n=0 kU[ΛJ ]f k is finite. Numerical experiments indicate that kU[ΛJ ]f k
+has exponential decay for a large class of functions, but we
+                                                           P∞do not charac-
+terize here the class of functions for which kU[PJ ]f k1 = n=0 kU[ΛnJ ]f k is
+finite. In audio and image processing applications [1, 3], the percentage of
+scattering energy becomes negligible over paths of length larger than 3 so
+(51) is applied with m = 4.
+
+                                      23
+    The following corollary derives from Theorem 2.12 that a windowed scat-
+tering is Lipschitz continuous to the action of diffeomorphisms over compactly
+supported functions.
+
+Corollary 2.15 For any compact Ω ⊂ Rd there exists C such that for all
+f ∈ L2 (Rd ) supported in Ω with kU[PJ ]f k1 < ∞ and for all τ ∈ C2 (Rd ) with
+                         kτ k∞
+k∇τ k∞ ≤ 1/2, if 2J ≥ k∇τ    k∞
+                                then
+                                                                     
+     kSJ [PJ ]Lτ f − SJ [PJ ]f k ≤ C kU[PJ ]f k1 k∇τ k∞ + kHτ k∞ .         (64)
+
+    Proof: The inequality (64) is proved by applying (49) to a τ̃ with Lτ̃ f =
+Lτ f , and showing that there exists C ′ which only depends on Ω such that
+
+                            k∆τ̃ k∞                                 
+ 2−J kτ̃ k∞ +k∇τ̃ k∞ (log           ∨1)+kH τ̃ k∞ ≤ C ′ k∇τ k∞ +kHτ k∞ . (65)
+                            k∇τ̃ k∞
+
+Since f has a support in Ω, Lτ̃ f = Lτ f is equivalent to τ̃ (x) = τ (x) for
+all x ∈ Ωτ = {x : x − τ (x) ∈ Ω} and τ̃ −1 (Ω) = Ωτ . If Ω has a radius R
+then the radius of Ωτ is smaller than 2R, because k∇τ k∞ ≤ 1/2. We define
+τ̃ as a regular extension of τ equal to τ (x) for x ∈ Ωτ and to the constant
+minx∈Ωτ τ (x) outside a compact Ωe τ of radius (4R+ 2) including Ωτ . It results
+that
+             k∆τ̃ k∞ = sup |τ̃ (x) − τ̃ (u)| ≤ (4R + 2) k∇τ̃ k∞ .           (66)
+                              e 2τ
+                        (x,u)∈Ω
+
+The extension in Ω e τ − Ωτ can be made regular in the sense that k∇τ̃ k∞ +
+kH τ̃ k∞ ≤ α (k∇τ k∞ k + kHτ k∞ ) for some α > 0 which depends on Ω. This
+property together with (66) proves (65). 
+    Similarly to Theorem 2.12, if PJ is replaced by the subset PJ,m of paths
+of length smaller than m, then kU[PJ ]f k1 is replaced by m kf k in (64). If
+Lτ f (x) = f ((1 − s) x) with |∇τ (x)| = |s| < 1 then the upper bound (64)
+is proportional to m |s| kf k. In this case, a lower bound is simply obtained
+by observing that since kSJ [PJ ]f k = kf k and kSJ [PJ ]Lτ f k = kLτ f k =
+(1 − s)−1 kf k
+
+           kSJ [PJ ]Lτ f − SJ [PJ ]f k ≥ |kLτ f k − kf k| > 2−1 s kf k.
+
+Together with the upper bound (64), it proves that if τ (x) = sx then the
+scattering distance of f and Lτ f is of the order of k∇τ k∞ kf k.
+
+                                       24
+    The next theorem reduces the translation error term 2−J kτ k∞ in Theorem
+2.12 to a second-order term 2−2J kτ k2∞ , with first-order Taylor expansion
+of each SJ [p]f . We denote ∇SJ [PJ ]f (x) = {∇SJ [p]f (x)}p∈PJ and τ (x) ·
+∇SJ [PJ ]f (x) = {τ (x) · ∇SJ [p]f (x)}p∈PJ .
+
+Theorem 2.16 There exists C such that all f ∈ L2 (Rd ) with kU[PJ ]f k1 <
+∞ and all τ ∈ C2 (Rd ) with k∇τ k∞ ≤ 1/2 satisfy
+
+       kSJ [PJ ]Lτ f − SJ [PJ ]f + τ · ∇SJ [PJ ]f k ≤ C kU[PJ ]f k1 K(τ )      (67)
+
+with
+                                               k∆τ k∞
+           K(τ ) = 2−2J kτ k2∞ + k∇τ k∞ (log          ∨ 1) + kHτ k∞ .          (68)
+                                               k∇τ k∞
+
+    Proof: The proof proceeds as the proof of Theorem 2.12. Replacing
+SJ [PJ ]Lτ − SJ [PJ ] by SJ [PJ ]Lτ − SJ [PJ ] + τ . ∇SJ [PJ ] in the derivation steps
+of the proof of Theorem 2.12 amounts to replace Lτ AJ − AJ by Lτ AJ − AJ +
+∇AJ . Equation (58) then becomes
+                                                              
+kSJ [PJ ]Lτ f − SJ [PJ ]f + τ . ∇SJ [PJ ]k ≤ kU[PJ ]f k1          kLτ AJ − AJ + ∇AJ k
+                                                                               
+                                                                  +k[WJ , Lτ ]k .
+
+Appendix C proves that there exists C > 0 such that
+
+                     kLτ AJ f − AJ + ∇AJ k ≤ C 2−2J kτ k2∞ .                   (69)
+
+Inserting the upper bound (61) of k[WJ , Lτ ]k proves (67). 
+   If 2J ≫ kτ k∞ and k∇τ k∞ + kHτ k∞ ≪ 1 then K(τ ) becomes negligible
+and τ (x) can be estimated at each x by solving the system of linear equations
+resulting from (67):
+
+       ∀p ∈ PJ , SJ [p]Lτ f (x) − SJ [p]f (x) + τ (x) . ∇SJ [p]f (x) ≈ 0.      (70)
+
+In dimension d, the displacement τ (x) has d coordinates which can be com-
+puted if the system (70) has rank d. Estimating τ (x) has many applications.
+In image processing, the displacement field τ (x) between two consecutive im-
+ages of a video sequence is proportional to the optical flow velocity of image
+points.
+
+
+                                        25
+3      Normalized Scattering Transform
+To define the convergence of SJ [PJ ], all countable sets PJ are embedded in
+a non-countable set P ∞ . Section 3.1 constructs a measure µ and a metric in
+P ∞ . Section 3.2 redefines the scattering transform Sf as limit of windowed
+scattering transforms over P ∞ , with Sf ∈ L2 (P ∞ , dµ) for f ∈ L2 (Rd ). Nu-
+merical comparisons between Sf and |fˆ| are given in Section 3.3.
+
+3.1      Dirac Scattering Measure and Metric
+A path p ∈ PJ can be extended into an infinite set of paths in PJ+1 which
+refine p. In that sense, PJ+1 is a set of higher resolution paths. When J
+increases to ∞, these progressive extensions converge to paths of infinite
+length, which belong to an uncountable path set P ∞ . A measure and a
+metric are defined on P ∞ .
+    A path p = (λ1 , ..., λm ) of length m belongs to the finite product set Λm ∞
+with Λ∞ = 2Z × G+ . An infinite path p is an infinite ordered string which
+belongs to the infinite product set Λ∞   ∞ . For complex-valued functions, adding
+negative paths (−λ1 , λ2 , ..., λm ) doubles the size of Λm        ∞
+                                                          ∞ and Λ∞ . We concen-
+trate on positive paths (λ1 , λ2 , ..., λm ) and the same construction applies to
+negative paths. Since Λ∞ = 2Z × G+ is a discrete group, its natural topology
+is the discrete topology where basic open sets are individual elements. Open
+elements of the product topology of Λ∞     ∞ are cylinders defined for any λ ∈ Λ∞
+and n ≥ 0 by Cn (λ) = {q = {qk }k>0 ∈ Λ∞       ∞ : qn+1 = λ} [22]. Cylinder sets
+are intersections of a finite number of open cylinders:
+
+    Cn (λ1 , ..., λm ) = {q ∈ Λ∞                                   m
+                               ∞ : qn+1 = λ1 , ..., qn+m = λm } = ∩i=1 Cn+i (λi ) .
+
+As elements of the topology, cylinder sets are open sets but are also closed.
+Indeed the complement of a cylinder set is a union of cylinders and is thus
+closed. As a result, the topology is a sigma algebra, on which a measure µ
+can be defined. The measure of a cylinder set C is written µ(C).
+    Let P∞ be the set of all finite paths including the ∅ path: P∞ = ∪m∈N Λm
+                                                                           ∞.
+To any p = (λ1 , ..., λm ) ∈ P∞ , we associate a cylinder set:
+
+               C(p) = C0 (p) = {q ∈ Λ∞
+                                     ∞ : q1 = λ1 , ..., qm = λm } .
+
+This family of cylinder sets generates the same sigma algebra as open cylin-
+ders since open cylinders can be written Cn (λ) = ∪(λ1 ,...,λn)∈Λn∞ C(λ1 , ..., λn , λ).
+
+                                          26
+The following proposition defines a measure on Λ∞      ∞ from the scattering of a
+Dirac:
+                    U[p]δ = | ||ψλ1 | ⋆ ψλ2 | ⋆ ...| ⋆ ψλm | .
+
+Proposition 3.1 There exists a unique σ-finite Borel measure µ, called
+Dirac scattering measure, such that µ(C(p)) = kU[p]δk2 for all p ∈ P∞ .
+For all 2l g ∈ Λ∞ and p ∈ P∞ , µ(C(2l gp)) = 2dl µ(C(p))
+If |ψ̂(ω)| + |ψ̂(−ω)| 6= 0 almost everywhere then kU[p]δk 6= 0 for p ∈ P∞ .
+
+   Proof: The Dirac scattering measure is defined as a subdivision measure
+over the tree that generates all paths. Each finite path p corresponds to
+a node of the subdivision tree. Its sons are the {p + λ}λ∈Λ∞ , and C(p) =
+∪λ∈Λ∞ C(p + λ) is a non-intersecting partition. Since
+                                           X
+               kU[p]δk2 = kUJ U[p]δk2 =        kU[p + λ]δk2 ,
+                                                λ∈Λ∞
+                            P
+it results that µ(C(p)) = λ∈Λ∞ µ(C(p + λ)). The sigma additivity of the
+Dirac measure over all cylinder sets results from the tree structure, and
+the decomposition of the measure of a node µ(C(p)) as a sum of the mea-
+sures µ(C(p + λ)) of all its sons. This subdivision measure is uniquely
+extended to the Borel sigma algebra through the sigma additivity. Since
+                                           2         2
+Λ∞∞ = ∪λ∈Λ∞ C(λ) and µ(C(λ)) = kU[λ]δk = kψλ k , this measure is σ-finite.
+    We showed in (20) that U[p](2l g◦f ) = 2l g◦U[2−l gp]f . Since 2l g◦δ = 2−dl δ
+it results kU[2−l gp]δk2 = 2−dl kU[p]δk2 and hence µ(C(2l gp)) = 2dl µ(C(p)).
+    If the set of ω ∈ Rd where ψ̂(ω) = 0 and ψ̂(−ω) = 0 is of measure 0, let us
+prove by induction on the path length that U[p]f 6= 0 if f ∈ L2 (Rd ) ∪ L1 (Rd )
+or if f = δ. We suppose that U[p]f 6= 0 and verify that U[p + λ]f 6= 0 for any
+                             \(ω)| = |U[p]f
+λ ∈ Λ∞ Since U[p]f is real, |U[p]f         \(−ω)|. But ψ̂λ (ω) = ψ̂(λ−1 ω),
+so ψ̂λ (ω) and ψ̂λ (−ω) vanish simultaneously on a set of measure 0. It results
+that U[p\            \ ψ̂λ 6= 0 if U[p]f
+           + λ]f = U[p]f               \ 6= 0 so U[p + λ]f is a non-zero
+function. 
+    A topology and a metric can now be constructed on the path set Λ∞         ∞.
+Neighborhoods are defined with cylinder sets of frequency resolution 2J :
+
+                      CJ (p) = ∪ λ∈Λ∞ C(p + λ) ⊂ C(p) .                      (71)
+                                 |λ|≤2−J
+
+
+Clearly CJ+1 (p) ⊂ CJ (p). The following proposition proves that µ(CJ (p))
+decreases at least like 2−dJ when 2J increases, and it defines a distance from
+
+                                           27
+these measures. The set Λ∞∞ of infinite paths is not complete with this metric.
+It is completed by embedding the set P∞ of finite paths, and we denote
+P ∞ = P∞ ∪ Λ∞   ∞ the completed set. This embedding is defined by adding
+each finite path p ∈ P∞ to C(p) and to each CJ (p) for all J ∈ Z, without
+modifying their measure. We still denote CJ (p) the resulting subsets of P ∞ .
+For complex valued functions, the size of P ∞ is doubled by adding finite and
+infinite negative paths (−λ1 , λ2 , ..., λm , ...).
+
+Proposition 3.2 If p ∈ P∞ is a path of length m then
+
+                  µ(CJ (p)) = kSJ δ[p]k2 ≤ 2−dJ kφk2 kψk2m
+                                                        1  .                                (72)
+
+Suppose that |ψ̂(ω)| + |ψ̂(−ω)| 6= 0 almost everywhere. For any q 6= q ′ ∈ P ∞
+               ¯
+               d(q, q ′ ) =        inf           µ(CJ (p)) and ¯
+                                                               d(q, q) = 0                  (73)
+                              (q,q ′ )∈CJ (p)2
+
+
+defines a distance on P ∞ , and P ∞ is complete for this metric.
+
+   Proof: According to (71)
+                       X                  X
+          µ(CJ (p)) =       µ(C(p + λ)) =   kU[p + λ]δk2 .
+                           λ∈Λ∞                            λ∈Λ∞
+                          |λ|≤2−J                         |λ|≤2−J
+
+                                                        P
+Since U[p+λ]δ = U[p]δ⋆ψλ and |φ̂2J (ω)|2 =                   λ∈Λ∞     |ψ̂λ (ω)|2 , the Plancherel
+                                                            |λ|≤2−J
+formula implies
+                     X
+      µ(CJ (p)) =             kU[p]δ ⋆ ψλ k2 = kU[p]δ ⋆ φ2J k2 = kSJ [p]δk2 .
+                     λ∈Λ∞
+                    |λ|≤2−J
+
+
+Since SJ [p]δ = U[p]δ⋆φ2J , Young’s inequality implies kSJ [p]δk ≤ kU[p]δk1 kφ2J k.
+Moreover kU[λ]f k1 ≤ kψλ k1 kf k1 with kψλ k1 = kψk1 , so we verify by induc-
+tion that kU[p]δk1 ≤ kψkm . Inserting kφ2J k2 = 2−dJ kφk2 proves (72).
+    Let us now prove that d¯ defines a distance. If q 6= q ′ , we denote p̄ ∈
+P∞ their common prefix of longest size m, which may be 0, and show that
+ ¯ q ′ ) 6= 0. Let |qm+1 | = 2jm+1 and |q ′ | = 2jm+1
+d(q,
+                                                  ′
+                                                       be the frequencies of their
+                                         m+1
+first different coordinate. If 2 = max(|qm+1 |, |qm+1 |) then (q, q ′ ) ∈ CJ (p̄)2
+                                 −J                  ′
+
+and it is the smallest set including both paths so ¯     d(q, q ′) = µ(CJ (p̄)). It
+               ¯ q ′ ) 6= 0 because µ(CJ (p̄)) ≥ µ(C(p̄ + 2J r)) for r ∈ G+ and
+results that d(q,
+Proposition 3.1 proves that µ(C(p)) 6= 0 for all p ∈ P∞ , so d(q,  ¯ q ′) 6= 0.
+
+                                                  28
+    The triangle inequality is proved by showing that
+                                3
+                                                                        
+                                    ¯ ′ , q ′′ ) ≤ max d(q,
+          ∀(q, q ′ , q ′′ ) ∈ P ∞ , d(q                 ¯ q ′) , d(q,
+                                                                 ¯ q ′′ ) .             (74)
+
+This is verified by writing d(q,   ¯ q ′ ) = µ(CJ (p̄)), d(q ¯ ′ , q ′′ ) = µ(CJ ′ (p̄′ )) and
+ ¯
+d(q , q ) = µ(CJ ′′ (p̄ )). Necessarily p̄ is a substring of p̄′ or vice versa, and
+     ′  ′′             ′′
+
+p̄′′ is larger then the smallest of the two. If p̄′′ is strictly larger then the
+smallest say p̄, then µ(CJ ′′ (p̄′′ )) ≤ µ(C(p̄′′ )) ≤ CJ (p̄), so (74) is satisfied. If
+                           ′′                       ′
+p̄′′ = p̄ = p̄′ then 2−J ≤ max(2−J , 2−J ) and (74) is satisfied. Otherwise
+                                                                 ′′
+p̄′′ = p̄ is strictly smaller than p̄′ and necessarily 2J = 2J so (74) is also
+satisfied.
+      To prove that P ∞ is complete, consider a Cauchy sequence {qj }j∈N in P ∞ .
+Let pk be the common prefix of maximum length mk among all qj for j ≥ k.
+It is a growing string which either converges to a finite string p ∈ P∞ if mk
+is bounded or to an infinite string p ∈ Λ∞          ∞ . Among all paths {qj }j≥k whose
+maximum common prefix with p has a length mk , let qjk be a path whose
+next element λmk +1 has a maximum frequency amplitude |λmk +1 |. One can
+verify that
+                      sup ¯                 d(qjk , p) = sup ¯
+                            d(qj , qj ′ ) = ¯               d(p, qj ) .
+                      j,j ′ ≥k                             j≥k
+
+                                                                                    ¯ qj )
+                 ¯ j , qj ′ ) converges to 0 as k increases, it implies that sup d(p,
+Since supj,j ′≥k d(q                                                            j≥k
+also converges to 0 and hence that {qj }j∈N converges to p. 
+
+3.2     Scattering Convergence
+                                               R
+For h ∈ L2 (P ∞ , dµ), we denote khk2P ∞ = P ∞ |h(q)|2 dµ(q), where µ is the
+Dirac scattering measure. This section redefines the scattering transform
+Sf as a limit of windowed scattering transforms, and proves that Sf ∈
+L2 (P ∞ , dµ) for all f ∈ L2 (Rd ). We suppose that ψ is an admissible scattering
+wavelet, and that |ψ̂(ω)| + |ψ̂(−ω)| 6= 0 almost everywhere.
+    Let 1CJ (p) (q) be the indicator function of CJ (p) in P ∞ . A windowed
+wavelet scattering SJ [PJ ]f (x) = {SJ [p]f (x)}p∈PJ is first extended into a
+normalized function of (q, x) ∈ P ∞ × Rd
+                                        X SJ [p]f (x)
+                        SJ f (q, x) =                      1CJ (p) (q) .                (75)
+                                        p∈PJ
+                                               kSJ [p]δk
+
+
+
+                                               29
+It satisfies SJ f (p, x) = SJ [p]f (x)/kSJ [p]δk for p ∈ P∞ . Since µ(CJ (p)) =
+kSJ [p]δk2 , for all (f, h) ∈ L2 (Rd )2
+Z Z
+          |SJ f (q, x)−SJ h(q, x)|2 dµ(q) dx = kSJ [PJ ]f −SJ [PJ ]hk2 ≤ kf −hk2 ,
+ P∞   Rd
+            Z        Z
+                              |SJ f (q, x)|2 dµ(q) dx = kSJ [PJ ]f k2 = kf k2 ,
+                P∞       Rd
+
+so SJ f (q, x) can be interpreted as a scattering energy density in P ∞ × Rd .
+     The windowed scattering SJ f (q, x) has a spatial resolution 2−J along
+x and a resolution 2J along the frequency path q. When J goes to ∞,
+SJ f (q, x) loses its spatial localization, and Theorem 2.10 proves that the
+asymptotic metric on SJ [PJ ]f and hence on SJ f (q, x) is translation invariant.
+The convergence of SJ f (q, x) to a function which depends only on q ∈ P ∞
+is studied by introducing the marginal L2 (Rd ) norm of SJ f (q, x) along x for
+q fixed:
+                            Z                    X kSJ [p]f k
+    ∀q ∈ P ∞ , S J f (q) = |SJ f (q, x)|2 dx =                 1C (p) (q) . (76)
+                                                p∈P
+                                                     kSJ [p]δk J
+                                                              J
+
+
+It is a piecewise constant function of the path variable q, whose resolution
+increases with J. Since µ(CJ (p)) = kSJ [p]δk2 ,
+                    Z                                X                     2
+              2
+kS J f −S J hkP ∞ =    |S J f (q)−S J h(q)|2 dµ(q) =   kSJ [p]f k−kSJ [p]hk .
+                          P∞                                      p∈PJ
+                                                                      (77)
+The following proposition proves that S J is a nonexpansive operator which
+preserves the norm.
+
+Proposition 3.3 For all (f, h) ∈ L2 (Rd )2 and J ∈ Z
+
+                     kS J f − S J hkP ∞ ≤ kS J+1 f − S J+1 hkP ∞ ,                (78)
+
+            kS J f − S J hkP ∞ ≤ kSJ [PJ ]f − SJ [PJ ]hk ≤ kf − hk ,              (79)
+                                       kS J f kP ∞ = kf k .                       (80)
+
+
+
+
+                                                30
+   Proof: We proved in (41) that
+                                           X
+                         kSJ [p]f k2 =               kSJ+1 [p′ ]f k2 ,                  (81)
+                                         p′ ∈PJp+1
+
+                       p
+where PJ+1 = ∪p∈PJ PJ+1      is a disjoint partition. Applying this to f and h
+implies
+                                2     X                                   2
+        kSJ [p]f k − kSJ [p]hk ≤            kSJ+1 [p′ ]f k − kSJ+1 [p′ ]hk .
+                                     p′ ∈PJp+1
+
+
+Summing over p ∈ PJ and inserting (77) proves (78).
+    Since kSJ [p]f k −kSJ [p]hk ≤ kSJ [p]f −SJ [p]hk, summing this inequality
+over p ∈ PJ and inserting (77) proves the first inequality of (79). The second
+inequality is obtained because SJ [PJ ] is nonexpansive. Setting h = 0 proves
+that kS J kP ∞ = kSJ [PJ ]f k and Theorem 2.6 proves kSJ [PJ ]f k = kf k, which
+gives (80). 
+    Since kS J f − S J hkP ∞ is non-decreasing and bounded when J increases,
+it converges to a limit which is smaller than the limit of the non-increasing
+sequence kSJ [PJ ]f − SJ [PJ ]hk. The following proposition proves that S J f
+converges pointwise to the scattering transform on P∞ introduced in Defini-
+tion 2.3.
+
+Proposition 3.4 If f ∈ L1 (Rd ) then
+                                                                  Z
+                                                     1
+            ∀p ∈ P∞ ,       lim S J f (p) = Sf (p) =                     U[p]f (x) dx   (82)
+                           J→∞                       µp
+            R
+with µp =       U[p]δ(x) dx.
+
+   Proof: If p ∈ P∞ then for J sufficiently large S J f (p) = kSJ [p]f k/kSJ [p]δk.
+Let us prove that
+                                              Z
+                        dJ/2
+                  lim 2      kSJ [p]f k = kφk U[p]f (x) dx ,                   (83)
+                     J→∞
+
+and that this equality also holds for f = δ. Since SJ [p]f = U[p]f ⋆ φ2J , the
+Plancherel formula implies
+                                      Z
+            dJ         2    dJ
+          2 kSJ [p]f k = 2 (2π)    −d     \(ω)|2 |φ̂(2J ω)|2 dω .
+                                         |U[p]f                           (84)
+
+                                            31
+Since derivatives of φ are in L1 (Rd ), we have φ̂(ω) = O((1 + |ω|)−1) and
+hence (2π)−d 2dJ |φ̂(2J ω)|2 converges to kφk2 δ(ω). Moreover, if f ∈ L1 (Rd )
+                          \ (ω) is continuous at ω = 0. It results from (84)
+then U[p]f ∈ L1 (Rd ) so U[p]f
+                                  \(0)|2 kφk2 which proves (83). The same
+that limJ→∞ 2dJ kSJ [p]f k2 = |U[p]f
+derivations hold to prove this result for f = δ.
+   Since |ψ̂(ω)|+|ψ̂(−ω)| 6= 0 almost everywhere, Proposition 3.1 proves that
+U[p]δ 6= 0. Since it is positive, it has
+                                       R a non-zero integral.
+                                                      R       It results from (83)
+that limJ→∞ kSJ [p]f k/kSJ [p]δk = U[p]f (x)dx/ U[p]δ(x)dx which proves
+(82). 
+   The scattering transform Sf can now be extended to P ∞ as a windowed
+scattering limit:
+
+                     ∀q ∈ P ∞ , Sf (q) = lim inf S J f (q) .
+                                                   J→∞
+
+
+Proposition 3.3 proves that kS J f kP ∞ = kf k so Fatou’s lemma implies that
+Sf ∈ L2 (P ∞ , dµ). The following theorem gives a sufficient condition so that
+S J f converges strongly to Sf , which then preserves the L2 (Rd ) norm of f .
+
+Theorem 3.5 If for f ∈ L2 (Rd ) there exists ΩfJ ⊂ PJ with
+
+                                                     SJ [p]f    SJ [p]δ
+  lim kSJ [ΩfJ ]f k2 = 0 and     lim      sup                 −          = 0 (85)
+  J→∞                           J→∞
+                                       p∈PJ −ΩfJ
+                                                    kSJ [p]f k kSJ [p]δk
+
+then S J f converges in norm to Sf with kSf kP ∞ = kf k and
+                            Z
+               ∀p ∈ P∞ ,         |S J f (q)|2 dµ(q) = kU[p]f k2 .            (86)
+                               C(p)
+
+
+If (f, h) ∈ L2 (Rd )2 satisfy (85) then
+
+                  lim kSJ [PJ ]f − SJ [PJ ]hk = kSf − ShkP ∞ .               (87)
+                 J→∞
+
+
+If (85) is satisfied in a dense subset of L2 (Rd ) then SJ f converges strongly
+to Sf for all f ∈ L2 (Rd ) and both (86) and (87) are satisfied in L2 (Rd ).
+
+   Proof: The following lemma proves that {S J f }J∈N is Cauchy and hence
+converges in norm to Sf ∈ L2 (P ∞ , dµ). The proof is in Appendix F.
+
+
+                                          32
+Lemma 3.6 If f ∈ L2 (Rd ) satisfies (85) then {S J f }J∈N is a Cauchy se-
+quence in L2 (P ∞ , dµ).
+
+    Since L2 (P ∞ , dµ) is complete, S J f (q) converges in norm to its limit
+inf Sf . Since kS J f k = kf k, it also implies that kSf kP ∞ = kf k. More-
+                                                   R
+over, U[p + q] = U[q]U[p] so kS J U[p]f k2P ∞ = C(p) |S J f (q)|2 dµ(q). Since
+kS J U[p]f k2P ∞ = kU[p]f k2 taking the limit when J goes to ∞ proves (86).
+    The windowed scattering convergence (87) relies on the following lemma.
+
+Lemma 3.7 If (f, h) ∈ L2 (Rd )2 satisfy (85) then
+
+               lim kSJ [PJ ]f − SJ [PJ ]hk = lim kS J f − S J hkP ∞ .                       (88)
+             J→∞                             J→∞
+
+
+    Since (85) implies that S J f and S J h respectively converge in norm to Sf
+and Sh, the convergenceP(87) results from (88). Proving (88) is equivalent
+to proving that limJ→∞ p∈PJ IJ (f, h)[p] = 0 for
+                                                                            2
+         IJ (f, h)[p] = kSJ [p]f − SJ [p]hk2 − kSJ [p]f k − kSJ [p]hk           .
+
+Observe that
+                                                                    2
+                                          SJ [p]f    SJ [p]h
+     IJ (f, h)[p] = kSJ [p]f k kSJ [p]hk           −                    .
+                                         kSJ [p]f k kSJ [p]hk
+                                                                            2
+                                                SJ [p]f    SJ [p]δ
+                   ≤ 2kSJ [p]f k kSJ [p]hk               −                                  (89)
+                                               kSJ [p]f k kSJ [p]δk
+                                                                                    !
+                                                                                2
+                                                SJ [p]h   SJ [p]δ
+                                             +          −                               .
+                                               kSJ [p]hk kSJ [p]δk
+
+When summing over p ∈ PJ , we separate ΩfJ ∪ΩhJ from its complement in PJ .
+Since limJ→∞ kSJ [ΩfJ ]f k2 = 0, kSJ [PJ ]f k2 = kf k2 , limJ→∞ kSJ [ΩhJ ]hk2 = 0,
+and kSJ [PJ ]hk2 = khk2 , dividing the sum over ΩfJ and ΩhJ and applying
+Cauchy-Schwartz proves that
+                            X
+                     lim          kSJ [p]f k kSJ [p]hk = 0 ,
+                      J→∞
+                            p∈ΩfJ ∪Ωh
+                                    J
+
+
+
+
+                                        33
+     P
+and p∈PJ kSJ [p]f k kSJ [p]hk ≤ kf k khk. The hypothesis (85) applied to f
+and h gives
+                                                                     !
+                                         2                         2
+                    SJ [p]f     SJ [p]δ       SJ [p]h     SJ [p]δ
+ lim     sup                 −             +          −                =0
+J→∞
+     p∈PJ −Ωf ∪Ωh
+                  kSJ [p]f k kSJ [p]δk       kSJ [p]hk kSJ [p]δk
+            J    J
+
+                              P
+so (89) implies that limJ→∞ p∈PJ IJ (f, h)[p] = 0, which finishes the Lemma
+proof.
+    Suppose that (85) is satisfied in a dense subset of L2 (Rd ). Any f ∈ L2 (Rd )
+is the limit of {fn }n>0 in this dense set. Since S and S J are nonexpansive
+
+                kSf − S J f kP ∞ ≤ 2 kf − fn k + kSfn − S J fn kP ∞ .
+
+Since fn satisfies (85), we proved that S J fn converges in norm to Sfn . Letting
+n go to ∞ implies that S J f converges in norm to S. The previous derivations
+then implies that both (86) and (87) are satisfied in L2 (Rd ). 
+   If f ∈ L1 (Rd ) and p ∈ P∞ , since SJ [p]f (x) = U[p]f ⋆ φ2J and kU[p]f k1 <
+∞, applying the Plancherel formula proves that
+                               SJ [p]f    SJ [p]δ 2
+                        lim             −           =0.                      (90)
+                        J→∞   kSJ [p]f k kSJ [p]δk
+
+This is however not sufficient to prove (85) because the sup is taken over all
+p ∈ PJ − ΩfJ which grows when J increases. For f ∈ L1 (Rd ), one can find
+paths pJ ∈ PJ , which are not frequency-decreasing, where SJ [pJ ]f /kSJ [pJ ]f k
+does not converge to SJ [pJ ]δ/kSJ [pJ ]δk. The main difficulty is to prove that
+over the set ΩfJ of all such paths, a windowed scattering transform has a
+norm kSJ [ΩfJ ]f k which converges to zero. Numerical experiments indicate
+that this property could be valid for all f ∈ L1 (Rd ). It also seems that if
+f ∈ L1 (Rd ) then Sf (q) is a continuous function of the path q, relatively
+to the Dirac scattering metric. This is analogous to the Fourier transform
+continuity when f ∈ L1 (Rd ).
+
+Conjecture 3.8 Condition (85) holds for all f ∈ L1 (Rd ). Moreover, if
+f ∈ L1 (Rd ) then Sf (q) is continuous in P ∞ relatively to the Dirac scattering
+metric.
+
+   If this conjecture is valid, since L1 (Rd ) is dense in L2 (Rd ), then Theo-
+rem 3.5 proves that S J converges strongly to Sf for all f ∈ L2 (Rd ), and
+
+                                         34
+kSf kP ∞ = kf k. Property (87) also proves that kSJ [PJ ]f − SJ [PJ ]hk con-
+verges to kSf − ShkP ∞ as J goes to ∞. Through this limit, the Lipschitz
+continuity of SJ under the action of diffeomorphisms can then be extended
+to the scattering transform S.
+
+3.3    Numerical Comparisons with Fourier
+Let Rd+ be the half frequency space of all ω = (ω1 , ..., ωd ) ∈ Rd with ω1 ≥ 0
+and ωk ∈ R for k > 1. To display numerical examples for real functions, the
+following proposition constructs a function from Rd+ to P ∞ which maps the
+Lebesgue measure of Rd+ into the Dirac scattering measure. It provides a
+representation of Sf over Rd+ . We assume that ψ is an admissible scattering
+wavelet, and that |ψ̂(ω)| + |ψ̂(−ω)| 6= 0 almost everywhere.
+
+Proposition 3.9 There exists a surjective function q(ω) from Rd+ onto P ∞
+such that for all measurable sets Ω ⊂ P ∞
+                                     Z
+                             µ(Ω) =       dω .                       (91)
+                                        q −1 (Ω)
+
+
+     Proof: The proof first constructs the inverse q −1 by mapping each cylin-
+der C(p) for p ∈ P∞ into Ra set q −1 (C(p)) ⊂ Rd+ satisfying the follow-
+ing properties: µ(C(p)) = q−1 (C(p)) dω, and q −1 (C(p)) ∩ q −1 (C(p′ )) = ∅
+if C(p) ∩ C(p′ ) = ∅, and q −1 (C(p)) ⊂ q −1 (C(p′ )) if C(p) ⊂ C(p′ ). Let
+q −1 (C(p)) be the closure of q −1 (C(p)) in Rd+ . For all p 6= ∅, we also im-
+pose that the frontier of q −1 (C(p)) is a set of measure 0 in Rd+ , and that
+q −1 (C(p + λ)) ⊂ q −1 (C(p)) for all λ ∈ Λ∞ . The cylinders C(p) generate the
+sigma algebra on which the measure µ is defined. A measurable set Ω can be
+approximated by sets Ωk which are union of disjoint cylinder sets C(p) with
+                                                 −1
+limk→∞R µ(Ω − Ωk ) = 0. The properties of q on the cylinders C(p) imply
+that q−1 (Ωk ) dω = µ(Ωk ) and when k goes to ∞ we get (91).
+     Once all q −1 (C(p)) are constructed, the inverse q(ω) is uniquely defined
+for all ω ∈ Rd+ , as follow. Let pm be the prefix of q̄ ∈ P ∞ of length m. We
+define q −1 (q̄) = ∩m∈N q −1 (C(pm )). Since q −1 (C(p + λ)) ⊂ q −1 (C(p)) for all
+λ ∈ Λ∞ , it results that ∩m∈N q −1 (C(pm )) = ∩m∈N q −1 (C(pm )). It is a closed
+non-empty set because q −1 (C(pm )) ⊂ q −1 (C(pm−1 )) is a non-empty set of
+measure kU[pm ]δk 6= 0. We verify that q(ω) = q̄ for all ω ∈ q −1 (q̄) defines
+a surjective function on Rd+ by showing that ∪q̄∈P ∞ q −1 (q̄) is a partition of
+
+                                       35
+Rd+ . If Pm is the set of all path of length m then ∪p∈Pm C(p) is a partition
+of P ∞ , so the recursive construction of q −1 implies that ∪p∈Pm q −1 (C(p)) is
+a partition of Rd+ . Letting m go to infinity proves that ∪q̄∈P ∞ q −1 (q̄) is a
+partition of Rd+ .
+     The sets q −1 (C(p)) satisfying the previously mentioned properties are
+defined recursively on the path length, with a subdivision procedure. In
+dimension d = 1, each q −1 (C(p)) is recursively defined as an interval of
+R+ . We begin with paths p = 2j of length 1 by defining q −1 (C(2j )) =
+[2j kψk2 , 2j+1kψk2 ), whose width is 2j kψk2 = µ(C(2j )). Suppose now that
+q −1 (C(p)) is an interval of width equal to µ(C(p)). All q −1 (C(p + 2j )) for
+j ∈ Z are defined as consecutive intervals [aj , aj−1), which define a partition
+of q −1 (C(p)) = ∪j∈Z [aj , aj−1) with aj−1 − aj = kU[p + 2j ]δk2 = µ(C(p + 2j )).
+One can verify that this recursive construction defines intervals q −1 (C(p))
+which satisfy all mentioned properties. Moreover, in this case the resulting
+function q(ω) is bijective from R+ to P ∞ .
+     In higher dimensions d ≥ 1, this construction is extended as follow. All
+cylinders C(λ) for all paths p = λ = 2j r of length 1 are mapped to non-
+intersecting hyper-rectangles q −1 (C(λ)) of measure
+              Z
+                         dω = µ(C(2j r)) = kU[2j r]δk2 = 2dj kψk2 .
+              q −1 (C(2j r))
+
+
+These hyper-rectangles are chosen to define a partition of Rd+ , and hence
+Rd+ = ∪λ∈Λ∞ q −1 (C(λ)) with qR−1 (C(λ)) ∩ q −1 (C(λ′ )) = ∅ for λ 6= λ′ . Sup-
+pose now that q −1 (C(p)), with q−1 (C(p)) dx = kU[p]δk2 , is defined for all paths
+                                               P
+p of length m. Since U preserves the norm λ∈Λ∞ kU[p + λ]δk2 = kU[p]δk2 .
+                           −1
+We
+R can thus partition q (C(p))        into subsets {q −1 (C(p + λ))}λ∈Λ∞ with
+ q −1 (C(p+λ)
+              dω = kU[p + λ]δk2 , whose frontiers are piecewise hyperplanes of
+dimensions d − 1 and hence have a zero measure.
+     The property q −1 (C(p + λ)) ⊂ q −1 (C(p)) for all λ ∈ Λ∞ is obtained
+with a progressive packing strategy. We first construct q −1 (C(p + λ)) for all
+λ = 2j r with  Pj ≥ 0, by defining a partition  of a closed subset of q −1 (C(p))
+of measure λ∈Λ∞ ,|λ|≥1 kU[p + λ]δk . The remaining q −1 (C(p + λ)) are then
+                                     2
+
+progressively constructed for λ = 2j r and j going from −1 to −∞, within the
+remaining closed subset of q −1 (C(p)) not already allocated. This is possible
+since we guarantee that the frontier of each q −1 (C(p)) has a zero measure.
+
+
+
+                                        36
+    The function q(ω) maps the Lebesgue measure into the Dirac scattering
+measure, but it is discontinuous at all ω ∈ Rd+ such that q(ω) ∈ P∞ . Indeed
+these ω are then at a boundary of the subdivision procedure used to construct
+q(ω). As a result, if ω and ω ′ are on opposite sides of a subdivision boundary
+then they are mapped to paths q(ω) and q(ω ′ ) whose distance ¯    d(q(ω), q(ω ′))
+does not converge to 0 as |ω − ω ′| goes to 0.
+    Measure preservation (91) implies that q(ω) defines a scattering function
+Sf (q(ω)) ∈ L2 (Rd+ ) with
+                      Z                      Z
+              2                       2
+  kSf (q(ω))kRd+ =        |Sf (q(ω))| dω =        |Sf (q)|2 dµ(q) = kSf k2P ∞ .
+                       Rd+                      P∞
+
+
+If f is a complex-valued function, then P ∞ is a union of positive paths
+q = (λ1 , λ2 , λ3 ...) and negative paths −q = (−λ1 , λ2 , λ3 ...). Setting q(−ω) =
+−q(ω) defines a surjective function from Rd to P ∞ which satisfies (91). It
+results that Sf (q(−ω)) = Sf (−q(ω)) for all ω ∈ Rd , and Sf (q(ω)) ∈ L2 (Rd )
+with kSf (q(ω))k = kSf kP ∞ .
+     If f satisfies (85) then Sf (q(ω)) and |fˆ(ω)| have an equivalent decay over
+dyadic frequency bands, because their norm is equal over these frequency
+bands. Indeed, for a frequency band λ = 2j r of radius proportional to |λ| =
+2j , the measure preservation (91) together with (86) prove that kU[λ]f k =
+kf ⋆ ψλ k satisfies
+    Z                                             Z
+                                                1
+                           2
+               |Sf (q(ω))| dω = kU[λ]f k =2
+                                                     |fˆ(ω)|2 |ψ̂(λ−1 ω)|2 dω . (92)
+      −1
+     q (C(λ))                                  2π
+
+If Conjecture 3.8 is valid then this is true for all f ∈ L2 (Rd ). In dimension
+d = 1, q −1 (C(2j )) = [kψk2 2j , kψk2 2j+1) and |ψ̂(2j ω)| is non-negligible on a
+similar dyadic frequency interval. Hence Sf (q(ω)) and |fˆ(ω)| have equivalent
+energy over dyadic frequency intervals.
+     Figure 2(c,d,e) illustrates the convergence of the windowed scattering
+transform S J f (q(ω)) when J increases, for a Gaussian second derivative f .
+S J f (q(ω)) is constant if q(ω) = p is constant and hence if ω ∈ q −1 (CJ (p)).
+The frequency interval q −1 (CJ (p)) has a width µ(CJ (p)) = kSJ δ[p]k2 , which
+goes to zero as J goes to ∞ as shown by (72). When J increases, each
+q −1 (CJ (p)) is subdivided into smaller intervals q −1 (CJ+1 (p′ )) corresponding
+to paths p which are prolongations of p. For each ω, the graph color specifies
+the length of the path p = q(ω). At low frequencies, q(ω) = ∅ is shown as
+
+
+                                        37
+0.8                                        0.8
+
+0.6                                        0.6
+
+0.4                                        0.4
+
+0.2                                        0.2
+
+  0                                          0
+   0       0.5       1       1.5      2       0    0.5       1       1.5      2
+                    (a)                                     (b)
+0.8                                         0.8
+
+0.6                                         0.6
+
+0.4                                         0.4
+
+0.2                                         0.2
+
+ 0                                           0
+  0        0.5       1       1.5       2      0    0.5       1       1.5      2
+                    (c)                                     (d)
+
+
+Figure 2: (a): Fourier modulus |fˆ(ω)| of a Gaussian second derivative, as a
+function of ω ∈ [0, 2]. (b,c,d): Piecewise constant graphs of S J f (q(ω)), as a
+function of ω ∈ [0, 2]. The color specifies the length of each path q(ω): 0 is
+yellow, 1 red, 2 green, 3 blue, 4 violet. The frequency resolution 2J increases
+from (b) to (c) to (d), and S J f (q(ω)) converges to a limit function Sf (q(ω)).
+
+a yellow interval. Paths q(ω) of length 1 to 4 are respectively coded in red,
+green, blue and violet.
+    In these numerical examples, the total energy of S J f (q(ω)) on frequency-
+decreasing paths q(ω) is about 105 times larger than the energy of scatter-
+ing coefficients on all other paths. We thus only compute S J f (q(ω)) for
+frequency-decreasing paths, with an O(N log N) filter bank algorithm de-
+scribed in [13]. It is implemented with the complex cubic spline Battle-
+Lemarié wavelet ψ. As expected from (92), S J f (q(ω))f has an amplitude
+and a frequency localization which is similar to the Fourier modulus |fˆ(ω)|
+shown in Figure 2(a). The discontinuities of S(q(ω))f along ω are produced
+by the discontinuities of the mapping q(ω), as opposed to discontinuities of
+S(q)f relatively to the scattering metric in P ∞ .
+    Figure 3 compares S(q(ω))fi and |fˆi (ω)| for four functions fi with 1 ≤
+i ≤ 4. For f1 = 1[0,1] , the first row of Figure 3 shows that |fˆ1 (ω)| = O((1 +
+
+                                       38
+ 0.04                              1                             1
+
+ 0.02                            0.5                         0.5
+
+    0                              0                             0
+    −4    −2     0     2     4      0   10        20   30   40    0   10     20   30   40
+ 0.02                              1                             1
+
+   0                             0.5                         0.5
+
+−0.02                             0                            0
+    −4   −2     0      2     4      0   10        20   30   40 0      10     20   30   40
+ 0.02                             1                           1
+
+    0                            0.5                         0.5
+
+−0.02                             0                           0
+    −4   −2     0      2     4     0    10        20   30   40 0      10     20   30   40
+ 0.02                             1                           1
+
+
+   0                             0.5                         0.5
+
+
+−0.02                              0                          0
+    −4   −2     0     2      4      0   10        20   30   40 0      10     20   30   40
+
+                (a)                           (b)                          (c)
+
+Figure 3: (a): Each row 1 ≤ i ≤ 4 gives an example of function fi (x). (b):
+Graphs of the Fourier modulus |fˆi (ω)|, as a function of ω. (c): Graphs of the
+scattering Sfi (q(ω)), as a function of ω.
+
+|ω|)−1) has the same decay in ω as Sf1 (q(ω)). The second row corresponds
+                                           2
+to a Gabor function f2 (x) = eiξx e−x /2 and the third row shows a small
+scaling f3 (x) = f2 ((1 − s)x) with s = −0.1. The support of fˆ3 (ω) = (1 −
+s)−1 fˆ2 ((1 − s)−1 ω) is shifted towards higher frequencies relatively to the
+support of fˆ2 . A numerical computation gives k|fˆ2 | − |fˆ3 |k = C |s| kf2 k with
+C = 13.5. As shown by (3), the constant C grows proportionally to the
+center frequency ξ of fˆ2 . It illustrates the instability of the Fourier modulus
+under the action of diffeomorphisms. On the contrary, the scattering distance
+remains stable. We numerically obtain kSf2 − Sf3 k = C |s| kf2k, with C =
+1.5, and this constant does not grow with ξ. It illustrates the Lipschitz
+continuity of a scattering relatively to deformations. In the fourth row, f4
+is a sum of two high-frequency Gabor functions, and |fˆ4 (ω)| includes two
+narrow peaks localized within the support of fˆ3 . The wavelet transform has a
+bad frequency localization at such high frequencies, and can not discriminate
+
+
+                                             39
+the two frequency peaks of fˆ4 from fˆ3 . However, these two frequency peaks
+create low frequency interferences, which appear in the graph of f4 , and
+which are captured by second order scattering coefficients. As a result, Sf4
+is very different from Sf3 , which illustrates the high frequency resolution of
+a scattering transform obtained through interferences.
+
+
+4     Scattering Stationary Processes
+A scattering defines a representation of stationary processes in l2 (P∞ ), hav-
+ing different properties than a Fourier power spectrum. The Fourier power
+spectrum depends only on second-order moments. A scattering transform
+incorporates higher-order moments that can discriminate processes having
+same second-order moments. Section 4.2 shows that it is Lipschitz continu-
+ous to random deformations, up to a log term.
+
+4.1    Expected Scattering
+The properties of a scattering transform in L2 (Rd ) are extended to stationary
+processes X(x) with finite second-order moments. The rôle of L2 (Rd ) norm
+on functions is replaced by the mean square norm E(|X(x)|2 )1/2 on stationary
+stochastic processes, which does not depend upon x and is thus denoted
+E(|X|2)1/2 . Convolutions as well as a modulus preserve stationarity. If X(x)
+is stationary, it results that U[p]X(x) is also stationary and its expected value
+thus does not depend upon x.
+Definition 4.1 The expected scattering transform of a sationary process X
+is defined for all p = (λ1 , ..., λm ) ∈ P∞ by
+              SX(p) = E(U[p]X) = E(| |X ⋆ ψλ1 | ⋆ ...| ⋆ ψλm |).
+   This definition replaces the normalized integral of the scattering trans-
+form (18) by an expected value. The expected scattering distance between
+two stationary processes X and Y is
+                                  X
+                  kSX − SY k2 =       |SX(p) − SY (p)|2 .
+                                    p∈P∞
+
+   Scattering coefficients depend upon normalized high order moments of
+X. This is shown by decomposing
+                    |U[p]X(x)|2 = E(|U[p]X|2 ) (1 + ǫ(x)) .
+
+                                       40
+                                                       R
+A first-order approximation
+                 p          assumes that |ǫ| ≪ 1. Since ψλ (x) dx = 0,
+                             2
+√ U[p]X(x) = |U[p]X(x)| , computing U[p + λ]X = |U[p]X ⋆ ψλ | with
+and
+  1 + ǫ ≈ 1 + ǫ/2 gives
+
+                                     ||U[p]X|2 ⋆ ψλ |
+                      U[p + λ]X ≈                     .                  (93)
+                                    2 E(|U[p]X|2 )1/2
+
+Iterating on (93) proves that SX(p) = E(U[p]X) for p = (λ1 , ..., λm ) depends
+on normalized moments of X of order 2m , successively filtered by the wavelets
+ψλk for 1 ≤ k ≤ m.
+    The expected scattering transform is estimated by computing a windowed
+scattering transform of a realization X(x):
+
+          SJ [PJ ]X = {SJ [p]X}p∈PJ with SJ [p]X = U[p]X ⋆ φ2J .
+       R
+Since φ2J (x) dx = 1, it results that E(SJ [p]X) = E(U[p]X) = SX(p). So
+SJ [PJ ]X is an unbiased estimator of {SX(p)}p∈PJ .
+    The autocovariance of a real stationary process X is denoted
+                                                            
+             RX(τ ) = E (X(x) − E(X)) (X(x − τ ) − E(X)) .
+
+                      b
+Its Fourier transform RX(ω)   is the power spectrum of X. The mean-square
+norm of SJ [PJ ]X = {SJ [p]X}p∈PJ is written
+                                        X
+                    E(kSJ [PJ ] Xk2 ) =     E(|SJ [p]X|2 ).
+                                       p∈PJ
+
+
+The following proposition proves that SJ [PJ ]X and SX are nonexpansive and
+that SX ∈ l2 (P∞ ). The wavelet ψ is assumed to satisfy the Littlewood-Paley
+condition (9).
+
+Proposition 4.2 If X and Y are finite second-order stationary processes
+then
+             E(kSJ [PJ ]X − SJ [PJ ]Y k2 ) ≤ E(|X − Y |2 ) ,       (94)
+                       kSX − SY k2 ≤ E(|X − Y |2 )                       (95)
+and
+                             kSXk2 ≤ E(|X|2 ) .                          (96)
+
+
+                                     41
+    Proof: We first show that the wavelet transform WJ X = {AJ X, (W [λ]X)λ∈ΛJ }
+is unitary over stationary processes. Let us denote
+                                             X
+              E(kWJ Xk2 ) = E(|AJ X|2 ) +        E(|W [λ]X|2) .
+                                             λ∈ΛJ
+                                                              R
+Both ARJ X = X ⋆φ2J and W [λ]X = X ⋆ψλ are stationary. Since φ2J (x) dx =
+1 and ψλ (x) dx = 0 it results that E(AJ X) = E(X) and E(W [λ]X) = 0.
+                                                            b
+Since the power spectrum of AJ X and W [λ]X is respectively RX(ω) |φ̂(2J ω)|2
+     b
+and RX(ω)   |ψ̂λ(ω)|2, we get
+                              Z
+                         2
+                E(|AJ X| ) =    b
+                                RX(ω) |φ̂(2J ω)|2 dω + E(X)2
+
+and                                 Z
+                               2
+                   E(|W [λ]X| ) =       b
+                                        RX(ω) |ψ̂λ(ω)|2 dω.
+                R
+                  b
+Since E(|X|2 ) = RX(ω)    dω + E(X)2 , the same proof as in Proposition 2.1
+shows that the wavelet condition (9) implies that E(kWJ Xk2 ) = E(|X|2 ).
+   The propagator UJ X = {AJ X, (|W [λ]X|)λ∈ΛJ } satisfies
+
+          E(kUJ X − UJ Y k2 ) ≤ E(kWJ X − WJ Y k2 ) = E(|X − Y |2 )
+
+and is thus nonexpansive on stationary processes. We verify as in (25) that
+                                      m         m+1
+                   UJ U[Λm
+                         J ]X = {SJ [ΛJ ]X , U[ΛJ   ]X} .
+
+Since PJ = ∪+∞      m
+              m=0 ΛJ , one can compute SJ [PJ ]X by iteratively applying the
+nonexpansive operator UJ . The nonexpansive property (94) is derived from
+the fact that UJ is nonexpansive, as in Proposition 2.5.
+   Let us prove (95). Since SX(p) = E(SJ [p]X) and SY (p) = E(SJ [p]Y )
+    X
+        |SX(p) − SY (p)|2 ≤ E(kSJ [PJ ]X − SJ [PJ ]Y k2 ) ≤ E(|X − Y |2 ) .
+   p∈PJ
+
+
+Letting J go to ∞ proves (95). The last inequality (96) is obtained by setting
+Y = 0. 
+    Paralleling the scattering norm preservation in L2 (Rd ), the following the-
+orem proves that SJ [PJ ] preserves the mean-square norm of stationary pro-
+cesses.
+
+                                        42
+Theorem 4.3 If the wavelet satisfies the admissibility condition (30) and if
+X is stationary with E(|X|2) < ∞ then
+
+                         E(kSJ [PJ ]Xk2 ) = E(|X|2 ) .                   (97)
+
+   Proof: The proof of (97) is almost identical to the proof of (31) in The-
+orem 2.6, if we replace f by X, |fˆ(ω)|2 by the power spectrum RX(ω)   b
+        2          2                                2          2
+and kf k by E(|X| ). We proved that E(kWJ Xk ) = E(|X| ) so we also
+have E(kUJ Xk2 ) = E(|X|2 ). In the derivations of Lemma 2.8, replacing
+                                            b p (ω), proves that
+fp = U[p]f by Xp = U[p]X, and |fˆp (ω)|2 by RX
+   α                                            XX
+     E(kU[PJ ]Xk2 ) ≤ max(J + 1, 1) E(|X|2) +            j E(|X ⋆ ψ2j r |2 ) .
+   2                                            j>0    +
+                                                      r∈G
+
+Since PJ = ∪m∈N Λm
+                 J , if the right hand-side term is finite then
+
+                           lim E(kU[Λm    2
+                                     J ]Xk ) = 0 .                       (98)
+                          m→∞
+
+The same density argument as in the proof of Theorem 2.6 proves that (98)
+                                   b
+also holds if E(|X|2 ) < ∞ because RX(ω)   is integrable.
+                                                                    m+1
+    Since E(kUJ Xk ) = E(|X| ) and UJ U[Λm
+                    2         2                           m
+                                             J ]X = {SJ [ΛJ ]X , U[ΛJ   ]X},
+iterating m times on UJ proves as in (34) that
+                         m−1
+                         X
+                                                              2
+             E(|X|2) =         E(kSJ [ΛnJ ]Xk2 ) + E(kU[Λm
+                                                         J ]Xk ) .
+                         n=0
+
+When m goes to ∞, (98) implies (97). 
+   A windowed scattering SJ [p] = U[p]X ⋆ φJ averages U[p]X over a domain
+whose size is proportional to 2J . If U[p]X is ergodic, it thus converges to
+SX(p) = E(U[p]X) when J goes to ∞. The windowed transformed scatter-
+ing SJ [PJ ]X is said to be a mean-square consistent estimator of SX if its
+total variance over all paths converges to zero:
+                                         X
+     lim E(kSJ [PJ ]X − S J Xk2 ) = lim      E(|SJ [p]X − SX(p)|2) = 0 .
+   J→∞                               J→∞
+                                            p∈PJ
+
+Mean-square convergence implies convergence in probability and hence that
+SJ [PJ ]X converges to SX with probability 1.
+    For a large class of ergodic processes X, including Gaussian processes,
+mean-square convergence is observed numerically, with E(|SJ [PJ ]X−S J X)|2) ≤
+
+                                       43
+C 2−αJ for C > 0 and α > 0. When J increases, the global variance of
+SJ [PJ ]X decreases despite the path subdivision into new paths because each
+modulus reduces the variance by removing random phase variations. The
+variance of SJ [p]X thus decreases when the path length increases, and it is
+concentrated over a small number of frequency-decreasing paths. For a Gaus-
+sian white noise and a moving average Gaussian process of unit variance,
+Figure 4 shows that log E(kSJ [PJ ]X − SXk2 ), computed over all frequency-
+decreasing paths, decays linearly as a function J. For the correlated Gaussian
+process, the decay begins for 2J ≥ 24 , which is the correlation length of this
+process. Indeed, the averaging by φ2J effectively reduces the estimator vari-
+ance when 2J is bigger than the correlation length.
+
+Conjecture 4.4 If X is a Gaussian stationary process with kRXk1 < ∞
+then SJ [PJ X] is a mean-square consistent estimator of SX.
+
+
+        2
+        0
+       −2
+       −4
+       −6
+       −8
+         1     2      3     4       5     6    7     8    9     10    11
+
+
+Figure 4: Decay of log2 E(kSJ [PJ ]X −SXk2 ) as a function of J for a Gaussian
+white noise X (bottom line) and a moving average Gaussian process (top
+line), along frequency-decreasing paths.
+
+   The following corollary of Theorem 4.3 proves that mean-square consis-
+tency implies an expected scattering energy conservation.
+
+Corollary 4.5 For an admissible scattering wavelet which satisfies condition
+(30), SJ [PJ ]X is mean-square consistent if and only if
+
+                                kSXk2 = E(|X|2 ) ,                          (99)
+
+and mean-square consistency implies that for all λ ∈ Λ∞
+                   X
+                        |SX(λ + p)|2 = E(|X ⋆ ψλ |2 ) .                    (100)
+                     p∈P∞
+
+
+
+                                        44
+   Proof: It results from Theorem 4.3 that E(kSJ [PJ ]Xk2 ) = E(|X|2 ). Since
+                        X
+   E(kSJ [PJ ]Xk2 ) =      E(SJ [p]X)2 + E(|SJ [PJ ]X − E(SJ [PJ ]X)|2 ),
+                       p∈PJ
+
+
+and E(SJ [p]X) = SX(p), we derive that limJ→∞ E(kSJ [PJ ]X−E(SJ [PJ ]X)k2 ) =
+0 if and only if kSXk2 = E(|X|2 ). Moreover, for all λ ∈ Λ∞ , since U[p]U[λ]X =
+U[λ + p]X, applying (99) to U[λ]X instead of X proves (100). 
+     The expected scattering can be represented by a singular scattering spec-
+trum in P ∞ . Similarly to Section 3.2, we associate to SX(p) = E(U[p]X) a
+function that is piecewise constant in P ∞ :
+                                       X               1CJ (p) (q)
+                ∀q ∈ P ∞ , PJ X(q) =          SX(p)2               .      (101)
+                                       p∈PJ
+                                                       kSJ [p]δk2
+
+The following proposition proves that PJ converges to a singular measure,
+called a scattering power spectrum.
+
+Proposition 4.6 PJ X(q) converges in the sense of distributions to a Radon
+measure in P ∞ , supported in P∞ :
+                                     X
+             P X(q) = lim PJ X(q) =       SX(p)2 δ(q − p) .           (102)
+                         J→∞
+                                            p∈P∞
+
+
+    Proof: RFor any p ∈ P∞ , the Dirac δ(p − q) is defined as a linear form
+satisfying P ∞ f (q) δ(p − q)dµ(q) = f (p) for all continuous functions f (q) of
+P ∞ relatively to the scattering metric. For all J ∈ Z, µ(CJ (p)) = kSJ [p]δk2 ,
+p ∈ CJ (p). and limJ→∞ µ(CJ (p)) = 0. We thus obtain the following conver-
+gence in the sense of distributions:
+
+                              1CJ (p) (q)
+                          lim             = δ(q − p).
+                          J→∞ kSJ [p]δk2
+
+
+Letting J go to ∞ in (101) proves (102). 
+    If SJ [PJ ]X is mean-square consistent then (100) implies that the scatter-
+ing spectrum P X(q) is related to the Fourier power spectrum RX(ω)b      by
+   Z                                         Z
+                                          1     b
+                                    2
+          P X(q) dµ(q) = E(|X ⋆ ψλ | ) =       RX(ω)   |ψ̂(λ−1 ω)|2 dω . (103)
+     C(λ)                                2π
+
+                                       45
+Let q(ω) be the function of Proposition 3.9, which maps the Lebesgue mea-
+sure of Rd+ into the Dirac scattering measure of P ∞ . It defines a scattering
+power spectrum P X(q(ω)) over the half frequency space ω ∈ Rd+ . In dimen-
+sion d = 1, q −1 (C(2j )) = [kψk2 2j , kψk2 2j+1), so (103) implies
+            Z kψk2 2j+1                       Z
+                                          1       b
+                          P X(q(ω)) dω =          RX(ω) |ψ̂(2j ω)|2 dω .
+             kψk2 2j                     2π
+
+                          b
+Although P X(q(ω)) and RX(ω)      have the same integral over dyadic frequency
+intervals, they have very different distributions within each of these intervals.
+Indeed, (93) shows that if p is of length m then E(U[p]X) depends upon
+normalized moments of X of order 2m . It results that P X(q(ω)) depends
+upon arbitrarily high order moments of X where as RX(ω)   b       only depends
+upon moments of order 2. Hence, P X(q) can discriminate different stationary
+processes having same Fourier power spectrum and thus same second-order
+moments.
+    Figure 5 gives the scattering power spectrum of a Gaussian white noise
+X2 and of a Bernoulli process X1 in dimension d = 1, estimated from a
+realization sampled over N = 104 integer points. Both processes have a
+constant Fourier power spectrum RX   b i (ω) = 1 but very different scattering
+spectrum. Their scattering spectrum P Xi (q(ω)) is estimated by PJ Xi (q(ω))
+in (101) at the maximum scale 2J = N. It is a sum of spikes in Figure
+5(b), which converges to a Radon measure supported in P∞ when increasing
+2J = N. A Gaussian white noise X2 has a scattering spectrum mostly
+concentrated on paths q(ω) = (2j ) of length 1. These scattering coefficients
+appear as large amplitude red spikes at dyadic positions, in the bottom graph
+of Figure 5(b). Their amplitude is proportional to SX2 (2j )2 ∼ 2j . Other
+spikes in green, correspond to paths q(ω) = (λ1 , λ2 ) of length two. They
+have a much smaller amplitude. Scattering coefficients for paths of length 3
+and 4, in blue and violet, are so small that they are not visible. The top of
+Figure 5(b) shows the scattering spectrum PJ X1 (q(ω)) of a Bernouilli process
+X1 . It has a maximum amplitude for paths q(ω) of length 1 (in red), but
+longer paths shown in green, blue and violet also produce large scattering
+coefficients, as opposed to a Gaussian white noise scattering. Scattering
+coefficients for paths p of length m depend upon the moments of X up to
+the order 2m . For m > 1, large scattering coefficients indicate a strongly
+non-Gaussian behavior of high order moments.
+
+
+                                        46
+                                                   5
+                                                x 10
+                                           2
+ 10
+                                          1.5
+
+                                           1
+  5
+                                          0.5
+
+  0                                        0
+   0    200    400    600    800   1000     0              0.5   1   1.5   2   2.5   3
+                                                       6
+                                                x 10
+ 4                                          2
+
+ 2                                        1.5
+
+ 0                                          1
+
+−2                                        0.5
+
+−4                                          0
+  0     200    400    600    800   1000      0             0.5   1   1.5   2   2.5   3
+
+
+                     (a)                                             (b)
+
+Figure 5: (a): Realization of a Bernoulli process X1 (x) at the top and a
+Gaussian white noise X2 (x) at the bottom, both having a unit variance.
+(b): Scattering power spectrum P Xi (q(ω)) of each process, as a function of
+ω ∈ [0, π]. The values of P Xi (q(ω)) are displayed respectively in red, green,
+blue and violet, for paths q(ω) of length 1, 2, 3 and 4.
+
+4.2    Random Deformations
+We now show that the scattering transform is nearly Lipschitz continuous to
+the action of random deformations. If τ is a random process with k∇τ k∞ =
+|∇τ (x)| < 1 then x − τ (x) is a random diffeomorphism. If X(x) and τ (x) are
+independent stationary processes then the action of this random diffeomor-
+phism on X(x) defines a randomly deformed process Lτ X(x) = X(x − τ (x))
+which remains stationary.
+   The following theorem adapts the result of Theorem 2.12 by proving that
+the scattering distance produced by a random deformation is dominated by
+
+
+
+
+                                      47
+a first-order term proportional to E(k∇τ k2∞ ). Let us denote
+                                                        1/2
+                                  +∞
+                                 X X
+                E(kU[PJ ]Xk1 ) =           E(|U[p]X|2 )
+                                   m=0    p∈Λm
+                                             J
+
+
+where Λm                                                            J
+       J is the set of paths p = (λk )k≤m of length m with |λk | < 2 .
+
+Theorem 4.7 There exists C such that for all independent stationary pro-
+cesses τ and X satisfying k∇τ k∞ ≤ 1/2 with probability 1, if E(kU[PJ ]Xk1 ) <
+∞ then
+
+         E(kSJ [PJ ]Lτ X − SJ [PJ ]Xk2 ) ≤ C E(kU[PJ ]Xk1 )2 K(τ )         (104)
+
+with
+                                                        2 
+                −J                   k∆τ k∞
+   K(τ ) = E   2 kτ k∞ + k∇τ k∞ (log        ∨ 1) + kHτ k∞      .           (105)
+                                     k∇τ k∞
+Over the subset PJ,m of path in PJ of length strictly smaller than m
+
+         E(kSJ [PJ,m ]Lτ X − SJ [PJ,m ]Xk2 ) ≤ C m E(|X|2) K(τ ) .         (106)
+
+   Proof: Similarly to the proof of Theorem 2.12, we decompose
+
+       E(kSJ [PJ ]Lτ X − SJ [PJ ]Xk2 ) ≤ 2 E(kLτ SJ [PJ ]X − SJ [PJ ]Xk2 )
+                                         +2 E(k[SJ [PJ ], Lτ ]Xk2 ).
+
+Appendix H proves that E(k[SJ [PJ ] , Lτ ]Xk2 ) ≤ E(kU[PJ ]Xk1 )2 B(τ ) with
+                   
+                                  k∆τ k∞                 2 
+               2
+      B(τ ) = C E    k∇τ k∞ (log           ∨ 1) + kHτ k∞      ,         (107)
+                                  k∇τ k∞
+and since
+
+  E(kLτ SJ [PJ ]X − SJ [PJ ]Xk2 ) ≤ C 2 E(kU[PJ ]Xk1 )2 E(2−J kτ k2∞ ) ,   (108)
+
+we get (104). The commutator [SJ [PJ ], Lτ ] and Lτ SJ [PJ ] − SJ [PJ ] are ran-
+dom operators since τ is a random process. The key argument of the proof
+is provided by the following lemma which relates the expected L2 (Rd ) sup
+norm of a random operator to its norm on stationary processes. This lemma
+is proved in Appendix G.
+
+                                         48
+Lemma 4.8 Let Kτ be an integral operator with a kernel kτ (x, u) which
+depends upon a random process τ . If the following two conditions are satisfied
+                                            ZZ
+             ∗      ′                 ′
+E kτ (x, u) kτ (x, u ) = k̄τ (x−u, x−u ) and      |k̄τ (v, v ′)| |v−v ′| dv dv ′ < ∞ ,
+
+then for any stationary process Y independent of τ , E(|Kτ Y (x)|2 ) does not
+depend upon x and
+                       E(|Kτ Y |2 ) ≤ E(kKτ k2 ) E(|Y |2 ) ,                   (109)
+where kKτ k is the operator norm in L2 (Rd ) for each realization of τ .
+   This result remains valid when replacing SJ [PJ ] by SJ [PJ,m ] and U[PJ ]
+by U[PJ,m ]. With the same argument as in the proof of (62), we verify that
+                        E(kU[PJ,m ]Xk1 ) ≤ m E(|X|2)1/2
+which proves (106). 
+    Small stationary deformations of stationary processes result in small mod-
+ifications of the scattering distance, which is important to characterize de-
+formed stationary processes as in image textures [3]. The following corollary
+proves that the expected scattering transform is almost Lipschitz continuous
+in the size of the stochastic deformation gradient ∇τ , up to a log term.
+Corollary 4.9 There exists C such that for all independent stationary pro-
+cesses τ and X satisfying k∇τ k∞ ≤ 1/2 with probability 1, if E(kU[P∞ ]Xk1 ) <
+∞ then
+              kSLτ X − SXk2 ≤ C E(kU[P∞ ]k1 ) E(|X|2 ) K(τ )           (110)
+with                     n                                      2 o
+                                            k∆τ k∞
+             K(τ ) = E        k∇τ k∞ (log          ∨ 1) + kHτ k∞     .         (111)
+                                            k∇τ k∞
+    Proof: E(kSJ [PJ ]Lτ X −SJ [PJ ]Xk2 ) ≤ kE(SJ [PJ ]Lτ X) −E(SJ [PJ ]X)k2 ,
+so letting J go to ∞ in (104) proves (110). 
+
+
+5      Invariance to Actions of Compact Lie Groups
+Invariant scattering are extended to the action of compact Lie Groups G.
+Section 5.1 builds scattering operators in L2 (G) which are invariant to the
+action of G. Section 5.2 defines a translation and rotation invariant operators
+on L2 (Rd ) by combining a scattering operator on L2 (Rd ) and a scattering
+operator on L2 (SO(d)).
+
+                                            49
+5.1    Compact Lie Group Scattering
+Let G be a compact LieRgroup and L2 (G) be the space of measurable functions
+f (r) such that kf k2 = G |f (r)|2 dr < ∞, where dr is the Haar measure of G.
+The left action of g ∈ G on f ∈ L2 (G) is defined by Lg f (r) = f (g −1r). This
+section introduces a scattering transform on L2 (G), which is invariant to the
+action of G. It is obtained with a scattering propagator which cascades the
+modulus of wavelet transforms defined on L2 (G).
+     The construction of Littlewood-Paley decompositions on compact mani-
+folds and in particular on compact Lie groups was developed by Stein [19].
+Different wavelet constructions have been proposed over manifolds [16]. Geller
+and Pesenson [8] have built unitary wavelet transforms on compact Lie
+groups, which can be viewed as analogs of unitary wavelet transforms on the
+circle in R2 . In place of sinusoids, they use the eigenvectors of the Laplace-
+Beltrami operator of an invariant metric defined on the group. Similarly to
+Meyer wavelets [14], these basis elements are regrouped into dyadic subbands
+with appropriate windowing. For any 2L ≤ 1, it defines a scaling function
+φe2L (r) and a family of wavelets {ψe2j (r)}−L<j<∞ which are in L2 (G) [8]. The
+wavelet coefficients of f ∈ L2 (G) are computed with left convolutions on the
+group G for each λ̃ = 2j :
+                                             Z
+                 f                 e
+                 W [λ̃]f (r) = f ⋆ ψλ̃ (r) =   f (g) ψeλ̃(g −1 r) dg       (112)
+                                                 G
+
+and the scaling function performs an averaging on G:
+                                          Z
+               AeL f (r) = f ⋆ φe2L (r) =         e2L (g −1 r) dg .
+                                            f (g) φ                          (113)
+                                             G
+
+The resulting wavelet transform of f ∈ L2 (G) is
+      fL f = {AeL f , (W
+                       f[λ̃]f )                 e            j
+      W                         λ̃∈Λ̃L } with ΛL = {λ̃ = 2 : j > −L} .
+                                                    R    −1
+At the maximum scale 2L = 1, since φe1 (r) = G dg              = |G|−1 is constant,
+             e0 performs an integration on the group:
+the operator A
+                                           Z
+                       e
+                      A0 f (r) = |G|    −1
+                                             f (g) dg = cst.                  (114)
+                                           G
+
+Wavelets are constructed to obtain a unitary operator [8]
+                                  fL f k = kf k ,
+                                 kW                                          (115)
+
+                                        50
+with                                                X
+                      fL f k2 = kA
+                     kW          eL f k2 +                 f[λ̃]f k2 .
+                                                          kW
+                                                 λ̃∈Λ̃L
+
+    The Abelian group G = SO(2) of rotations in R2 is a simple example
+parametrized by an angle in [0, 2π]. The space L2 (G) is thus equivalent
+to L2 [0, 2π]. Wavelets in L2 (G) are the well-known periodic wavelets in
+L2 [0, 2π] [14]. They are obtained by periodizing a scaling function φ2L (x) =
+2−L φ(2−L x) and wavelets ψ2j (x) = 2j ψ(2j x) with (φ, ψ) ∈ L2 (R)2 :
+                 X                               X
+     φe2L (x) =     φ2L (x − 2πm) and ψe2j (x) =     ψ2j (x − 2πm) .     (116)
+               m∈Z                                         m∈Z
+
+
+We suppose that φ̂(0) = 1 and φ̂(2kπ) = 0 for k ∈ Z − {0}. The Poisson
+                          e       P
+formula implies that φ(x)      = n∈Z φ(x − n) = 2π. Convolutions (112) and
+(113) on the rotation group are circular convolutions of periodic functions
+in L2 [0, 2π]. With the Poisson formula, one can prove that the periodic
+wavelet transform W   fL is unitary if and only if (φ, ψ) ∈ L2 (R)2 satisfy the
+Littlewood-Paley equalities (9).
+    For a general compact Lie group G, we define a wavelet modulus operator
+by Ue [λ̃]f = |W
+               fL [λ̃]f |, and the resulting one-step propagator is
+
+                          eL f = {A
+                                  eL f , (U[
+                                          e λ̃]f |)
+                          U                         λ̃∈Λ̃L } .
+
+      fL is unitary, we verify as in (26) that U
+Since W                                             eL is nonexpansive and preserves
+                2
+the norm in L (G).
+    A scattering operator on L2 (G) applies U      eL iteratively. Let PeL denote the
+set of all finite paths p̃ = {λ̃1 , ..., λ̃m } of length m, where λ̃k = 2jk ∈ Λ   e L.
+                                                              2
+Following Definition 2.2, a scattering propagator on L (G) is a path ordered
+product of non-commutative wavelet modulus operators
+                              e [p̃] = U
+                              U        e [λ̃m ] ... U[
+                                                    e λ̃1 ] ,
+
+with Ue [∅] = Id.
+    Following Definition 2.4, a windowed scattering is defined by averaging
+U[p̃]f through a group convolution with φe2L
+e
+                                            Z
+             e              e  e
+             SL [p̃]f (r) = AL U[p̃]f (r) =   U[p̃]f (g) φe2L (g −1 r) dg . (117)
+                                                G
+
+
+                                           51
+It yields an infinite family of functions SeL [P
+                                               eL ]f = {SeL [p̃]f } e , whose norm
+                                                                   p̃∈PL
+is
+                     X                                     Z
+       e  e      2
+     kSL [PL ]f k =        e        2          e      2
+                         kSL [p̃]f k with kSL [p̃]f k =         |SeL [p̃]f (r)|2 dr .
+                       eL                                       G
+                    p̃∈P
+
+
+         e [P
+   Since U  eL ] is obtained by cascading the nonexpansive operator U
+                                                                    eL , the
+same proof as in Proposition 2.5 shows that it is nonexpansive:
+
+            ∀(f, h) ∈ L2 (G)2 , kSeL [P
+                                      eL ]f − SeL [PeL ]hk ≤ kf − hk .
+
+Since U  e [P
+            eL ] preserves the norm in L2 (G), to also prove as in Theorem 2.6
+that kSeL [PeL ]f k = kf k, it is necessary to verify that limm→∞ kU  e [Λ
+                                                                         e m ]k2 = 0.
+                                                                           L
+                                             d
+For the translation group where G = R , Theorem 2.6 proves this result by
+imposing a condition on the Fourier transform of the wavelet. The extension
+of this result is not straightforward on L2 (G) for general compact Lie groups
+G, but it remains valid for the rotation group G = SO(2) in R2 . Indeed,
+periodic wavelets ψ̃λ̃ ∈ L2 (SO(2)) = L2 [0, 2π] are obtained by periodizing
+wavelets ψλ̃ ∈ L2 (R) in (116), which is equivalent to subsample uniformly
+their Fourier transform. If ψ satisfies the admissibility condition of Theorem
+2.6 then by replacing convolutions with circular convolutions in the proof,
+we verify that the periodized wavelets ψ̃λ̃ define a scattering transform of
+L2 [0, 2π] which preserves the norm kSeL [P   eL ]f k = kf k.
+               L         e
+     When 2 = 1, A0 is the integration operator (114) on the group, so
+ e
+S0 [p̃]f (r) does not depend on r. Following Definition 2.3, it defines a scatter-
+ing transform which maps any f ∈ L2 (G) into a function of the path variable
+p̃:                                               Z
+                           e      e
+                    ∀p̃ ∈ P0 , S0 [p̃]f = |G|  −1
+                                                      U[p̃]f (g) dg .           (118)
+                                                       G
+
+Over a compact Lie group, the scattering transform Se0 [Pe0 ]f = {Se0 [p̃]f }p̃∈Pe0
+                              e0 ). The following proposition proves that it is
+is a discrete sequence in l2 (P
+invariant to the action Lg f (r) = f (g −1r) of g ∈ G on f ∈ L2 (G).
+
+Proposition 5.1 For any f ∈ L2 (G) and g ∈ G
+
+                              Se0 [Pe0 ] Lg f = Se0 [Pe0 ]f .                  (119)
+
+
+
+                                           52
+      Proof: Since A e0 and W  f [λ̃]f are computed with left convolutions on G,
+they commute with Lg . It results that U         e [λ̃] and hence Se0 [PeL ] also commutes
+with Lg . If p̃ ∈ P e0 , since Se0 [p̃]f (r) is constant in r, Se0 [p̃] Lg f = Lg Se0 [p̃]f =
+Se0 [p̃]f , which proves (119). 
+      As in the translation case, the Lipchitz continuity of SeL to the action of
+diffeomorphisms relies on the Lipschitz continuity of the wavelet transform
+fL . The action of a small diffeomorphism on f ∈ L2 (G) can be written
+W
+Lτ f (r) = f (τ (r)−1 r) with τ (r) ∈ G. The proof of Theorem 2.12 on Lipschitz
+continuity applies to any compact Lie groups G. The main difficulty is to
+prove Lemma 2.14, which proves the Lipschitz continuity of W                fL by comput-
+ing an upper bound of the commutator norm k[W               fL , Lτ ]k. The proof of this
+lemma can still be carried by applying Cotlar’s lemma, but integration by
+parts and the resulting bounds require appropriate hypothesis on the regu-
+larity and decay of ψ̃λ̃ . If G = SO(2) then the proof can be directly adapted
+from the proof on the translation group, by replacing convolutions with cir-
+cular convolutions. It proves that SeL is Lipschitz continuous to the action of
+diffeomorphisms on L2 (SO(2)).
+
+5.2     Combined Translation and Rotation Scattering
+We construct a scattering operator on L2 (Rd ) which is invariant to transla-
+tions and rotations, by combining a translation invariant scattering operator
+on L2 (Rd ) and a rotation invariant scattering operator on L2 (SO(d)).
+     Let G be a rotation subgroup of the general linear group of Rd , which
+also includes the reflection −1 defined by −1x = −x. According to (4),
+the wavelet transform in L2 (Rd ) is defined for any λ = 2j r ∈ 2Z × G by
+W [λ]f = f ⋆ ψλ , where ψλ (x) = 2dj ψ(2j r −1 x). Section 2.1 considers the
+case of a finite group G, which is a subgroup of SO(d) if d is even or which
+is a subgroup of O(d) if d is odd, while including −1. The extension to a
+compact subgroup potentially equal to SO(d) or O(d) is straightforward. We
+still denote G+ the quotient of G by {−1, 1}. The wavelet transform of a
+complex valued functions is defined over all λ ∈ 2Z × G but it is restricted
+to 2Z × G+ if f is real. All discrete sums on G and G+ are replaced by
+integrals with the HaarR measure dr. The group is compact and thus has a
+finite measure |G| = G dr. It results that these integrals behave as finite
+sums in all derivations of this paper. The theorems proved for a finite group
+G remains valid for a compact group G. In the following we concentrate on
+
+
+                                             53
+real valued functions.
+    Let PJ be the countable set of all finite paths p = (λ1 , ..., λm ) with λk ∈
+ΛJ = {λ = 2j r : j > −J , r ∈ G+ }. The windowed scattering SJ [PJ ]f =
+{SJ [p]f }p∈PJ is defined in Definition 2.4, but ΛJ and PJ are not discrete sets
+anymore. The scattering norm is defined by summing the L2 (Rd ) norms of
+all SJ [p]f for all p = (2j1 r1 , ..., 2jm rm ) ∈ P J , with the Haar measure:
+                   ∞
+                   X          X            Z
+              2
+  kSJ [PJ ]f k =                                    kSJ [2j1 r1 , ..., 2jm rm ]f k2 dr1 ...drm ,
+                   m=0 j1 >−J,...,jm>−J    G+m
+
+
+which is written                               Z
+                                       2
+                         kSJ [PJ ]f k =             kSJ [p]f k2 dp .
+                                               PJ
+
+One can verify that SJ [PJ ] is nonexpansive as in the case where G is a finite
+group. For an admissible scattering wavelet satisfying (30), Theorem 2.6
+remains valid and kSJ [PJ ]f k = kf k.
+   The scattering SJ is covariant to rotations. Invariance to rotations in
+G is obtained by applying the scattering operator SeL defined on L2 (G) by
+(117). Any p = (λ1 , ..., λm ) ∈ PJ with λ1 = r2j1 can be written as a rotation
+p = r p̄ of a normalized path p̄ = (λ̄1 , ..., λ̄m ), where λ̄k = r −1 λk and hence
+where λ̄1 = 2j1 is a scaling without rotation. It results that
+
+                              SJ [p]f (x) = SJ [r p̄]f (x) .
+
+For each x and p̄ fixed, SJ [r p̄]f (x) is a function of r which belongs to L2 (G).
+We can thus apply the scattering operator SeL [p̃] to this function of r. The
+result is denoted SeL [p̃]SJ [r p̄]f (x) for all p̃ ∈ P
+                                                      eL . This output can be indexed
+by the original path variable p = r p̄, and we denote the combined scattering:
+
+                       SeL [p̃] SJ [p]f (x) = SeL [p̃] SJ [r p̄]f (x) .                     (120)
+
+This combined scattering cascades wavelet transforms and hence convolutions
+along the spatial variable x and along the rotation r, which is factorized from
+each path. In d = 2 dimensions then L2 (SO(2)) = L2 [0, 2π]. The wavelet
+tranform along rotations is implemented by circular convolutions along the
+rotation angle variable in [0, 2π], with the periodic wavelets (116).
+   A combined scattering transform computes
+
+                   SeL [PeL ]SJ [PJ ]f = {SeL [p̃]SJ [p]f }p∈PJ ,p̃∈PeL .
+
+                                               54
+Its norm is computed by summing the L2 (Rd ) norms kSeL [p̃]SJ [p]f k2 :
+                                     XZ
+               e   e              2
+              kSL [PL ]SJ [PJ ]f k =    kSeL [p̃]SJ [p]f k2 dp .         (121)
+                                          eL   PJ
+                                       p̃∈P
+
+
+Since SeL [P
+           eL ] and SJ [PJ ] are nonexpansive their cascade is also nonexpansive:
+
+    ∀(f, h) ∈ L2 (Rd )2 , kSeL [PeL ]SJ [PJ ]f − SeL [P
+                                                      eL ]SJ [PJ ]hk ≤ kf − hk .
+
+If SJ is computed with an admissible scattering wavelet then kSJ [PJ ]f k =
+kf k. In d = 2 dimensions, if SeL is computed with periodic wavelets de-
+rived in (116) from a one-dimensional admissible scattering wavelet, then
+the combined scattering preserves the norm:
+
+                    kSeL [P
+                          eL ]SJ [PJ ]f k = kSJ [PJ ]f k = kf k .
+
+    By setting L = 0 and letting J go to ∞, the following proposition proves
+that the resulting combined scattering is invariant to translations and rota-
+tions. Such combined scattering representations are used for rotation invari-
+ant classification of image textures [18]. For any (c, g) ∈ Rd × SO(d), we
+denote Lc,g f (x) = f (g −1(x − c)).
+
+Proposition 5.2 For all (c, g) ∈ Rd × SO(d) and all f ∈ L2 (Rd )
+
+                         e0 × P ∞ , Se0 [p̃]S(p)Lc,g f = Se0 [p̃]S(p)f .
+              ∀(p̃, p) ∈ P                                                    (122)
+
+      Proof: The scattering transform in L2 (Rd ) is translation invariant and
+covariant to rotations: SLc,g f (p) = Sf (g −1p) for all p ∈ P ∞ . Since g −1 acts
+as a rotation on the path p, Proposition 5.1 proves that Se0 [p̃]Sf (g −1 p) =
+Se0 [p̃]Sf (p), which gives (122). 
+
+
+A      Proof of Lemma 2.8
+The proof of (37) shows that the scattering energy propagates towards lower
+frequencies. It computes the average arrival log frequency of the scattering
+energy kU[p]f k for paths of length m, and shows that it increases when
+m increases. The arrival log frequency of p = {λk = 2jk rk }k≤m is the log
+frequency index log2 |λm | = jm of the last path element.
+
+                                         55
+    Let us denote em = kU[Λm        2                   m 2
+                              J ]f k and em = kSJ [ΛJ ]f k . The average
+arrival log frequency among paths of length m is
+                              X
+                     am = e−1
+                           m        jm kU[p]f k2 ≥ −J .            (123)
+                                 p∈Λm
+                                    J
+
+
+The following lemma shows that when m increases by 1 then am decreases
+by nearly α/2, where α is defined in (30).
+
+Lemma A.1 If (30) is satisfied then
+               α
+  ∀m > 0 ,       em−1 ≤ (am + J)em − (am+1 + J)em+1 + em−1 − em . (124)
+               2
+   We first show that (124) implies (37) and then prove this lemma. Sum-
+ming over (124) gives
+   m−1
+ αX
+       ek ≤ (a1 + J)e1 − (am+1 + J)em+1 + e0 − em ≤ e0 + (a1 + J)e1 . (125)
+ 2 k=0
+                                        P        P
+For m = 1, p = 2j r so a1 e1 =            j>−J
+                                                                j     2
+                                                    r∈G+ j kW [2 r]f k .      Moreover,
+e0 = kf k2, so
+                                        X X
+           e0 + (a1 + J)e1 = kf k2 +                (j + J) kW [2j r]f k2 .
+                                        j>−J r∈G+
+
+Inserting this in (125) for m = ∞ proves (37).
+    Lemma A.1 is proved by calculating the evolution of am as m increases.
+We consider the advancement of a path p of length m − 1 with two steps
+p + 2j r + 2l r ′ , and denote fp = U[p]f . The average arrival log frequency am
+can be written as the average arrival log frequency of kU[p + 2j r]f k2 over all
+2j r and all p of length m − 1:
+                                 X X X
+                       am em =                  j kfp ⋆ ψ2j r k2 .          (126)
+                             p∈Λm−1 j>−J r∈G+
+                                J
+
+
+After the second step, the average arrival log frequency of kU[p+2j r+2l r ′ ]f k2
+overall p ∈ Λm−1
+             J   , 2j r and 2l r ′ is am+1 :
+                        X X X X X
+        am+1 em+1 =                               l k|fp ⋆ ψ2j r | ⋆ ψ2l r′ k2 .
+                      p∈Λm−1 j>−J r∈G+ l>−J r ′ ∈G+
+                         J
+
+
+
+                                        56
+The wavelet transform is unitary and hence for any h ∈ L2 (Rd )
+                        X X
+                khk2 =           kh ⋆ ψ2l r′ k2 + kh ⋆ φ2J k2 .
+                            l>−J r ′ ∈G+
+
+
+Applied to each h = fp ⋆ ψ2j r in (126) this relations, together with
+                       X X X
+                em =                    k|fp ⋆ ψ2j r | ⋆ φ2J k2 dr,
+                        p∈Λm−1 j>−J r∈G+
+                           J
+
+
+shows that I = am em − am+1 em+1 + J em satisfies
+                X X X X X
+        I =                            (j − l) k|fp ⋆ ψ2j r | ⋆ ψ2l r′ k2
+                p∈Λm−1 j>−J r ′ ∈G+ l>−J r∈G+
+                   J
+                                                                
+                               + (j + J) k|fp ⋆ ψ2j r | ⋆ φ2J k2 .
+
+A lower bound of I is calculated by dividing the sum on l for l ≥ j and l < j.
+In the j + J − 1 term for l < j, the index l is replaced by j − 1 and the
+convolution with φ2J is incorporated in the sum:
+                          "                                         !
+          X X X              X      X
+  I ≥                                    k|fp ⋆ ψ2j r | ⋆ ψ2l r′ k2
+         p∈Λm−1 j>−J r ′ ∈G+    −J<l<j     r∈G+
+            J
+                                                                                         #
+                                      XX
+                                 2                                                 ′ 2
+         +k|fp ⋆ ψ2j r | ⋆ φ2J k −                (l − j) k|fp ⋆ ψ2j r | ⋆ ψ2l r′ dr k       dr
+                                                                                             (127)
+                                                                                                .
+                                      l>j r∈G+
+
+
+   Since wavelets satisfy the unitary property (9), for all real functions f ∈
+L (Rd ) and all q ∈ Z,
+ 2
+
+                X X
+                          kf ⋆ ψ2l r k2 + kf ⋆ φ2J k2 = kf ⋆ φ2q k2 .    (128)
+             −q≥l>−J r∈G+
+
+
+Indeed (9) implies that
+                            1 X X
+            |φ̂(2J ω)|2 +                 |ψ̂(2−l r −1 ω)|2 = |φ̂(2q ω)|2 .                  (129)
+                            2 −q≥l>−J r∈G
+
+
+
+
+                                            57
+If f is real, then kf ⋆ ψ2j r k = kf ⋆ ψ−2j r k. Multiplying (129) by |fˆ(ω)|2 and
+integrating in ω proves (128). Inserting (128) in (127) gives
+               X X X
+     I ≥                        k|fp ⋆ ψ2j r | ⋆ φ2−j+1 k2
+             p∈Λm−1 j>−J r∈G+
+                J
+                 X                                                                  
+             −         (l − j) k|fp ⋆ ψ2j r | ⋆ φ2−l k2 − k|fp ⋆ ψ2j r | ⋆ φ2−l+1 k2    .
+                 l>j
+
+
+If ρ ≥ 0 satisfies |ρ̂(ω)| ≤ |φ̂(2ω)|, then for any f ∈ L2 (Rd ) and any l ∈ Z,
+
+           kf ⋆ φ2−l+1 k2 ≥ kf ⋆ ρ2l r k2 with ρ2l r (x) = 2dl ρ(2l r −1 x) .
+
+It results that
+                        X       X X
+          I ≥                                k|fp ⋆ ψ2j r | ⋆ ρ2j r k2
+                   p∈Λm−1 j>−J r∈G+
+                      J
+                         X                                                       
+                                                    2                           2
+                   −           (l − j) kfp ⋆ ψ2j r k − k|fp ⋆ ψ2j r | ⋆ ρ2l r k      .
+                         l>j
+
+
+Applying Lemma 2.7 for h = ρ2l r and a frequency 2j rη proves that
+                                                                                         j
+ k|fp ⋆ ψ2j r | ⋆ ρ2l r k ≥ kfp ⋆ ψ2j r ⋆ ρ2l r,2j k with ρ2l r,2j (x) = ρ2l r (x) ei2 rη.x
+
+and ρ̂2l r,2j (ω) = ρ̂(2−l r −1 ω − 2j−l η). It results that
+                       X        X X
+          I ≥                               kfp ⋆ ψ2j r ⋆ ρ2j r,2j k2
+                   p∈Λm−1 j>−J r∈G+
+                      J
+                        X                                                       
+                   −          (l − j) kfp ⋆ ψ2j r k2 − kfp ⋆ ψ2j r ⋆ ρ2l r,2j k2    .
+                        l>j
+
+
+    We shall now rewrite this equation in the Fourier domain. Since fp (x) ∈
+R, |fˆp (ω)| = |fˆp (−ω)|, applying Plancherel gives
+                     Z            XX
+          1 X
+ I ≥                   |fˆp (ω)|2           |ψ̂(2−j r −1 ω)|2 |ρ̂(2−j r −1 ω − η)|2
+          2                       r∈G j>−J
+            p∈Λm−1
+               J
+                      X                                                             
+                                       −j −1    2            −l −1          j−l  2
+                   −      (l − j) |ψ̂(2 r ω)| (1 − |ρ̂(2 r ω − 2 η)| ) dω .
+                        l>j
+
+
+                                                 58
+Inserting Ψ̂ defined in (29) by
+                                            +∞
+                                            X
+              Ψ̂(ω) = |ρ̂(ω − η)| −    2
+                                                  k (1 − |ρ̂(2−k (ω − η))|2 )
+                                            k=1
+
+with k = l − j, gives
+                             Z
+                       1 X                 X
+                    I≥         |fˆp (ω)|2      b(2−j ω) dω
+                       2 m−1              j>−J
+                                p∈ΛJ
+
+              P            −1
+with b(ω) =        ω) |ψ̂(r −1 ω)|2 . Let us add to I
+               r∈G Ψ̂(r
+
+               X                    X Z
+        em−1 =               2
+                 kfp ⋆ φ2J k =              |fˆp (ω)|2 |φ̂(2J ω)|2 dω .
+                  p∈Λm−1
+                     J                       p∈Λm−1
+                                                J
+
+
+
+Since ρ ≥ 0, |ρ̂(ω)| ≤ ρ̂(0) = 1 and hence Ψ̂(ω) ≤ 1. The wavelet unitary
+property (9) together with Ψ̂(ω) ≤ 1 implies that
+                           1 XX                           1 X
+           |φ̂(2J ω)|2 =              |ψ̂(2−j r −1 ω)|2 ≥        b(2−j ω)
+                           2 j≤−J r∈G                     2 j≤−J
+
+so
+                         1             X Z                 +∞
+                                                           X
+              I + em−1 ≥                      |fˆp (ω)|2          b(2−j ω) dω .
+                         2                                 j=−∞
+                                   p∈Λm−1
+                                      J
+                      P                       P
+   If α = inf 1≤|ω|<2 j b(2−j ω) then j b(2−j ω) ≥ α for all ω 6= 0. If the
+hypothesis (30) is satisfied and hence α > 0 then
+                                     Z
+                           α X                         α X
+          I + em−1 ≥                   |fˆp (ω)|2 dω =          kfp k2
+                           2                           2
+                              p∈Λm−1
+                                 J                       p∈Λm−1
+                                                            J
+                           α X                2    α
+                      =              kU[p]f k = em−1 .
+                           2     m−1
+                                                   2
+                                   p∈ΛJ
+
+
+Inserting I = am em − am+1 em+1 + J em proves that
+                                                                   α
+                  am em − am+1 em+1 + J em + em−1 ≥                  em−1 .       (130)
+                                                                   2
+
+                                             59
+   Since UJ preserves the norm, em = em+1 + em , indeed (25) proves that
+                  m+1
+UJ U[Λm
+      J ]f = {U[ΛJ    ]f , SJ [Λm
+                                J ]f }. Inserting em = em − em+1 and em−1 =
+em−1 − em in (130) gives
+            α
+              em−1 ≤ (am + J)em − (am+1 + J)em+1 + em−1 − em ,
+            2
+which finishes the proof of Lemma A.1.
+
+
+B     Proof of Lemma 2.11
+Lemma 2.11 as well as all other upper bounds on operatorR norms are com-
+puted with Schur’s lemma. For any operator Kf (x) = f (u) k(x, u) du,
+Schur’s lemma proves that
+    Z                        Z
+       |k(x, u)| dx ≤ C and     |k(x, u)| du ≤ C =⇒ kKk ≤ C ,       (131)
+
+where kKk is the L2 (Rd ) norm of K.
+   The operator norm of kJ = Lτ AJ − AJ is computed by applying Schur’s
+lemma on its kernel
+
+                    kJ (x, u) = φ2J (x − τ (x) − u) − φ2J (x − u) .            (132)
+
+A first-order Taylor expansion proves that
+                Z 1                                        Z 1
+|kJ (x, u)| ≤ |     ∇φ2J (x−u−t τ (x)) . τ (x) dt| ≤ kτ k∞     |∇φ2J (x−u−t τ (x))| dt
+                0                                               0
+so
+      Z                            Z 1Z
+          |kJ (x, u)| du ≤ kτ k∞            |∇φ2J (x − u − t τ (x))| du dt .   (133)
+                                    0
+
+Since ∇φ2J (x) = 2−dJ−J ∇φ(2−J x), it results that
+   Z                                 Z
+      |kJ (x, u)| du ≤ kτ k∞ 2 −dJ−J
+                                       |∇φ(2−J u′ )| du′ = 2−J kτ k∞ k∇φk1 .
+                                                                               (134)
+Similarly to (133) we prove that
+         Z                        Z 1Z
+           |kJ (x, u)| dx ≤ kτ k∞      |∇φ2J (x − u − t τ (x))| dx dt .
+                                        0
+
+                                            60
+The Jacobian of the change of variable v = x − t τ (x) is 1 − t∇τ (x) whose
+determinant is larger than (1 − k∇τ k∞ )d ≥ 2−d so
+          Z                             Z 1Z
+                                      d
+             |kJ (x, u)| dx ≤ kτ k∞ 2         |∇φ2J (v − u)| dv dt
+                                             0
+                                  −J
+                            = 2        kτ k∞ k∇φk1 2d .
+Schur’s lemma (131) applied to this upper bound and (134) proves the lemma
+result:
+                  kLτ AJ − AJ k ≤ 2−J+d k∇φk1 kτ k∞ .
+
+
+C     Proof of (69)
+We prove that
+              kLτ AJ f − AJ f + τ . ∇AJ f k ≤ C kf k 2−2J kτ k2∞              (135)
+by applying Schur’s lemma (131) on the kernel of kJ = Lτ AJ − AJ + τ · ∇AJ :
+     kJ (x, u) = φ2J (x − τ (x) − u) − φ2J (x − u) + ∇φ2J (x − u) · τ (x) .
+  Let Hf (x) the Hessian matrix of a function f at x and |Hf (x)| the sup
+matrix norm of this Hessian matrix. A Taylor expansion gives
+                     Z 1
+      |kJ (x, u)| =       tτ (x) · Hφ2J (u − x − (1 − t)τ (u)) · τ (x) dt
+                       0
+                            Z 1
+                         2
+                  ≤ kτ k∞       |t||Hφ2J (u − x − (1 − t) τ (x))| dt .    (136)
+                              0
+
+Since φ2J (x) = 2−dJ φ(2−J x), Hφ2J (x) = 2−Jd−2J Hφ(2−J x). With a change
+of variable, (136) gives
+   Z                                 Z
+                          2
+     |kJ (x, u)| du ≤ kτ k∞ 2 −dJ−2J
+                                       |Hφ(2−J u′ )| du′ = 2−2J kτ k2∞ kHφk1 ,
+
+                  R                                                      (137)
+where kHφk1 = |Hφ(u)| du is bounded. Indeed all second-order derivatives
+of φ at u are O((1 + |u|)−d−1).
+    The upper bound (136) also implies that
+     Z                        Z 1 Z
+                            2
+       |kJ (x, u)| dx ≤ kτ k∞    |t| |Hφ2J (u − x − (1 − t)τ (x))| du dt .
+                              0
+
+                                        61
+The Jacobian of the change of variable v = x−(1 −t) τ (x) is 1 −(1 −t)∇τ (x)
+whose determinant is larger than (1 − k∇τ k∞ )d so
+    Z                                         Z 1Z
+                            2              −d
+      |kJ (x, u)| dx ≤ kτ k∞ (1 − k∇τ k∞ )          |Hφ2J (v − u)| dv dt
+                                                          0
+                       = 2−2J kτ k2∞ kHφk1 2d .                                      (138)
+
+The upper bounds (137) and (138) with Schur’s lemma (131) proves (135).
+
+
+D      Proof of Lemma 2.13
+This appendix proves that for any operator L and any f ∈ L2 (Rd )
+                                                                 ∞
+                                                                 X
+  k[SJ [PJ ] , L]f k ≤ k[UJ , L]k kU[PJ ]f k1 = k[UJ , L]k             kU[ΛnJ ]f k. (139)
+                                                                 n=0
+
+If A and B are two operators, we denote {A, B} the operator defined by
+{A, B}f = {Af, Bf }. We introduce a wavelet modulus operator without
+averaging:
+
+  VJ f = {|W [λ]f | = |f ⋆ ψλ |}λ∈ΛJ with ΛJ = {2j r : j > −J , r ∈ G+ },
+                                                                     (140)
+and UJ = {AJ , VJ }. The propagator VJ creates all paths VJ U[ΛnJ ]f =
+U[Λn+1                                 0                        n
+    J ]f for any n ≥ 0. Since U[ΛJ ] = Id, it results that VJ = U[ΛJ ].
+                                                                          n
+
+Let PJ,m be the subset of PJ of paths p of length smaller than m. To verify
+(139), we shall prove that
+                                              m
+                                              X
+                         [SJ [PJ,m ], L] =          Km−n VJn ,                       (141)
+                                              n=0
+
+where Kn = {[AJ , L] , SJ [PJ,n−1 ][VJ , L]} satisfies
+
+                                   kKn k ≤ k[UJ , L]k .                              (142)
+
+Since VJn f = U[ΛnJ ]f , it implies that for any f ∈ L2 (Rd )
+                             m
+                             X                                     m−1
+                                                                   X
+     k[SJ [PJ,m ], L]f k ≤         kKm−n k kVJn f k ≤ k[UJ , L]k         kU[ΛnJ ]f k ,
+                             n=0                                   n=0
+
+
+                                            62
+and letting m tend to ∞ proves (139).
+   Property (141) is proved by first showing that
+                  SJ [PJ,m ]L = {LAJ , SJ [PJ,m−1 ]LVJ } + Km ,                      (143)
+where Km = {[AJ , L] , SJ [PJ,m−1 ] [VJ , L]}. Indeed, since VJn = U[ΛnJ ], we
+have AJ VJn = SJ [ΛnJ ] and PJ,m = ∪m−1     n                         n
+                                     n=0 ΛJ yields SJ [PJ,m ] = {AJ VJ }0≤n<m .
+It results that
+    SJ [PJ,m ]L =    {AJ VJn L}0≤n<m
+                =    {LAJ + [AJ , L] , AJ VJn−1 LVJ + AJ VJn−1 [VJ , L]}1≤n<m
+                =    {LAJ , SJ [PJ,m−1 ]LVJ } + {[AJ , L] , SJ [PJ,m−1 ] [VJ , L]}
+                =    {LAJ , SJ [PJ,m−1 ]LVJ } + Km ,
+which proves (143).
+   A substitution of SJ [PJ,m−1 ]L in (143) by the expression derived by this
+same formula gives
+       SJ [PJ,m ]L = {LAJ , LAJ VJ , SJ [PJ,m−2 ]LVJ2 } + Km−1 VJ + Km .
+With m substitions, we obtain
+                                        m
+                                        X                                m
+                                                                         X
+ SJ [PJ,m ]L = {LAJ VJn }0≤n<m +              Km−n VJn = LSJ [PJ,m ] +         Km−n VJn
+                                        n=0                              n=0
+
+which proves (141).
+    Let us now prove (142) on Km = {[AJ , L] , SJ [PJ,m−1 ] [VJ , L]}. Since
+SJ [PJ ] is nonexpansive, its restriction SJ [PJ,m ] is also nonexpansive. Given
+that UJ = {AJ , VJ } we get
+  kKm f k2 = k[AJ , L]f k2 + kSJ [PJ,m−1 ] [VJ , L]f k2
+           ≤ k[AJ , L]f k2 + k[VJ , L]f k2 = k[UJ , L]f k2 ≤ k[UJ , L]k2 kf k2
+which proves (142).
+
+
+E      Proof of Lemma 2.14
+This section computes an upper bound of k[WJ , Lτ ]k by considering
+                          X     ∞
+                                X
+         ∗
+[WJ , Lτ ] [WJ , Lτ ] =             [W [2j r], Lτ ]∗ [W [2j r], Lτ ]+[AJ , Lτ ]∗ [AJ , Lτ ].
+                          r∈G+ j=−J+1
+
+
+                                              63
+Since k[WJ , Lτ ]k = k[WJ , Lτ ]∗ [WJ , Lτ ]k1/2 ,
+
+                  X          ∞
+                             X                                            1/2
+k[WJ , Lτ ]k ≤                         [W [2j r], Lτ ]∗ [W [2j r], Lτ ]         +k[AJ , Lτ ]∗ [AJ , Lτ ]k1/2 .
+                 r∈G+      j=−J+1
+                                                                         (144)
+To prove the upper bound (61) of Lemma 2.14, we compute an upper bound
+for each term on the right under the integral and the last term, which is done
+by the following lemma.
+
+Lemma E.1 Suppose that h(x), as well as all its first and second-order
+derivatives have a decay in O((1 + |x|)−d−2 ). Let Zj f = f ⋆ hj with hj (x) =
+2dj h(2j x). There exists C > 0 such that if k∇τ k∞ ≤ then
+
+                                        k[Zj , Lτ ]k ≤ C k∇τ k∞                                   (145)
+         R
+and if       h(x) dx = 0 then
+   +∞
+   X                              1/2             k∆τ k∞                   
+         [Zj , Lτ ]∗ [Zj , Lτ ]         ≤ C max log        , 1 k∇τ k∞ + kHτ k∞ .
+  j=−∞
+                                                    k∇τ k∞
+                                                                                                  (146)
+
+   The inequality (146) clearly remains valid if the summation is limited to
+−J instead of −∞ since [Zj , Lτ ]∗ [Zj , Lτ ] is a positive operator. Inserting in
+(144) both (145) with h = φ and (146) with h(x) = ψ(r −1 x) for each r ∈ G+ ,
+and replacing −∞ by −J proves the upper bound (61) of Lemma 2.14.
+   To prove Lemma E.1, we factorize
+
+                    [Zj , Lτ ] = Kj Lτ with Kj = Zj − Lτ Zj L−1
+                                                             τ .
+
+Observe that
+
+      k[Zj , Lτ ]∗ [Zj , Lτ ]k1/2 = kL∗τ Kj∗ Kj Lτ k1/2 ≤ kLτ k kKj∗ Kj k1/2 ,                    (147)
+
+and that
+                  +∞
+                  X                                                +∞
+                                                                   X
+                                                 1/2
+                                   ∗
+                        [Zj , Lτ ] [Zj , Lτ ]          ≤ kLτ k k          Kj∗ Kj k1/2 ,           (148)
+                 j=−∞                                              j=−∞
+
+
+
+
+                                                    64
+with kLτ k ≤ (1 − k∇τ k∞ )−d . Since L−1
+                                      τ f (x) = f (ξ(x)) with ξ(x − τ (x)) = x,
+                                 −1
+the kernel of Kj = Zj − Lτ Zj Lτ is
+
+  kj (x, u) = hj (x − u) − hj (x − τ (x) − u + τ (u)) det(1 − ∇τ (u)) . (149)
+                                                                     P
+   The lemma is proved by computing upper bounds of kKj k and k +∞            ∗
+                                                                       j=−∞ Kj Kj k.
+The sum over j is divided in three parts
+    +∞                             −γ−1                     −1                       ∞
+    X                              X                        X                        X
+k            Kj∗ Kj k1/2 ≤ k              Kj∗ Kj k1/2 + k          Kj∗ Kj k1/2 + k         Kj∗ Kj k1/2 .
+    j=−∞                        j=−∞                        j=−γ                     j=0
+                                                                                                  (150)
+We shall first prove that
+        −γ
+        X                                                                    
+    k          Kj∗ Kj k1/2 ≤ C k∇τ k∞ + 2−γ k∆τ k∞ + 2−γ/2 k∆τ k1/2
+                                                                ∞   k∇τ k 1/2
+                                                                          ∞     .
+        j=−∞
+                                                                                                  (151)
+Then we verify that kKj k ≤ C k∇τ k∞ and hence that
+                             −1
+                             X
+                        k           Kj∗ Kj k1/2 ≤ γ kKj k ≤ C γ k∇τ k∞ .                          (152)
+                             j=−γ
+
+The last term carries the singular part and we prove that
+                             ∞
+                             X
+                         k         Kj∗ Kj k1/2 ≤ C (k∇τ k∞ + kHτ k∞ ) .                           (153)
+                             j=0
+
+                     k∆τ k∞
+Choosing γ = max(log k∇τ k∞
+                            , 1) yields
+             +∞
+             X                                      k∆τ k∞                   
+         k          Kj∗ Kj k1/2 ≤ C           max log        , 1 k∇τ k∞ + kHτ k∞ .
+             j=−∞
+                                                      k∇τ k∞
+
+Inserting this result in (148) will prove the second lemma result (146) . In
+the proof, C is a generic constant which depends only on h but which evolves
+along the calculations.
+   The proof of (151) is done by decomposing Kj = K̃j,1 + K̃j,2, with a first
+kernel
+
+        k̃j,1(x, u) = a(u) hj (x − u) with a(u) = (1 − det(1 − ∇τ (u))) ,                         (154)
+
+                                                     65
+and a second kernel
+                                                                     
+ k̃j,2(x, u) = det(1 − ∇τ (u)) hj (x − u) − hj (x − τ (x) − u + τ (u)) . (155)
+
+This kernel has a similar form as the kernel (132) in Appendix B by τ (x) is
+replaced here by τ (x) − τ (u). The same proof shows that
+
+                                 kK̃j,2k ≤ C 2j k∆τ k∞ .                                (156)
+
+Taking advantage of this decay, to prove (151), we decompose
+           −γ                          −γ
+           X                           X
+                                               ∗
+       k          Kj∗ Kj k1/2   ≤ k          K̃j,1 K̃j,1 k1/2
+           j=−∞                       j=−∞
+                                       −γ
+                                       X
+                                   +         (kK̃j,2 k + 21/2 kK̃j,2k1/2 kK̃j,1k1/2 )
+                                       j=−∞
+
+and verify that
+                                         0
+                                         X
+                                                   ∗
+       kK̃j,1k ≤ C k∇τ k∞ and k                  K̃j,1 K̃j,1 k1/2 ≤ C k∇τ k∞ .          (157)
+                                         j=−∞
+
+                                               ∗
+The kernel of the self-adjoint operator K̃j,1    K̃j,1 is:
+                   Z
+                       ∗
+       k̃j (y, z) = k̃j,1 (x, y) k̃j,1(x, z) dx = a(y) a(z) h̃j ⋆ hj (z − y) ,
+
+                                                                    P
+with h̃j (u) = h∗j (−u). It results that the kernel of K̃ =                  ∗
+                                                                       j≤0 K̃j,1 K̃j,1 is:
+                X                                                       X
+   k̃(y, z) =         k̃j (y, z) = a(y) a(z) θ(z − y) with θ(x) =             h̃j ⋆ hj (x) .
+                j≤0                                                     j≤0
+
+
+Applying Young’s inequality to kK̃f k gives
+
+                                kK̃k ≤ sup |a(u)|2 kθk1 .
+                                        u∈Rd
+
+               P           −j  2
+                                             R
+Since θ̂(ω) =     j≤0 |ĥ(2 ω)| and ĥ(0) =     h(x) dx = 0 and h is both
+regular with a polynomial decay, we verify that kθk1 < ∞. Moreover, since
+(1 − det(1 − ∇τ (u))) ≥ (1 − k∇τ k∞ )d we have supu |a(u)| ≤ d k∇τ k∞ which
+
+                                              66
+proves that kK̃k1/2 ≤ C k∇τ k∞ . Since kK̃j,1 k2 ≤ kK̃k we get the same
+                       2
+inequality for kK̃P
+                  j,1 k , which proves the two upper bounds of (157).
+     The last sum ∞        ∗
+                      j=0 Kj Kj carries the singular part of the operator, which
+is isolated and evaluated separately by decomposing Kj = Kj,1 + Kj,2 , with
+a first kernel
+    kj,1(x, u) = hj (x − u) − hj ((1 − ∇τ (u))(x − u)) det(1 − ∇τ (u))  (158)
+                     R                    R
+satisfying Kj,1 1 = kj,1(x, u) du = 0 if h(x) dx = 0. The second kernel is
+                                                                         
+kj,2(x, u) = det(1−∇τ (u)) hj ((1−∇τ (u))(x−u))−hj (x−τ (x)−u+τ (u)) .
+           P                                                            (159)
+                   ∗
+The sum j≥0 Kj,1 Kj,1 has a singular kernel along its diagonal, and its norm
+is evaluated separately with the upper bound
+    ∞
+    X                       ∞
+                            X                        ∞
+                                                     X
+k         Kj∗ Kj k1/2 ≤ k          ∗
+                                  Kj,1 Kj,1 k1/2 +         (kKj,2k + 21/2 kKj,2k1/2 kKj,1k1/2 ) .
+    j=0                     j=0                      j=0
+                                                                                           (160)
+     We will prove that
+                                       kKj,1k ≤ C k∇τ k∞                                   (161)
+and
+                       kKj,2k ≤ C min(2−j kHτ k∞ , k∇τ k∞ ) .                              (162)
+It implies that kKj k ≤ C k∇τ k∞ . Inserting this inequality in (147) yields
+the first lemma result (145) and it proves (152). Equations (161) and (162)
+also prove that
+      ∞
+      X
+            (kKj,2k + 21/2 kKj,2k1/2 kKj,1k1/2 ) ≤ C(k∇τ k∞ + kHτ k∞ ) .                   (163)
+      j=0
+  R
+If h(x) dx = 0 then thanks to the vanishing integrals of kj,1 we will prove
+that             ∞
+                X
+                      ∗
+              k     Kj,1 Kj,1k1/2 ≤ C (k∇τ k∞ + kHτ k∞ ) .            (164)
+                       j=0
+
+Inserting (163) and (164) in (160) proves (153).
+    Let us now first prove the upper bound (162) on Kj,2 . The kernel of Kj,2
+is
+                                                                         
+kj,2(x, u) = det(1−∇τ (u)) hj ((1−∇τ (u))(x−u))−hj (x−τ (x)−u+τ (u)) .
+
+                                                67
+A Taylor expansion of hj together with a Taylor expansion of τ (x) gives
+
+                     τ (x) − τ (u) = ∇τ (u)(x − u) + α(u, x − u)                    (165)
+
+with                               Z 1
+                      α(u, z) =          t z Hτ (u + (1 − t)z) z dt ,               (166)
+                                     0
+so
+
+kj,2(x, u) = − det(1 − ∇τ (u))                                                 (167)
+             Z 1                                                   
+                 ∇hj (1 − t ∇τ (u))(x − u) + (1 − t) (τ (u) − τ (x)) α(u, x − u) dt .
+                 0
+
+     For j ≥ 0, we prove that kKj,2 k decays like 2−j . Observe that | det(1 −
+∇τ (u))| ≤ 2d . Since ∇hj (u) = 2j+dj ∇h(2j u), the change of variable x′ =
+2j (x − u) in (167) gives
+Z                         Z Z 1        
+                        d
+    |kj,2(x, u)| dx ≤ 2          ∇h (1 − t ∇τ (u))x′
+                              0
+                                                           
+                       +(1 − t) 2j (τ (u) − τ (2−j x′ + u)) 2j α(u, 2−j x′ ) dt dx′ .
+
+For any 0 ≤ t ≤ 1
+
+(1 −t ∇τ (u))x′ + (1 −t) 2j (τ (2−j x′ + u) −τ (u)) ≥ |x′ | (1 −k∇τ k∞ ) ≥ |x′ |/2 .
+
+Equation (166) also implies that
+                           Z 1
+  j       −j ′        −j                                                |x′ |2
+|2 α(u, 2 x )| = 2 |             t x′ Hτ (u + (1 − t)2−j x′ ) x′ dt| ≤ 2−j kHτ k∞
+                                                                               .
+                       0                                                  2
+                                                                         (168)
+Since |∇h(u)| ≤ C (1 + |u|)−d−2 , with the change of variable x = x′ /2 we get
+                     Z
+                         |kj,2(x, u)| dx ≤ C 2−j kHτ k∞ .                (169)
+
+   For j ≤ 0, we use a maximum error bound on the remainder α of the
+Taylor approximation (165):
+
+                           |2j α(u, 2−j x′ )| ≤ 2 k∇τ k∞ |x′ | ,
+
+                                              68
+                  R
+which proves that |kj,2(x, u)|dx ≤ C k∇τ k∞ and hence that
+              Z
+                |kj,2(x, u)| dx ≤ C min(2−j kHτ k∞ , k∇τ k∞ ) .                (170)
+                            R
+    Similarly, we compute |kj,2(x, u)| du with the change of variable u′ =
+2j (x − u) which leads to the same bound (170). Schur’s lemma gives:
+
+                     kKj,2k ≤ C min(2−j kHτ k∞ , k∇τ k∞ )                      (171)
+
+which finishes the proof of (162).
+   Let us now compute the upper bound (161) on Kj,1 . Its kernel kj,1 in
+(158) can be written kj,1(x, u) = 2dj g(u, 2j (x − u)) with
+
+              g(u, v) = h(v) − h((1 − ∇τ (u))v) det(1 − ∇τ (u)).               (172)
+
+A first-order Taylor decomposition of h gives
+
+         g(u, v) = (1 − det(1 − ∇τ (u))) h((1 − ∇τ (u)v)                       (173)
+                     Z 1
+                   +     ∇h((1 − t)v + t(1 − ∇τ (u))v) · ∇τ (u)v dt.
+                          0
+
+Since det(1−∇τ (u)) ≥ (1−k∇τ k∞ )d we get (1−det(1−∇τ (u))) ≤ d k∇τ k∞ .
+Moreover k∇τ k∞ ≤ 1/2 and h(x) as well as its partial derivatives have a
+decay which is O((1 + |x|)−d−2 ), so
+                                               −d−2
+                   |g(u, v)| ≤ C k∇τ k∞ 1 + |v|       ,            (174)
+                                                
+so kj,1(x, u) = O 2dj k∇τ k∞ (1 + 2j |x − u|)−d−2 . Since
+    Z                                         Z
+        |kj,1(x, u)| du = O(k∇τ k∞ ) and          |kj,1(x, u)| dx = O(k∇τ k∞ ) ,
+
+Schur’s lemma (131) proves thatRkKj,1k = O(k∇τ k∞ ) and hence (161).
+     Let us now prove (164) when h(x) dx = 0. The kernel of the self-adjoint
+                  ∗
+operator Qj = Kj,1    Kj,1 is:
+              Z                               Z
+k̄j (y, z) =     kj,1(x, y) kj,1(x, z) dx = 22dj g ∗ (y, 2j (x − y)) g(z, 2j (x − z)) dx
+                  ∗
+
+              Z
+           =     2dj g ∗ (y, x′ + 2j (z − y)) g(z, x′)) dx′ .                      (175)
+
+                                         69
+                        P         P
+The singular kernel k̄ = j k̄j of j Qj almost satisfies the hypotheses of the
+T(1) theorem of David, Journé and Semmes [5] but not quite because it does
+not satisfy the decay condition |k̄(y, z) − k̄(y, z ′)| ≤ C|z ′ − z|α |z − y|−d−α for
+some α > 0. We bound this operator with Cotlar’s lemma [20] which proves
+that if Qj satisfies
+
+       ∀j, l , kQ∗j Ql k ≤ |β(j − l)|2 and kQj Q∗l k ≤ |β(j − l)|2 ,            (176)
+
+then                              X            X
+                              k       Qj k ≤       β(j) .                       (177)
+                                  j            j
+
+   Since Qj is self-adjoint, it is sufficient to bound kQl Qj k. The kernel of
+Ql Qj is computed from the kernel k̄j of Qj
+                                    Z
+                      k̄l,j (y, z) = k̄j (z, u) k̄l (y, u) du.          (178)
+
+An upper bound of kQl Qj k is obtained with Schur’s lemma (131) applied to
+k̄l,j . Inserting (175) in (178) gives
+         Z                    Z Z
+           |k̄l,j (y, z)| dy = |      g(u, x) g(u, x′) 2dl g ∗ (y, x + 2l (u − y))
+
+                                       2dj g ∗(z, x′ + 2j (u − z)) dx dx′ du dy .(179)
+
+The parameters j and l have symmetrical roles and we can thus suppose that
+j ≥ l.   R                                             R
+   Since h(x) dx = 0 it results from (172) that g(u, v) dv = 0 for all u.
+For v = (vn )n≤d , one can thus write g(u, v) = ∂ḡ(u,v)
+                                                  ∂v1
+                                                         and (174) implies that
+                                                   −d−1
+                      |ḡ(u, v)| ≤ C k∇τ k∞ 1 + |v|       .                     (180)
+
+Let us make an integration by parts along the variable u1 in (179). Since
+all first and second-order derivatives of h(x) have a decay which is O((1 +
+|x|)−d−2 ), we derive from (172) that for any u = (un )n≤d ∈ Rd and v =
+(vn )n≤d ∈ Rd
+
+              ∂g(u, v)                                 −d−1
+                       ≤ C kHτ k∞ 1 + |v| (1 − k∇τ k∞ )       ,                 (181)
+                ∂u1
+
+                                          70
+and from (173)
+
+                   ∂g(u, v)                                 −d−1
+                            ≤ C k∇τ k∞ 1 + |v| (1 − k∇τ k∞ )       .                  (182)
+                     ∂v1
+
+In the integration by part, integrating 2dj g(z, x′ +2j (u−z)) brings out a term
+proportional to 2−j and differentiating g(u, x) g(u, x′) 2dl g(y, x + 2l (u − y))
+brings out a term bounded by 2l . An upper bound of (179) is obtained by
+inserting (174,180, 181,182), which prove that there exists C such that
+         Z
+            |k̄l,j (y, z)| dy ≤ C 2 (2−j k∇τ k3∞ kHτ k∞ + 2l−j k∇τ k4∞ )
+
+                         ≤ C 2 2l−j (k∇τ k∞ + kHτ k∞ )4 .
+                                                R
+The same calculation proves the same bound on |k̄l,j (y, z)| dz so Schur’s
+lemma (131) implies that
+
+                         kQl Qj k ≤ C 2 2l−j (k∇τ k∞ + kHτ k∞ )4 .
+
+Applying Cotlar’s lemma (176) with β(j) = C 2−|j|/2 (k∇τ k∞ + kHτ k∞ )2
+proves that
+              +∞
+              X                         X
+                      ∗
+          k          Kj,1 Kj,1 k = k          Qj k ≤ C (k∇τ k∞ + kHτ k∞ )2 ,          (183)
+              j=−∞                       j
+
+
+which implies (164).
+
+
+F     Proof of Lemma 3.6
+It results from (85) that there exists ǫJ with limJ→∞ ǫJ = 0 such that
+
+                                             kSJ [p]f k        2 ǫJ
+                   sup           SJ [p]f −              SJ [p]δ ≤ kSJ [p]f k2 ,
+                p∈PJ −ΩfJ
+                                             kSJ [p]δk            2
+      P                      2
+and       p∈ΩfJ kSJ [p]f k       ≤ ǫJ kf k2 /8. Since kSJ [PJ ]f k2 = kf k2, we get
+
+                       X                      kSJ [p]f k        2
+                                  SJ [p]f −              SJ [p]δ ≤ ǫJ kf k2 .         (184)
+                       p∈PJ
+                                              kSJ [p]δk
+
+                                                   71
+   The set of all extensions of a p ∈ PJ into PJ+1 is defined in (39). It can
+               p
+be rewritten PJ+1  = PJ+1 ∩ CJ (p), and (40) proves that
+                                   X
+        kSJ [p]f − SJ [p]hk2 ≥             kSJ+1 [p′ ]f − SJ+1 [p′ ]hk2 .
+                                            p′ ∈PJ +1 ∩CJ (p)
+
+Iterating k times on this result yields
+                                    X
+        kSJ [p]f − SJ [p]hk2 ≥                                    kSJ+k [p′ ]f − SJ+k [p′ ]hk2 .
+                                           p′ ∈PJ +k ∩CJ +k (p)
+
+
+Applying it to f and h = µp δ with µp = kSJ [p]f k/kSJ [p]δk gives
+                                   2              X                                                2
+       SJ [p]f − µp SJ [p]δ            ≥                           SJ+k [p′ ]f − µp SJ+k [p′ ]δ .
+                                           p′ ∈PJ +k ∩CJ +k (p)
+
+
+Summing over p ∈ PJ and applying (184) proves that
+        X           X                                   kSJ [p]f k            2
+                                       SJ+k [p′ ]f −               SJ+k [p′ ]δ ≤ ǫJ kf k2 ,
+       p∈PJ p′ ∈PJ +k ∩CJ +k (p)
+                                                        kSJ [p]δk
+
+and hence
+   X             X              kSJ+k [p′ ]f k kSJ [p]f k 2
+                                              −             kSJ+k [p′ ]δk2 ≤ ǫJ kf k2 .
+    p∈PJ p′ ∈PJ +k ∩CJ +k (p)
+                                kSJ+k [p′ ]δk   kSJ [p]δk
+
+If q ∈ CJ+k (p′ ) then SJ+k (q) = kSJ+k [p′ ]f k/kSJ+k [p′ ]δk. But p′ ∈ CJ (p)
+so q ∈ CJ (p) and hence SJ (q) = kSJ [p]f k/kSJ [p]δk. Finally kSJ+k [p′ ]δk2 =
+µ(CJ+k (p′ )) so the sum can be rewritten as a path integral
+                  Z
+                       |SJ+k f (q) − SJ f (q)|2 dµ(q) ≤ ǫJ kf k2 ,
+                       P∞
+
+which proves that {SJ f }J∈N is a Cauchy sequence in L2 (P ∞ , dµ).
+
+
+G       Proof of Lemma 4.8
+This appendix proves that
+
+                            E(|Kτ X|2) ≤ E(kKτ k2 ) E(|X|2 ) ,                                         (185)
+
+                                                     72
+as well as a generalization to sequence of operators, at the end of the ap-
+pendix. The lemma result is proved by restricting X to a finite hypercube
+IT = {(x1 , ..., xd ) ∈ Rd : ∀i ≤ d , |xi | ≤ T }, whose indicator function 1IT
+defines a finite energy process XT (x) = X(x) 1IT (x). We shall verify that
+E(|Kτ X(x)|2 ) does not depend upon x and that
+                                               E(kKτ XT k2 )
+                      E(|Kτ X(x)|2 ) = lim                   .                   (186)
+                                          T →∞    (2 T )d
+
+Let first show how this result implies (185). The L2 (Rd ) operator norm
+definition implies
+                     Z                          Z
+                   2              2
+           kKτ XT k = |Kτ XT (x)| dx ≤ kKτ k  2
+                                                  |XT (x)|2 dx .
+
+Since X and τ are independent processes
+
+                   E(kKτ XT k2 ) ≤ E(kKτ k2 ) E(|X|2) (2T )d .
+
+Applying (186) thus proves the lemma result (185).
+  To prove (186), we first compute
+                         Z Z                                          
+                  2
+      E(|Kτ X(x)| ) = E       kτ (x, u) kτ∗ (x, u′) X(u) X ∗(u′ )du du′ .
+
+Since X is stationary E(X(u) X ∗(u′)) = AX (u − u′), and the lemma hypoth-
+esis supposes that E(kτ (x, u) kτ∗ (x, u′ )) = k̄τ (x − u, x − u′ ). Since X and τ
+are independent, the change of variable v = x − u and v ′ = x − u′ gives
+                             ZZ
+                     2
+         E(|Kτ X(x)| ) =            k̄τ (x − u, x − u′ ) AX (u − u′ ) du du′
+                             ZZ
+                         =          k̄τ (v, v ′ ) AX (v − v ′ ) dv dv ′ ,     (187)
+
+which proves that E(|Kτ X(x)|2 ) does not depend upon x. Similarly
+                   ZZ
+              2
+ E(|Kτ XT (x)| ) =    k̄τ (v, v ′ ) AX (v−v ′ ) 1IT (v−x) 1IT (v ′ −x) dv dv ′ , (188)
+
+and integrating along x gives
+                        ZZ
+      −d           2
+ (2T ) E(kKτ XT k ) =        k̄τ (v, v ′) AX (v −v ′ ) (1 −ρT (v −v ′ )) dv dv ′ , (189)
+
+                                          73
+with
+                              Z                                       d 
+            ′           −d                             ′
+                                                                      Y           |vi − vi′ | 
+1−ρT (v−v ) = (2T )                1IT (v−x) 1IT (v −x) dx =                 1−                 1IT (v−v ′ )
+                                                                       i=1
+                                                                                     2T
+
+and hence
+                                                 d
+                                                 X
+                   0 ≤ ρT (v) ≤ (2T )−1                    |vi | ≤ d (2T )−1|v| .                 (190)
+                                                 i=1
+
+Inserting (187) in (189) proves that
+                                    ZZ
+       −d           2                        2
+(2 T ) E(kKτ XT k ) = E(|Kτ X(x)| )−   k̄τ (v, v ′ ) AX (v−v ′ ) ρT (v−v ′ ) dv dv ′ .
+
+      RR                                                                      (191)
+Since |k̄τ (v, v ′ )| |v − v ′ | dv dv ′ < ∞ and AX (v − v ′ ) ≤ AX (0) = E(|X|2 ), it
+results from (191) and (190) that
+
+                   lim (2 T )−dE(kKτ XT k2 ) = E(|Kτ X(x)|2 ) ,
+                  T →∞
+
+which proves (186).
+   Lemma 4.8 is extended to sequences of operators K τ = {Kτ,n }n∈I with
+kernels {kτ,n }n∈I , as follow. Let us denote
+                      X                             X
+        kK τ Xk2 =        |Kτ,n X|2 and kK τ f k2 =   kKτ,n f k2 . (192)
+                        n∈I                                          n∈I
+
+If each average bilinear kernel is stationary
+                                ∗
+                 E(kτ,n (x, u) kτ,n (x, u′ )) = k̄τ,n (x − u, x − u′ )                            (193)
+
+and                 ZZ X
+                      |  k̄τ,n (v, v ′ )| |v − v ′ | dv dv ′ < ∞ ,                                (194)
+                                  n∈I
+
+then
+                         E(kK τ Xk2 ) ≤ E(kK τ k2 ) E(|X|2) .                                     (195)
+The proof of this extension follows the same derivations as the proof of (185)
+for a single
+       P operator.     It just requires to replace the L2 (Rd ) norm kf k2 by the
+norm n∈I kfn k over the space of finite energy sequences {fn }n∈I of L2 (Rd )
+                 2
+
+functions and the sup operator norms in L2 (Rd ) by sup operator norms on
+sequence of L2 (Rd ) functions.
+
+                                                 74
+H       Proof of Theorem 4.7
+This appendix proves that E(k[SJ [PJ ] , Lτ ]Xk2 ) ≤ E(kU[PJ ]Xk1 )2 B(τ )
+with                  n                                       2 o
+                                       k∆τ k∞
+           B(τ ) = C E k∇τ k∞ (log              ∨ 1) + kHτ k∞      ,     (196)
+                                       k∇τ k∞
+                      P     P                        1/2
+and E(kU[PJ ]Xk1 ) = +∞ m=0          m
+                                  p∈ΛJ E(|U[p]X|  2
+                                                    )      .
+   For this purpose, we shall first prove that if for any stationary process X
+
+                       E(k[WJ , Lτ ]Xk2 ) ≤ B(τ ) E(|X|2 )                         (197)
+
+where
+                                                    X
+        E(k[WJ , Lτ ]Xk2 ) = E(|[AJ , Lτ ]X|2 ) +          E(|[W [λ] , Lτ ]X|2 )
+                                                    λ∈ΛJ
+
+then
+                E(k[SJ [PJ ] , Lτ ]Xk2 ) ≤ B(τ ) E(kU[PJ ]Xk1 )2 .                 (198)
+   Since a modulus operator is nonexpansive and commutes with Lτ , with
+the same argument as in the proof of (57), we derive from (197) that
+
+                       E(k[UJ , Lτ ]Xk2 ) ≤ B(τ ) E(|X|2 ) .                       (199)
+
+The proof of Proposition 4.2 also shows that UJ is nonexpansive for the
+mean square norm on processes. Since SJ [PJ ] is obtained by iterating on UJ
+it results that
+
+                E(k[SJ [PJ ] , Lτ ]Xk2 ) ≤ B(τ ) E(kU[PJ ]Xk1 )2 .
+
+The proof of this inequality follows the same derivations as in Appendix D,
+for L = Lτ , by replacing f by X, kf k2 by E(|X|2 ), kU[p]f k2 by E(|U[p]X|2 ),
+and the L2 (Rd ) sup operator norm k[UJ , L]k by B(τ ) which satisfies (199)
+for all X.
+    The proof of (196) is ended by verifying that
+
+                     E(k[WJ , Lτ ]Xk2 ) ≤ E(C 2 (τ )) E(|X|2)                      (200)
+
+and hence B(τ ) = E(C 2 (τ )) with
+                                  k∆τ k∞              
+            C(τ ) = C k∇τ k∞ (log         ∨ 1) + kHτ k∞ .
+                                   k∇τ k∞
+
+                                        75
+The inequality (200) is derived from Lemma 2.14 which proves that the
+L2 (Rd ) operator norm of the commutator [WJ , Lτ ] satisfies
+                                   k[WJ , Lτ ]k ≤ C(τ ) ,                             (201)
+and by applying to K τ = [WJ , Lτ ] = {[AJ , Lτ ] , [W [λ] , Lτ ]}λ∈ΛJ the exten-
+sion (195) of Lemma 4.8. This extension proves that if the kernels of the
+wavelet commutator satisfy the conditions (193) and (194) then
+                    E(k[WJ , Lτ ]Xk2 ) ≤ E(k[W, Lτ ]k2 ) E(|X|2).
+Together with (201) it proves (200).
+    To finish the proof we verify that the wavelet commutator kernels satisfy
+(193) and (194). If Zj f (x) = f ⋆ hj (x) with hj (x) = 2dj h(2j x) then the kernel
+of the integral commutator operator [Zj , Lτ ] = Zj Lτ − Lτ Zj is
+ kτ,j (x, u) = hj (x − u − τ (x))                                        (202)
+               −hj (x − u − τ (u + τ (β(u)))) | det(1 − ∇τ (u + τ (β(u))))|−1
+where β is defined by β(x) = x + τ (β(x)). The kernel of [AJ , Lτ ] is kτ,J with
+h = φ, and the kernel of [W [λ], Lτ ] for λ = 2j r is kτ,j with h(x) = ψ(r −1 x).
+Since τ and ∇τ are jointly stationary, the joint probability distribution of
+their values at x and u + τ (β(u)) only depends upon x − u. It results that
+E(kτ,j (x, u) kτ,j (x, u′ )) = k̄τ,j (x − u, x − u′ ) which proves the kernel station-
+arity (193) for wavelet commutators.
+    The second kernel hypothesis (194) is proved by showing that if |h(x)| =
+O((1 + |x|)−d−2 ) then
+                      ZZ X
+                            |      k̄τ,j (v, v ′)| |v − v ′ | dv dv ′ < ∞ .
+                            j≥−J
+
+Since k̄τ,j (v, v ′ ) = E(kτ,j (x, x − v) kτ,j (x, x − v ′ )), it is sufficient to prove that
+there exists C such that for all x, with probability 1
+           X ZZ
+    I=                 |kτ,j (x, x − v)| |kτ,j (x, x − v ′ )| |v − v ′ | dv dv ′ ≤ C .  (203)
+          j≥−J
+
+Since hj (x) = 2dj h(2j x) and u + τ (β(u)) = β(u), it results from (202) that
+kτ,j (x, x − 2−j w) = 2dj k̃τ,j (x, x − w) with
+k̃τ,j (x, x − w) = h(w − 2j τ (x))                                   (204)
+                   −h(w − 2 τ (β(x − 2 w))) | det(1 − ∇τ (β(x − 2 w)))|−1 .
+                             j        −j                         −j
+
+
+
+                                             76
+The
+P change    of variable w = 2j v and w ′ = 2−j v ′ in (203) shows that I =
+        −j
+  j≥−J 2 Ij with
+              ZZ
+         Ij =      |k̃τ,j (x, x − w)| |k̃τ,j (x, x − w ′ )| |w − w ′| dw dw ′ .
+
+Since |h(w)| = O((1 + |w|)−d−2 ) and k∇τ k∞ ≤ 1/2 with probability 1, by
+computing separately the integrals of each of the four terms of the product
+|k̃τ,j (x, x+w)| |kτ,j (x, x+w ′ )| |w−w ′|, with change of variables, y = w+2j τ (x)
+and z = w+2j τ (β(x+2       −j
+                        P w)),       we verify that there exists C ′ such that Ij ≤ C ′
+and hence that I = j≥−J 2−j Ij ≤ 2J+1C ′ with probability 1. It proves (203)
+and hence the second kernel hypothesis (194).
+
+   Acknowledgement I would like to thank Joan Bruna, Mike Glinsky
+and Nir Soren for the many inspiring conversations in connection with image
+processing, physics and group theory.
+
+
+References
+ [1] J. Anden, and S. Mallat, “Multiscale scattering for audio classification”,
+     Proc. of ISMIR Conf., Florida, 2011.
+
+ [2] J. Bouvrie, L. Rosasco, T. Poggio: “On Invariance in Hierarchical Mod-
+     els”. Proc. of NIPS 2009
+
+ [3] J. Bruna, S. Mallat, “Classification with scattering operators”, Proc. of
+     IEEE CVPR, Colorado Springs, 2011.
+
+ [4] J. Bruna, S. Mallat, “Invariant Scattering Convolution Networks”, sub-
+     mitted to IEEE Trans. on PAMI, 2012.
+
+ [5] G. David, J.-L. Journé, and S. Semmes, “Opérateurs de Calderòn Zygu-
+     mund, fonctions para-accrétives et interpolation,” Rev. Mat. Iberoameri.
+     1:1-56, 1985.
+
+ [6] T. Frankel, “The Geometry of Physics, An Introduction”, Cabridge
+     Univ. Press, 2004.
+
+ [7] M. Frazier, B. Jawerth, G. Weiss, “Littlewood-Paley theory and the
+     study of function spaces,” CBMS AMS, (1991).
+
+                                          77
+ [8] D. Geller and I. Z. Pesenson, “Band-Limited Localized Parseval Frames
+     and Besov Spaces on Compact Homogeneous Manifolds”, J. of Geomet-
+     ric Analysis, July, 2010.
+
+ [9] M. Glinsky, “A new perspective on renormalization: invariant actions, a
+     dynamical DNA”, June 2011, http://arxiv.org/abs/1106.4369
+
+[10] Lars Hörmander, “Fourier Integral Operators, I,”Acta Mathematica,
+     127:79183, 1971.
+
+[11] Y. LeCun, K. Kavukvuoglu and C. Farabet: “Convolutional Networks
+     and Applications in Vision”, Proc. Int. Symposium on Circuits and Sys-
+     tems (ISCAS’10)”, IEEE, 2010.
+
+[12] W. Lohmiller and J.J.E. Slotine “On Contraction Analysis for Nonlinear
+     Systems”, Automatica, 34(6), 1998.
+
+[13] S. Mallat. “Recursive Interferometric Representation”, Proc. of EUSICO
+     conference, Danemark, August 2010.
+
+[14] Y. Meyer, “Wavelets and Operators”, Cambridge University Press, 1992.
+
+[15] P. Olver, “Equivalence, Invariants and Symmetry” Cambridge Univer-
+     sity Press, 1995.
+
+[16] I. Rahman, I. Drori , V. Stodden , D. Donoho, ”Multiscale Representa-
+     tions for Manifold-Valued Data,” SIAM Multiscale Modelling and Sim-
+     ulation, vol. 4, no. 4, 2005, pp. 12011232.
+
+[17] M. Riesenhuber, T. Poggio, “Hierarchical models of object recognition
+     in cortex,” Nature Neuroscience, 2: 10191025.
+
+[18] L. Sifre, S. Mallat, “Combined scattering for rotation invariant texture
+     analysis,” subm. ESANN 2012.
+
+[19] E. Stein, “Topics in harmonic analysis related to Littlewood-Paley the-
+     ory”, Annals of Mathematical Studies, Princeton University Press, 1970.
+
+[20] E. Stein, “Harmonic Analysis”, Princeton Mathematical Series, Prince-
+     ton University Press, 1993.
+
+
+
+                                     78
+[21] A. Trouvé, L. Younes; “Local Geometry of Deformable Templates”;
+     SIAM J. Math Anal. Volume 37, Issue 1, pp. 17-59; 2005.
+
+[22] Stephen Willard, “General Topology” Addison-Wesley Publishing Com-
+     pany, Reading Massachusetts, 1970.
+
+
+
+
+                                  79
+

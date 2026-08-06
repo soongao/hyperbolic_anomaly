@@ -1,0 +1,721 @@
+                                                       FreqAnchorAD: Language-Free Zero-Shot Anomaly Detection via
+                                                                     Frequency-Deviation Anchoring
+                                                                           Jianfeng Qiu1 , Peiyuan Li1 , Juan Xie1 , Xueliang Ma1 ,
+                                                                                  Sihang Zhou2 , Yanning Hou2* , Ke Xu1*
+                                                                                               1
+                                                                                               Anhui University, Hefei, China
+                                                                             2
+                                                                                 National University of Defense Technology, Changsha, China
+
+
+                                                                        Abstract                                collecting sufficient and clean normal data for each target cat-
+                                                                                                                egory is often challenging in real-world deployments. This
+                                          Zero-shot anomaly detection (ZSAD) aims to detect anoma-
+                                          lous samples and localize defective regions in unseen tar-            motivates zero-shot anomaly detection (ZSAD), which aims
+                                          get domains without using target training data. Many recent           to detect and localize anomalies without using any target-
+                                          ZSAD methods build on pretrained vision models, particularly          domain training samples (Li et al. 2024; Cao et al. 2023).
+                                          CLIP, and construct normal and anomaly references using tex-             This problem is challenging due to domain shifts across
+
+
+
+
+arXiv:2608.00695v1 [cs.CV] 1 Aug 2026
+                                          tual prompts or learnable visual representations. Text-guided         unseen categories, diverse anomaly appearances, and subtle
+                                          and visual-reference methods perform anomaly discrimina-              local defects. Most ZSAD methods build on CLIP (Radford
+                                          tion primarily in spatial feature spaces, where subtle changes        et al. 2021), whose transferable representations provide use-
+                                          in texture, boundaries, and local structures are difficult to dis-
+                                          tinguish from normal appearance variations. Although such
+                                                                                                                ful priors for unseen categories. Text-guided methods (Jeong
+                                          defects are inconspicuous in the spatial domain, they can dis-        et al. 2023; Chen, Han, and Zhang 2023; Chen et al. 2023; Qu
+                                          rupt local texture regularity or boundary continuity, thereby         et al. 2024; Gu et al. 2024; Cao et al. 2024; Ma et al. 2025)
+                                          inducing distinguishable response deviations across different         construct normal and anomaly references through textual
+                                          frequency bands. However, these frequency-dependent char-             prompts. In contrast, VisualAD (Hou et al. 2026) removes the
+                                          acteristics are not explicitly modeled by existing ZSAD meth-         language branch and learns purely visual references, result-
+                                          ods. Our image-domain analysis reveals that local defects             ing in a simpler framework with strong ZSAD performance.
+                                          exhibit spatial-frequency deviations from their normal ref-           Despite their different reference construction strategies, both
+                                          erences across low-, middle-, and high-frequency bands, indi-         paradigms discriminate anomalies primarily in spatial fea-
+                                          cating that anomaly evidence is not universally dominated by          ture spaces. In these spaces, subtle texture, boundary, and
+                                          high-frequency responses. Motivated by this observation, we
+                                          propose FreqAnchorAD, a frequency-aware framework cen-
+                                                                                                                local structural changes can be difficult to distinguish from
+                                          tered on organizing frequency-enhanced responses for anchor-          normal appearance variations. Frequency-domain modeling
+                                          relative anomaly discrimination. Specifically, we propose a           can complement spatial representations by explicitly char-
+                                          Local Frequency Compensation Module (LFCM) to enhance                 acterizing the spectral deviations induced by these changes.
+                                          intermediate patch tokens with local spatial-frequency cues.          FE-CLIP (Gong et al. 2025) introduces frequency cues into
+                                          Moreover, we introduce the Frequency-Deviation Anchor Pro-            CLIP-based anomaly detection to enhance the representation
+                                          jector (FDAP), the core discrimination module that organizes          of subtle local defects. However, its frequency cues mainly
+                                          the enhanced responses along a source-derived channel coor-           serve to enhance visual features, rather than constructing
+                                          dinate and measures anomaly evidence through relative sim-            a channel-spectral space for directly comparing patch repre-
+                                          ilarity to normal and anomaly anchors. Finally, we design             sentations with normal and anomalous token references, lim-
+                                          Asymmetric Anchor Supervision (AAS) to stabilize normal-
+                                          anchor alignment while preserving diverse anomaly patterns.
+                                                                                                                iting the explicit exploitation of subtle spectral deviations for
+                                          Experiments on thirteen industrial and medical benchmarks             anomaly discrimination. To address this gap, we propose Fre-
+                                          show that FreqAnchorAD achieves state-of-the-art mean per-            qAnchorAD, a frequency-aware framework for ZSAD that
+                                          formance on both image-level anomaly recognition and pixel-           organizes frequency-enhanced responses in a structured an-
+                                          level defect localization.                                            chor space for reference-based anomaly discrimination.
+                                                                                                                   To characterize local anomaly deviations, we conduct a
+                                                                 Introduction                                   post hoc analysis of spatial frequency in the image domain, as
+                                        Anomaly detection (Xie et al. 2023; Roth et al. 2022; Mou               shown in Fig. 1. Using same-category normal training images
+                                        et al. 2023; Wang et al. 2023) aims to detect abnormal sam-             only as diagnostic references, we construct normal-calibrated
+                                        ples and localize defective regions by identifying deviations           low-, mid-, and high-frequency deviation maps and identify
+                                        from normal patterns. Conventional methods (Defard et al.               the dominant band according to its sensitivity to anomalous
+                                        2021; Rudolph et al. 2022; Li et al. 2021) usually rely on tar-         regions, quantified by pixel-level AUROC. High-frequency
+                                        get category normal samples to learn specific normality, but            deviations are most frequent (39.75%), while low- and mid-
+                                                                                                                frequency deviations jointly account for 60.25%, motivating
+                                           ∗
+                                               Corresponding authors.                                           collaborative multi-band modeling rather than reliance on a
+                                                                           Low   Mid      High
+               Do local anomalies always induce                                                                                            High           Mid            Low     Not an isolated phenomenon
+               dominant high-frequency deviations?                                                                                   100
+                                                                                                                                           n=60 n=119 n=63 n=70n=92 n=30 n=141 n=89 n=93 n=40 n=84n=92 n=109 n=57n=119 n=1258
+
+
+
+
+                                                                                                 Fraction of anomalous regions (%)
+                          Low      Mid       High
+                                                          High-frequency                                                                                                                                               40%
+ Normal                                                   responses are                                                               75
+ Reference
+                                                          sensitive to
+                                                          anomalies.
+ Anomalous                                                                                                                            50
+ Sample                                                                                                                                                                                                                27%
+
+
+ Deviation
+                                                                                                                                      25
+from Normal                                                                                                                                                                                                           33%
+
+
+             For this sample, low-frequency responses     Mid-frequency                                                                0            w
+             exhibit the strongest anomaly sensitivity.
+                                                                                                                                                  zi doo
+                                                                                                                                                     pp
+                                                                                                                                                   bo r
+                                                                                                                                              ha t t l e
+                                                                                                                                                   ze     e
+                                                                                                                                                      ln
+                                                          responses are
+                                                                                                                                                 l e ut
+                                                                                                                                           t o a t he
+                                                                                                                                               ot  hb r
+                                                                                                                                                      ru
+                                                                                                                                                     pi    sh
+                                                                                                                                            m r peca l
+                                                                                                                                                et t
+                                                                                                                                                   al
+                                                                                                                                             t r a _nu
+                                                                                                                                                  ns ti stl
+                                                                                                                                                    catil
+                                                                                                                                                       b  eor
+  Answer: No. Local anomalies are not limited
+                                                                                                                                                ca le
+                                                          sensitive to
+                                                                                                                                                    ps
+                                                                                                                                                   scgr
+                                                                                                                                                      reul
+                                                                                                                                                         id
+                                                                                                                                                          w e
+                                                                                                                                                O  ve  ra   ll
+  to high-frequency deviations.                           anomalies.                                                                 Anomaly-induced deviations span multiple frequency bands.
+
+
+Figure 1: Motivation for frequency-aware anomaly deviation modeling. Spatial-frequency analysis relative to category-specific
+normal references shows that low-, mid-, and high-frequency deviations can each dominate anomaly localization for different
+images and categories. These observations indicate that local anomalies are better characterized as frequency-dependent
+deviations from normal references than as universally high-frequency responses, motivating frequency-aware representation and
+its integration with reference-based anomaly discrimination.
+
+
+single frequency band.                                                                 • Extensive experiments on thirteen industrial and medical
+   Motivated by the observed multi-band deviations, we pro-                              benchmarks demonstrate that FreqAnchorAD achieves
+pose FreqAnchorAD, a frequency-aware ZSAD framework                                      competitive image-level anomaly recognition and strong
+that combines local spatial frequency enhancement with                                   pixel-level defect localization under the ZSAD setting.
+source-derived channel organization for anomaly discrimi-
+nation relative to normal and anomaly anchors. Specifically,                                                                                      Related Work
+the Local Frequency Compensation Module (LFCM) in-                                 Reference-based Zero-shot Anomaly Detection
+jects local spatial-frequency cues into patch representations,
+while the Frequency-Deviation Anchor Projector (FDAP),                             Reference-based ZSAD methods aim to detect anomalies by
+as the core discrimination module, organizes the enhanced                          comparing test samples with normal or abnormal references
+channel responses along a channel coordinate constructed                           in a pretrained representation space. WinCLIP (Jeong et al.
+from source-domain normal and anomalous responses and                              2023) constructs normal/anomaly references from hand-
+applies a spectral transform for anchor-relative discrimina-                       crafted textual prompts, while AnomalyCLIP (Zhou et al.
+tion. The resulting channel-spectral components characterize                       2024) introduces learnable anomaly semantics to refine tex-
+variations along the source-derived channel coordinate rather                      tual anomaly references. VisualAD (Hou et al. 2026) further
+than spatial frequency bands of the input image or token                           revisits the necessity of the CLIP language branch and con-
+grid. Asymmetric Anchor Supervision (AAS) further regu-                            structs visual reference features for language-free anomaly
+larizes the resulting channel-spectral anchor space by stabi-                      discrimination. However, they mainly operate on CLIP-
+lizing normal alignment while preserving diverse anomaly                           derived spatial domain features, making it difficult to explic-
+patterns.                                                                          itly characterize subtle signal-level perturbations such as tex-
+   The main contributions of this paper are summarized as                          ture irregularities, boundary changes, and micro-structural
+follows:                                                                           defects. Our work constructs a source-derived channel coor-
+                                                                                   dinate and performs anchor-relative anomaly discrimination
+  • We provide an image-domain spatial-frequency analy-                            in the resulting channel-spectral space.
+    sis showing that low-, mid-, and high-frequency bands
+    exhibit complementary anomaly-localization sensitivity                         Frequency-aware Visual Representation Learning
+    across images and categories, motivating collaborative                         Frequency-domain modeling has been widely explored to
+    multi-band modeling of visual representations.                                 complement spatial visual representations (Bai et al. 2024;
+  • We introduce source-derived channel canonicalization,                          Liu et al. 2025; Zhao et al. 2025; Zhang et al. 2025;
+    which constructs a consistent channel coordinate from                          Li et al. 2026; Gardner et al. 2026). FFC (Chi, Jiang,
+    the response statistics of normal and anomalous source                         and Mu 2020) captures non-local and cross-scale interac-
+    images for channel-spectral modeling.                                          tions through Fourier units. FcaNet (Qin et al. 2021) uses
+  • We propose FreqAnchorAD, an FDAP-centered                                      multi-spectral DCT components for channel attention, while
+    frequency-aware ZSAD framework that integrates                                 GFNet (Rao et al. 2021) models long-range dependencies
+    local spatial-frequency compensation, source-derived                           through global frequency-domain filtering. FE-CLIP (Gong
+    channel-spectral anchor projection, and asymmetric                             et al. 2025) extends frequency modeling to ZSAD by incor-
+    anchor supervision for robust relative normal/anomaly                          porating frequency-aware feature extraction and local fre-
+    discrimination.                                                                quency statistics into the CLIP visual encoder. However, it
+mainly uses frequency information for feature enhancement,      Frequency-Deviation Anchor Projector
+without explicitly organizing anomaly-induced frequency de-     LFCM enhances patch tokens with frequency-sensitive local
+viations relative to normal and anomaly references. In con-     responses. FDAP further organizes these responses along a
+trast, FreqAnchorAD combines local spatial-frequency com-       source-derived channel coordinate for normal/anomaly an-
+pensation with anchor-relative channel-spectral modeling.       chor discrimination. To this end, FDAP maps the enhanced
+                                                                tokens into a channel-spectral anchor space and quantifies
+                         Method                                 anomaly evidence through relative anchor similarity. How-
+Problem Setting and Overview                                    ever, the channels of pretrained visual features have no inher-
+We follow the zero-shot anomaly detection (ZSAD) setting,       ent spatial or frequency ordering. Consequently, directly ap-
+where the model is trained on auxiliary source categories and   plying a channel-spectral transform would produce spectral
+directly evaluated on unseen target categories. Let Cs and Ct   coordinates determined by arbitrary channel indices rather
+denote the source and target category sets, with Cs ∩ Ct =      than by a stable response structure. We address this issue by
+∅. During evaluation, no target-domain training images are      constructing a source-derived channel canonicalization from
+used.                                                           source-domain normal and anomalous responses.
+   Motivated by these frequency-dependent deviations, we           For each selected layer ℓ, we collect all patch tokens from
+propose FreqAnchorAD, a language-free, frequency-aware          the selected source split:
+framework centered on FDAP-based anchor-relative dis-
+                                                                                 Xℓs = Concat Xℓs,n , Xℓs,a ,
+                                                                                                             
+                                                                                                                            (2)
+crimination. LFCM provides defect-sensitive local spatial-
+frequency cues, FDAP organizes the enhanced responses in        where Xℓs,a denotes all patch tokens extracted from anoma-
+a source-derived channel-spectral anchor space, and AAS         lous source images rather than only those inside anoma-
+stabilizes the resulting normal/anomaly anchor discrimina-      lous regions. The channel-wise variance and permutation
+tion.                                                           are computed as
+   Given an image I, the frozen backbone extracts interme-
+diate patch tokens Xl ∈ RB×N ×D from layers L, where                             Mℓ                     Mℓ
+                                                                                                                 !2
+N = H × W . LFCM enriches patch tokens with local fre-                  ℓ     1 X        ℓ
+                                                                                            2      1 X       ℓ
+                                                                       vc =           Xs,ic −               X       ,
+quency cues, FDAP maps the enhanced tokens into a source-                    Mℓ i=1                Mℓ i=1 s,ic         (3)
+derived channel-spectral anchor space for anchor-relative               ℓ                  ℓ
+                                                                                             
+anomaly scoring, and AAS regularizes this space by stabiliz-           π = Argsortasc v .
+ing normal alignment while preserving diverse anomaly-side         where Mℓ denotes the number of source patch to-
+deviations. The whole pipeline operates only on visual en-      kens in Xℓs . The ascending permutation orders channels
+coder features, without textual prompts, cross-modal align-     from relatively stable low-variance responses to more ac-
+ment, target-domain statistics, or test-time adaptation. The    tive high-variance responses, thereby establishing a re-
+overview of the proposed model is illustrated in Fig. 2.        producible source-derived channel coordinate before the
+                                                                channel-spectral transform.
+Local Frequency Compensation Module                                Given an LFCM-enhanced patch token x   eℓi , its variance-
+The frozen vision encoder provides transferable visual rep-     ordered representation is defined as
+resentations, but its intermediate patch tokens may not ex-
+                                                                                      xℓ,π    eℓi π ℓ .
+                                                                                                  
+plicitly preserve local spatial-frequency deviations on the                             i  =x                             (4)
+token grid. To address this limitation, we introduce the Lo-
+cal Frequency Compensation Module (LFCM) at each se-            The objective of FDAP is to represent target tokens in a uni-
+lected layer to enhance the sensitivity of visual features to   fied source-derived channel coordinate system for anomaly
+texture, boundary, and structural perturbations. Given patch    scoring. Accordingly, the inference rule of FDAP is defined
+tokens Xℓ ∈ RB×N ×D , we first reshape them into a spa-         as full channel canonicalization, corresponding to ρ = 1,
+tial token grid Xℓg ∈ RB×D×H×W , where N = H × W .              where all target samples are mapped into the same determin-
+LFCM contains two complementary branches: Local Fre-            istic canonical channel space.
+quency Modulation (LFM) uses DCT-based modulation on               During training, directly enforcing the fully canonicalized
+non-overlapping local windows to capture compact spectral       representation may introduce an abrupt shift from the pre-
+perturbations, while Local Spectral Aggregation (LSA) sum-      trained feature space to the reordered channel space. To alle-
+marizes DCT statistics from sliding neighborhoods to capture    viate this optimization difficulty, we introduce soft channel
+regional structural deviations. The two branches produce fre-   canonicalization:
+quency responses FℓLFM and FℓLSA , which are fused with the
+original token grid by                                                                         xℓi + ρxℓ,π
+                                                                                  xℓi = (1 − ρ)e       i ,                 (5)
+          e ℓ = (1 − λ)Xℓ + λ Fℓ
+          X                                  ℓ
+                                                                  where ρ < 1 controls the degree of canonicalization only
+            g              g         LFM + FLSA .         (1)
+                                                                during training. This strategy preserves part of the pretrained
+The enhanced grid is then flattened back to patch tokens        channel structure while gradually adapting the projection
+Xe ℓ ∈ RB×N ×D . This residual compensation preserves           head and anchors to the canonical channel space. Unless
+the pretrained representation while injecting local spatial-    otherwise specified, we set the training coefficient to ρ = 0.6
+frequency evidence for anchor-based anomaly scoring.            throughout all experiments.
+                                                                                                     Step 1：Channel Perm Pre-processing
+                                                                                                                                          Channel
+                     ViT Encoder                                                                     Channel
+                                                                                                                             Variance
+                                                                                                                                                                                  C6    C2 . . .      C4
+                                                                                                      Sort
+                                                                                                                                                                             Channel perm
+Input Image                                                                Patch Tokens
+                                                                                                                                        stable        →   active
+                                                                                            Step 3：Frequency-Deviation Anchor Projector
+                                                                           (1-�)�+�[perm]                                                                                              Linear
+                                                                                                                                        DCT-1 � DCT
+
+                                Block 2         Block M                                                                                                               LayerNorm
+                                          ...
+                  Block 1                                                                                                                                                          Linear   GELU   Linear   L2Norm
+                                                                                                 reshape                                                   Flat
+                                                                                                 2D Channel
+ Input Image                                                      �                                           [N,32,32]
+                                                                                 [N,1024]                                                                                         Projection Head
+
+                                                                                                                                                                                                   CLS+
+ Step 2：Local Frequency Compensation Module                                                           aan                                                                                          Top-K
+                                                                                                                                                                        �
+                                                                                                                 Sa - Sn
+                LFM Branch                                                                             n
+                  3×3     Linear+               3×3                                          z                                             �6                                         Image
+                                                           Fold                                        a                                     �12
+                  DCT     GELU                  IDCT                                                  aaa                                                                 Anomaly Map Score
+                                                                                                                            Similarity Map     �18
+                LSA Branch                                                                                                                                    �24
+                            Mean                Linear+
+                                                              λ=0.05
+  Patch          UnFold     (DCT)               GELU                   Enhanced     Step 4：Asymmetric Anchor Supervision
+  Tokens                                                                Tokens Znormal
+                                                                                       cos(znormal,an)                  Zreal_anom Zsynth_anom
+      Matrix
+     Addition
+                       Matrix
+                       MatMul             �     Aggregation
+                                                                        Cosine
+                                                                                                                  an                                                    aa
+                                                                       Similarity                                                  ReLU(cos(an,aa)+0.5)                                cos(zanomaly,an)
+                     Anomalous
+ an Normal
+    Patch
+                aa      Patch
+                                                  Frozen              Training
+                                                                                            Normal Alignment (a)                Anchor Separation (b)                Weak Regularization (c)
+
+
+Figure 2: Overview of FreqAnchorAD. A frozen vision encoder extracts multi-layer patch tokens, LFCM enhances local
+spatial-frequency cues, and FDAP projects them into a channel-spectral anchor space for relative normal/anomaly scoring. AAS
+regularizes this space during training, while aggregated layer-wise maps produce the final anomaly map and image score.
+
+
+   The canonicalized channel sequence is arranged into an                                             branch and a residual projection branch:
+Hc × Wc computational grid, where Hc Wc = D. To de-
+                                                                                                                 zℓi = Norm2 Fℓ uℓi + Pℓ uℓi ,
+                                                                                                                                              
+termine the grid shape consistently across different channel                                                                                                                                                         (9)
+dimensions, we adopt a dimension-balanced factorization
+                                                                                                      where Fℓ denotes a layer-specific two-layer MLP projection
+rule:
+                                                                                                      head, and Pℓ denotes the residual projection.
+               (Hc , Wc ) = arg min |h − w|.             (6)
+                                           hw=D                                                         Given the normal anchor aℓn and anomaly anchor aℓa , the
+                                            h≥w                                                       anomaly score of the i-th patch is computed as
+This rule limits the cross-row stride of the ordered sequence
+                                                                                                                  sℓi = cos zℓi , aℓa − cos zℓi , aℓn .
+                                                                                                                                                    
+while balancing the spectral resolution along the two trans-                                                                                                (10)
+form axes. For D = 1024, this rule yields a balanced 32 × 32
+                                                                                                      Thus, FDAP measures anomaly evidence through anchor-
+DCT grid based on the source-derived channel order rather
+                                                                                                      relative deviations in the channel-spectral space rather than
+than any intrinsic spatial structure; when no nontrivial fac-
+                                                                                                      through absolute responses in a predefined spectral band. The
+torization exists, the layout reduces to D × 1.
+                                                                                                      patch scores are finally rearranged according to their spatial
+   The organized channel representation is then transformed
+                                                                                                      positions to obtain the layer-wise anomaly map Sℓ .
+using a two-dimensional DCT (Ahmed, Natarajan, and Rao
+1974):
+                                                                                                      Training Objective
+          Dℓi = DCT2D ReshapeHc ×Wc xℓi .
+                                                 
+                                                          (7)                                         We introduce Asymmetric Anchor Supervision (AAS) to sta-
+The DCT is applied over the source-derived channel coordi-                                            bilize the channel-spectral anchor space learned by FDAP.
+nate rather than the spatial layout of the input image, produc-                                       Normal representations are strongly aligned with the normal
+ing a channel-spectral representation of different response-                                          anchor, while real and synthetic anomaly-side representa-
+variation rates.                                                                                      tions are weakly guided toward the anomaly anchor:
+   We then flatten the resulting channel-spectral representa-
+                                                                                                                                1 X
+tion and apply layer normalization:                                                                                Lℓn = 1 − ℓ          cos(zℓi , aℓn ),      (11)
+                                                                                                                              |Ωn |   ℓ                    i∈Ωn
+                  uℓi = LN Flatten Dℓi .
+                                            
+                                                            (8)
+                                                                                                                                        1     X
+The normalized channel-spectral representation is projected                                                                Rℓa,r = 1 − ℓ         cos(zℓi , aℓa ),                                               (12)
+into the channel-spectral anchor space through an MLP                                                                                 |Ωa,r |  ℓ            i∈Ωa,r
+                           1     X
+                                                               protocol, VisA is used as the source dataset for all non-VisA
+           Rℓa,s = 1 −     ℓ
+                                        zℓi , aℓa ),
+                                    cos(e              (13)
+                         |Ωa,s |  ℓ
+                                                               targets, while MVTec AD is used for VisA; no target-dataset
+                                i∈Ωa,s
+                                                               samples are used during training.
+where Ωℓn and Ωℓa,r index normal and anomaly-labeled              Baselines. We compare with WinCLIP (Jeong et al.
+                                                               2023), APRIL-GAN (Chen, Han, and Zhang 2023), CLIP-
+source patches, respectively, while Ωℓa,s indexes synthetic
+                                                               AD (Chen et al. 2023), AnomalyCLIP (Zhou et al. 2024),
+                zℓi generated by adding Gaussian noise ϵ ∼
+representations e                                              AdaCLIP (Cao et al. 2024), FE-CLIP (Gong et al. 2025),
+         2
+N (0, σ I) to normal frequency-domain features before pro-     and VisualAD (Hou et al. 2026). FE-CLIP is included only
+jection.                                                       in the industrial comparison due to its limited medical dataset
+   The anomaly-side regularization and anchor-separation       coverage and inconsistent pixel-level metrics.
+term are                                                          Evaluation metrics. We report AUROC, F1-max, and AP
+             Rℓa = ηr Rℓa,r + ηs Rℓa,s ,               (14)    for image-level evaluation, and AUROC, F1-max, AP, and
+                                                               AUPRO for pixel-level evaluation. Industrial tables report all
+            Lℓsep = max 0, cos(aℓn , aℓa ) − m .
+                                                
+                                                       (15)    metrics for each benchmark. Image- and pixel-level metrics
+The AAS objective is                                           are prefixed by I- and P-, respectively.
+                                                                  Implementation details. We instantiate FreqAnchorAD
+                    1 X ℓ                                      with frozen CLIP ViT-L/14@336px (Radford et al. 2021)
+                       Ln + βLℓsep + γRℓa ,
+                                         
+         LAAS =                                        (16)
+                   |L|                                         and DINOv2 ViT-L/14 (Caron et al. 2021; Oquab et al. 2024)
+                       ℓ∈L
+                                                               backbones and resize all inputs to 518 × 518. LFCM is in-
+where the smaller anomaly-side weight γ preserves hetero-      serted into layers L = {6, 12, 18, 24}, and FDAP operates
+geneous anomaly responses.                                     on their patch tokens. FDAP interpolates between the origi-
+  The layer-wise anomaly maps and image-level score are        nal and source-derived channel orders with ρ = 0.6 during
+computed as                                                    training and uses the fully canonicalized order with ρ = 1.0
+          X                                                    during inference. AAS supervises the corresponding channel
+    M=       Up(Sℓ ),      smap = TopKMean(M, r),              spectral anchor spaces. Additional implementation details are
+          ℓ∈L                                                  provided in the Appendix.
+  simg = λmap smap + (1 − λmap )sCLS .
+                                                   (17)        Performance Comparison with SOTA Methods
+For CLIP-based industrial experiments, sCLS denotes the        Tables 1 and 2 report the results on industrial and medi-
+CLS-anchor score and is fused directly with smap using         cal benchmarks, respectively. FreqAnchorAD achieves state-
+λmap = 0.5. For DINOv2 and all medical configurations,         of-the-art overall performance on industrial benchmarks
+the CLS-anchor head is disabled and simg = smap . The          and consistently improves over the corresponding VisualAD
+overall objective is                                           baselines on medical benchmarks. The stronger pixel-level
+          Ltotal = αLcls + Lseg + λAAS LAAS ,          (18)    results indicate that the proposed frequency-aware frame-
+                                                               work effectively captures subtle local anomalies. Its consis-
+where Lcls is the image-level BCE loss and Lseg combines       tent gains with both CLIP and DINOv2 further demonstrate
+focal and Dice losses (Lin et al. 2017; Li et al. 2020).       good backbone and cross-domain generality.
+   During training, the pretrained vision encoder is frozen,
+while LFCM, the FDAP projection heads, and the learnable       Ablation Studies
+normal and anomaly anchors are optimized under the AAS         In this section, we use CLIP’s ViT-L/14@336px backbone
+objective. During inference, all learned modules and source-   by default and conduct ablation studies on the VisA dataset to
+derived channel permutations are fixed. FDAP always per-       examine how different settings affect the proposed FreqAn-
+forms full canonicalization (ρ = 1) and does not use text      chorAD framework. We additionally include DINOv2-based
+encoders, target-domain statistics, or test-time adaptation.   ablations for part of the experiments, with the full results
+                                                               deferred to the appendix.
+                       Experiments
+Experimental Setup                                             Effect of Core Components. Table 3 evaluates the three
+                                                               core components. Removing FDAP causes the largest degra-
+Datasets. We evaluate FreqAnchorAD on six industrial           dation in both transfer directions, while LFCM mainly ben-
+benchmarks: MVTec AD (Bergmann et al. 2019), VisA (Zou         efits localization and AAS contributes more to image-level
+et al. 2022), BTAD (Mishra et al. 2021), KSDD2 (Božič,         discrimination.
+Tabernik, and Skočaj 2021), DAGM (Wieler, Hahn, and
+Hamprecht 2007), and DTD-Synthetic (Aota, Tong, and            Effect of Canonicalization Ratio. We analyze the
+Okatani 2023). We further use seven medical benchmarks:        training-time soft canonicalization coefficient ρ, which inter-
+OCT17 (Kermany et al. 2018), BrainMRI (Salehi et al. 2021),    polates between the pretrained channel order and the source-
+Brain_AD (Baid et al. 2021; Bakas et al. 2017; Menze           derived variance order. Table 4 shows stable performance
+et al. 2014), HIS (Ehteshami Bejnordi et al. 2017), CVC-       across a broad range, indicating low sensitivity to ρ. We use
+ClinicDB (Bernal et al. 2015), Endo (Hicks et al. 2021), and   ρ = 0.6 during training and ρ = 1.0 at inference to align
+Kvasir (Jha et al. 2020). Following the cross-dataset ZSAD     samples with the source-derived channel coordinate.
+  Method                       MVTec                               VisA                        BTAD                              KSDD2                          DAGM                               DTD                          Avg.
+
+  Image-level             (I-AUROC,I-F1,I-AP)                (I-AUROC,I-F1,I-AP)         (I-AUROC,I-F1,I-AP)              (I-AUROC,I-F1,I-AP)              (I-AUROC,I-F1,I-AP)               (I-AUROC,I-F1,I-AP)         (I-AUROC,I-F1,I-AP)
+✗ WinCLIP                  (90.4,92.7,95.6)                   (75.6,78.2,78.8)            (68.2,67.8,70.9)                 (93.5,86.4,94.2)                 (91.8,75.8,79.5)                  (95.1,94.1,97.7)           (85.8, 82.5, 86.1)
+✗ APRIL-GAN                (86.1,90.4,93.6)                   (77.4,78.6,80.9)            (73.7,68.7,69.9)                 (90.4,82.9,92.0)                 (94.4,80.3,83.9)                  (85.5,89.1,94.0)           (84.6, 81.7, 85.7)
+✗ CLIP-AD                  (74.1,86.3,88.1)                   (66.2,74.3,71.4)            (66.7,65.9,67.3)                 (81.7,75.0,85.5)                 (62.1,37.1,32.3)                  (75.1,86.3,88.0)           (71.0, 70.8, 72.1)
+✗ AnomalyCLIP              (91.6,92.7,96.2)                   (81.0,80.3,84.4)            (88.7,86.0,90.6)                 (91.9,84.5,93.4)                 (98.0,90.6,92.4)                  (93.7,94.3,97.4)           (90.8, 88.1, 92.4)
+✗ AdaCLIP                  (92.0,92.7,96.4)                   (79.7,79.6,83.2)            (90.0,87.2,91.5)                 (94.9,90.3,96.2)                 (98.3,91.5,94.2)                  (92.1,92.4,96.3)           (91.2, 89.0, 93.0)
+✗ FE-CLIP                    (91.9,–,96.5)                      (84.6,–,86.6)               (90.3,–,90.0)                         —                           (97.5,–,92.3)                     (98.3,–,99.4)                    —
+✓ VisualAD(CLIP)           (92.2,93.2,96.7)                   (84.7,82.5,87.6)            (94.9,93.9,97.0)                 (98.0,93.9,98.3)                 (99.5,95.0,97.8)                  (97.5,96.6,99.1)           (94.5, 92.5, 96.1)
+✓ VisualAD(DINOv2)         (90.1,92.4,94.8)                   (83.1,81.4,86.8)            (88.2,84.7,89.7)                 (97.7,93.1,98.1)                 (93.2,83.9,86.1)                  (91.0,94.4,97.4)           (90.6, 88.3, 92.2)
+✓ Ours(CLIP)               (93.4,93.3,96.9)                   (86.8,83.6,89.1)            (96.0,94.9,98.4)                 (98.1,92.9,98.4)                 (99.5,95.8,97.8)                  (97.3,96.0,98.9)           (95.2, 92.8, 96.6)
+✓ Ours(DINOv2)             (92.0,93.6,96.1)                   (82.0,80.8,86.4)            (85.0,87.9,91.4)                 (97.4,93.1,98.0)                 (98.0,89.5,91.4)                  (93.4,96.0,98.1)           (91.3, 90.1, 93.6)
+
+  Pixel-level         (P-AUROC,P-F1,P-AP,P-AUPRO)    (P-AUROC,P-F1,P-AP,P-AUPRO)    (P-AUROC,P-F1,P-AP,P-AUPRO)     (P-AUROC,P-F1,P-AP,P-AUPRO)        (P-AUROC,P-F1,P-AP,P-AUPRO)     (P-AUROC,P-F1,P-AP,P-AUPRO) (P-AUROC,P-F1,P-AP,P-AUPRO)
+✗ WinCLIP                (82.3,24.8,18.2,62.0)            (73.2,9.0,5.4,51.1)           (72.7,18.5,12.9,27.3)            (94.1,24.6,17.4,77.6)             (87.6,12.7,6.8,65.7)              (79.5,16.1,9.8,51.5)     (81.6, 17.6, 11.8, 55.9)
+✗ APRIL-GAN              (87.5,42.3,39.1,43.7)           (93.8,32.6,26.2,86.5)          (91.3,40.1,37.7,21.0)            (94.5,64.2,66.9,39.2)            (84.4,35.1,27.8,12.7)             (94.9,60.4,61.0,33.8)     (91.0, 45.8, 43.1, 39.5)
+✗ CLIP-AD                (77.9,26.3,21.1,55.7)           (93.0,24.1,17.9,80.2)          (80.9,24.1,18.3,41.4)            (95.6,43.0,39.6,73.5)            (69.1,20.9,14.7,36.1)             (86.6,35.8,31.0,63.2)     (83.9, 29.0, 23.8, 58.4)
+✗ AnomalyCLIP            (91.0,38.9,34.4,81.7)           (95.4,27.6,20.7,86.4)          (93.0,47.1,41.5,71.0)            (98.0,50.6,43.7,90.8)            (96.9,56.9,53.6,89.2)             (97.5,55.8,52.5,87.9)     (95.3, 46.2, 41.1, 84.5)
+✗ AdaCLIP                (88.5,43.9,41.0,47.6)           (95.1,33.8,29.2,71.3)          (87.7,42.3,36.6,17.1)            (96.1,59.2,58.6,40.8)            (88.6,48.5,42.6,37.6)             (95.1,58.4,56.1,34.3)     (91.9, 47.7, 44.0, 41.5)
+✗ FE-CLIP                   (92.6,–,–,88.3)                 (95.9,–,–,92.8)                (95.6,–,–,80.4)                        —                          (98.5,–,–,96.6)                   (99.0,–,–,97.4)                  —
+✓ VisualAD(CLIP)         (90.8,43.9,41.2,87.5)           (95.8,34.6,28.4,91.0)          (91.1,49.8,43.1,80.4)            (98.5,60.9,62.1,98.5)            (92.2,57.9,56.4,89.3)             (98.1,64.3,65.5,94.8)     (94.4, 51.9, 49.5, 90.3)
+✓ VisualAD(DINOv2)       (91.3,47.4,45.4,88.6)           (95.3,35.2,29.9,88.2)          (93.4,42.6,38.7,76.7)            (98.9,64.0,66.8,98.9)            (89.5,54.8,52.2,84.5)             (96.7,65.8,67.7,92.4)     (94.2, 51.6, 50.1, 88.2)
+✓ Ours(CLIP)             (91.5,45.0,43.6,88.3)           (95.8,35.2,28.5,90.8)          (93.8,51.2,45.2,80.9)            (99.5,61.3,63.9,98.9)            (95.8,57.1,56.4,92.0)             (98.1,62.1,63.6,94.4)     (95.8, 52.0, 50.2, 90.9)
+✓ Ours(DINOv2)           (91.1,48.7,47.5,88.1)           (95.9,36.0,30.6,88.0)          (94.5,48.8,45.6,75.9)            (99.3,64.0,68.0,98.0)            (95.7,60.8,60.4,91.8)             (98.2,66.9,70.2,94.2)     (95.8, 54.2, 53.7, 89.3)
+
+
+
+Table 1: Comparisons with state-of-the-art zero-shot AD methods on industrial benchmarks. ✓/✗ denote language-free/language-
+based methods. Image-/pixel-level metrics are (AUROC, F1-max, AP) / (AUROC, F1-max, AP, AUPRO).
+  Method                  OCT17               BrainMRI             Brain ADI            HIS                     I-Avg.                Brain ADP             ClinicDB                 Endo               Kvasir                P-Avg.
+
+ Image-/Pixel-level     (I-AUROC,I-AP)     (I-AUROC,I-AP)          (I-AUROC,I-AP)   (I-AUROC,I-AP)        (I-AUROC,I-F1,I-AP)         (P-AUROC,P-AP)      (P-AUROC,P-AP)         (P-AUROC,P-AP)     (P-AUROC,P-AP)   (P-AUROC,P-F1,P-AP,P-AUPRO)
+
+✗ WinCLIP                (55.2, 81.1)         (86.6, 91.5)         (72.5, 91.6)     (47.1, 40.9)         (65.4, 75.8, 76.3)            (87.6, 13.3)        (70.3, 19.4)           (68.2, 23.8)       (69.7, 27.8)    (74.0, 29.5, 21.1, 36.3)
+✗ APRIL-GAN              (30.4, 67.0)         (89.3, 90.9)         (58.8, 87.8)     (59.8, 56.5)         (59.6, 82.0, 75.6)            (83.6, 35.0)        (82.4, 36.4)           (82.7, 47.2)       (77.6, 42.5)    (81.6, 41.8, 40.3, 47.0)
+✗ CLIP-AD                (58.1, 84.1)         (83.0, 89.3)         (72.1, 91.5)     (44.7, 46.0)         (64.5, 80.9, 77.7)            (94.1, 40.5)        (76.5, 24.6)           (78.1, 36.8)       (73.6, 31.1)    (80.6, 38.8, 33.3, 51.0)
+✗ AnomalyCLIP            (63.7, 86.5)         (96.4, 97.2)         (69.0, 90.1)     (55.2, 56.1)         (71.1, 84.5, 82.5)            (95.1, 42.3)        (84.6, 41.7)           (86.5, 50.7)       (82.0, 43.2)    (87.1, 48.1, 44.5, 63.3)
+✗ AdaCLIP                (77.3, 91.8)         (94.9, 96.8)         (80.0, 94.1)     (59.9, 55.8)         (78.0, 84.5, 84.6)            (95.2, 37.0)        (84.3, 43.3)           (82.9, 47.7)       (80.3, 31.0)    (85.7, 45.2, 39.8, 45.8)
+✓ VisualAD(CLIP)         (88.9, 96.4)         (96.7, 97.6)         (80.8, 94.7)     (60.1, 55.9)         (81.6, 85.9, 86.2)            (95.2, 43.7)        (85.2, 37.8)           (84.9, 46.2)       (80.3, 47.6)    (86.4, 48.0, 43.8, 66.8)
+✓ VisualAD(DINOv2)       (91.2, 97.1)         (93.8, 95.9)         (87.1, 96.7)     (60.1, 56.2)         (83.1, 85.5, 86.5)            (96.4, 51.9)        (85.9, 36.2)           (86.8, 53.2)       (82.6, 46.4)    (87.9, 50.1, 46.9, 64.8)
+✓ Ours(CLIP)             (95.0, 98.4)         (96.6, 97.7)         (83.2, 95.6)     (59.6, 55.5)         (83.6, 87.1, 86.8)            (95.7, 49.9)        (86.7, 40.5)           (86.7, 49.7)       (82.2, 44.6)    (87.8, 50.4, 46.2, 67.7)
+✓ Ours(DINOv2)           (93.7, 98.1)         (92.9, 95.6)         (88.9, 97.2)     (62.5, 58.1)         (84.5, 85.5, 87.3)            (97.2, 55.4)        (87.7, 43.3)           (88.6, 56.6)       (83.7, 50.0)    (89.3, 53.2, 51.3, 68.6)
+
+
+Table 2: Comparisons with state-of-the-art zero-shot AD methods on medical benchmarks. Classification and segmentation
+datasets report (AUROC, AP) at image and pixel levels, respectively; mean columns additionally include F1-max and AUPRO.
+
+
+Method                        P-AUROC                 P-AP                I-AUROC              I-AP                                              VisA → MVTec AD                                       MVTec AD → VisA
+                                                                                                                                ρ
+                                                                                                                                            Pixel                    Image                          Pixel                 Image
+                                   VisA→MVTec AD
+                                                                                                                                0.2   (91.2,43.3,39.3)           (93.5,92.8,96.5)             (94.9,30.7,24.2)        (85.3,82.5,88.1)
+Full model                      91.5       43.6                              93.4             96.9                              0.4   (91.5,45.0,43.1)           (93.8,93.3,97.0)             (95.6,34.7,28.0)        (86.7,83.7,89.1)
+w/o FDAP                      88.8(↓2.7) 34.8(↓8.8)                        89.1(↓4.3)       94.7(↓2.2)                          0.6   (91.5,45.0,43.6)           (93.4,93.3,96.9)             (95.8,35.2,28.5)        (86.8,83.6,89.1)
+w/o LFCM                      91.1(↓0.4) 42.6(↓1.0)                        92.4(↓1.0)       96.7(↓0.2)                          0.8   (91.4,44.9,43.6)           (93.1,93.2,96.8)             (95.8,34.7,28.2)        (86.6,83.4,88.9)
+w/o AAS                       91.1(↓0.4) 42.8(↓0.8)                        91.6(↓1.8)       96.3(↓0.6)                          1.0   (91.4,44.8,43.6)           (93.0,93.1,96.8)             (95.8,34.4,27.9)        (86.5,83.2,88.9)
+
+                                   MVTec AD→VisA                                                                           Table 4: Ablation on the training-time soft canonicalization
+Full model                      95.8        28.5                             86.8             89.1
+                                                                                                                           coefficient ρ. All results use ρ = 1 during inference. For
+w/o FDAP                      94.2(↓1.6)  23.3(↓5.2)                       85.5(↓1.3)       87.2(↓1.9)
+                                                                                                                           each transfer direction, pixel-level and image-level metrics
+w/o LFCM                      95.4(↓0.4)  26.7(↓1.8)                       87.2(↑0.4)       88.9(↓0.2)
+                                                                                                                           are reported as (AUROC, F1-max, AP).
+w/o AAS                       95.7(↓0.1)  28.3(↓0.2)                       86.4(↓0.4)       88.7(↓0.4)
+
+
+Table 3: Ablation study of LFCM, FDAP, and AAS for cross-
+dataset transfer between MVTec AD and VisA. Parentheses                                                                    Progressive Separation Across Representation Spaces.
+report changes relative to the full model.                                                                                 Figure 3 shows progressively improved separation between
+                                                                                                                           normal and anomalous patches across representation spaces.
+                                                                                                                           FDAP achieves the largest mean-score gaps in both direc-
+                                                                                                                           tions, showing an advantage over a plain MLP.
+Effect of Frequency-Deviation Anchor Projection. Ta-
+ble 5 shows that LFCM substantially improves the raw token                                                                 Effect of Spectral Layout. Table 6 shows that the source-
+space, while a plain MLP provides further gains. Compared                                                                  derived channel order remains effective under both 1D and
+with the plain MLP, FDAP improves seven of eight metrics                                                                   2D organization. The anisotropic 16 × 64 layout performs
+and matches the remaining one, demonstrating consistent                                                                    worst, whereas the balanced 32 × 32 layout provides the best
+benefits beyond generic nonlinear projection.                                                                              overall result and is therefore adopted by default.
+  Space                                                            P-AUROC                                       P-AP                      I-AUROC                                    I-AP                        Spectral Organization                                       P-AUROC          P-AP       I-AUROC            I-AP
+                                                                                                                                                                                                                   2D grid (32 × 32)                                             91.5          43.6          93.4            96.9
+                                                                                    VisA→MVTec AD                                                                                                                     1D sequence                                             91.1(↓0.4)     42.6(↓1.0)   93.0(↓0.4)       96.7(↓0.2)
+  LFCM + FDAP                                                                 91.1                               42.8                              91.6                               96.3                         2D grid (16 × 64)                                          89.6(↓1.9)     40.1(↓3.5)   91.1(↓2.3)       96.1(↓0.8)
+  LFCM + Plain MLP                                                  90.9(↓0.2)                           42.6(↓0.2)                        91.4(↓0.2)                           96.1(↓0.2)                         2D grid (64 × 16)                                          91.1(↓0.4)     42.8(↓0.8)   93.3(↓0.1)       97.0(↑0.1)
+  LFCM token space                                                  89.7(↓1.4)                           38.2(↓4.6)                        90.8(↓0.8)                           95.8(↓0.5)
+  Raw token space                                                   83.6(↓7.5)                           20.6(↓22.2)                       77.9(↓13.7)                          88.9(↓7.4)                    Table 6: Ablation of spectral organization in FDAP un-
+                                                                                                                                                                                                              der VisA→MVTec AD cross-dataset evaluation. Parentheses
+                                                                                    MVTec AD→VisA
+  LFCM + FDAP                                                                 95.7                               28.3                              86.4                               88.7
+                                                                                                                                                                                                              show changes from the default 2D grid (32 × 32).
+  LFCM + Plain MLP                                                  95.7(↓0.0)                           27.5(↓0.8)                        85.6(↓0.8)                           88.3(↓0.4)
+  LFCM token space                                                  94.5(↓1.2)                           23.8(↓4.5)                        85.3(↓1.1)                           86.9(↓1.8)                         Transform Basis                                            P-AUROC          P-AP       I-AUROC            I-AP
+  Raw token space                                                   94.0(↓1.7)                           22.3(↓6.0)                        87.5(↑1.1)                           89.4(↑0.7)                       2D DCT (32 × 32)                                                91.5          43.6          93.4            96.9
+                                                                                                                                                                                                                Normalized Hadamard                                           91.4(↓0.1)     43.7(↑0.1)   93.3(↓0.1)       96.9(↓0.0)
+                                                                                                                                                                                                                       Identity                                               91.6(↑0.1)     42.9(↓0.7)   93.3(↓0.1)       96.9(↓0.0)
+  Table 5: Bidirectional cross-dataset ablation of LFCM and                                                                                                                                                         PCA rotation                                              89.9(↓1.6)     40.6(↓3.0)   92.7(↓0.7)       96.5(↓0.4)
+  FDAP, with AAS disabled. Parentheses show changes rela-                                                                                                                                                        Random orthogonal                                            91.3(↓0.2)     42.9(↓0.7)   92.9(↓0.5)       96.7(↓0.2)
+  tive to LFCM + FDAP in each direction.
+                                                                                                                                                                                                              Table 7: Transform-basis ablation for FDAP under
+                                                                                      MVTec AD → VisA
+                                                                                                                                                                                                              VisA→MVTec AD cross-dataset evaluation. Parentheses
+                                 Raw token space                         LFCM token space          LFCM+Plain MLP                                                          LFCM+FDAP
+                                   Gap= 2.25                                   Gap= 4.04                                     Gap= 5.04                                      Gap= 6.07                         show changes from the default 2D DCT (32 × 32) basis.
+
+Patch Label
+              Anomaly
+
+
+
+               Normal                                                                                                                                                                                                           Input                           GT                Full Map     W/O Low      W/O Mid       W/O High
+
+
+                       -6    -4     -2   0     2       4       6   -6    -4    -2    0       2       4       6    -6    -4    -2   0       2       4       6   -6   -4     -2     0       2       4       6
+                            Patch anomaly score                         Patch anomaly score         Patch anomaly score                                             Patch anomaly score                       Low Band
+                                                                                      VisA → MVTec AD                                                                                                         Dominance
+                                 Raw token space                         LFCM token space          LFCM+Plain MLP                                                         LFCM+FDAP
+                                   Gap= 1.39                                   Gap= 3.08                                     Gap= 3.26                                      Gap= 4.85
+
+
+
+
+Patch Label
+              Anomaly
+                                                                                                                                                                                                              Mid Band
+                                                                                                                                                                                                              Dominance
+              Normal
+
+
+
+                            -4      -2   0         2       4            -4     -2        0       2       4             -4     -2       0       2       4            -4       -2       0       2       4
+                            Patch anomaly score                         Patch anomaly score                            Patch anomaly score                               Patch anomaly score
+                                                                                                                                                                                                              High Band
+                                                                                                                                                                                                              Dominance
+  Figure 3: Patch-score distributions across representation
+  spaces in both directions, with AAS disabled. Columns show                                                                                                                                                                                                   Normalized Positive Response Drop Share on MVTec-AD
+                                                                                                                                                                                                                                                                                                                         0.607
+  raw tokens, LFCM, plain MLP, and FDAP; green and orange                                                                                                                                                                                                       Low              Mid          High
+
+
+
+
+                                                                                                                                                                                                                          Positive Response Drop Share
+                                                                                                                                                                                                                                                         0.6
+  denote normal and anomalous patches, with vertical lines                                                                                                                                                                                               0.5
+
+  marking their means and shading indicating the gap.                                                                                                                                                                                                    0.4
+
+                                                                                                                                                                                                                                                         0.3
+                                                                                                                                                                                                                                                                                                 0.211
+                                                                                                                                                                                                                                                                      0.182
+                                                                                                                                                                                                                                                         0.2
+
+                                                                                                                                                                                                                                                         0.1
+
+                                                                                                                                                                                                                                                         0.0
+  Effect of Transform Basis. Table 7 shows that 2D DCT                                                                                                                                                                                                            Low Band                     Mid Band                High Band
+
+  provides the best overall trade-off across pixel- and image-
+  level metrics. It leads or ties the image-level results and                                                                                                                                                 Figure 4: Individual band removal analysis on MVTec AD,
+  remains within 0.1 points of the best pixel-level scores. Al-                                                                                                                                               visualizing the dominance of different channel spectral bands
+  though Identity and Hadamard remain competitive on in-                                                                                                                                                      across images and their normalized positive response drop
+  dividual metrics, PCA and random orthogonal transforms                                                                                                                                                      shares within ground-truth anomaly regions.
+  produce larger drops, supporting the ordered cosine basis of
+  DCT as a stable and interpretable default.
+                                                                                                                                                                                                                                                                          Conclusion
+                                                                                                                                                                                                              This paper presents FreqAnchorAD, a language-free
+  Visualization of Channel Spectral Bands                                                                                                                                                                     frequency-aware framework for zero-shot anomaly detec-
+                                                                                                                                                                                                              tion. It combines LFCM for local frequency enhancement,
+  As shown in Fig. 4, no single spectral order consistently                                                                                                                                                   FDAP as the core module for anchor projection in a source-
+  dominates across samples. Depending on the anomaly ap-                                                                                                                                                      derived channel space, and AAS for stable anchor discrimi-
+  pearance, low-, mid-, or high-order responses can each pro-                                                                                                                                                 nation. Without text encoders, cross-modal alignment, target-
+  vide the principal localization evidence. Their non-negligible                                                                                                                                              domain training, or test-time adaptation, the framework di-
+  aggregate contributions further demonstrate that the three                                                                                                                                                  rectly generalizes from auxiliary source categories to unseen
+  spectral orders are complementary. Jointly modeling these                                                                                                                                                   industrial and medical categories. Experiments on thirteen
+  band-dependent responses therefore preserves more com-                                                                                                                                                      benchmarks demonstrate state-of-the-art mean performance
+  plete anomaly evidence than removing any individual band,                                                                                                                                                   across image-level anomaly recognition and pixel-level de-
+  validating the effectiveness of multi-band collaboration.                                                                                                                                                   fect localization.
+                       References                                Chi, L.; Jiang, B.; and Mu, Y. 2020. Fast fourier convolu-
+Ahmed, N.; Natarajan, T.; and Rao, K. R. 1974. Discrete          tion. Advances in Neural Information Processing Systems,
+Cosine Transform. IEEE Transactions on Computers, C-             33: 4479–4488.
+23(1): 90–93.                                                    Defard, T.; Setkov, A.; Loesch, A.; and Audigier, R. 2021.
+                                                                 Padim: a patch distribution modeling framework for anomaly
+Aota, T.; Tong, L. T. T.; and Okatani, T. 2023. Zero-shot
+                                                                 detection and localization. In International conference on
+versus many-shot: Unsupervised texture anomaly detection.
+                                                                 pattern recognition, 475–489. Springer.
+In Proceedings of the IEEE/CVF Winter Conference on Ap-
+plications of Computer Vision, 5564–5572.                        Ehteshami Bejnordi, B.; Veta, M.; Johannes van Diest, P.; van
+                                                                 Ginneken, B.; Karssemeijer, N.; Litjens, G.; van der Laak, J.
+Bai, Y.; Zhang, J.; Chen, Z.; Dong, Y.; Cao, Y.; and Tian,       A. W. M.; Hermsen, M.; Manson, Q. F.; et al. 2017. Diagnos-
+G. 2024. Dual-path frequency discriminators for few-shot         tic assessment of deep learning algorithms for detection of
+anomaly detection. Knowledge-Based Systems, 302: 112397.         lymph node metastases in women with breast cancer. JAMA,
+Baid, U.; Ghodasara, S.; Mohan, S.; Bilello, M.; Calabrese,      318(22): 2199–2210.
+E.; Colak, E.; Farahani, K.; Kalpathy-Cramer, J.; Kitamura,      Gardner, C.; Dhiren, A.; Min, B.; and Ahn, T. H. 2026.
+F. C.; Pati, S.; et al. 2021. The rsna-asnr-miccai brats 2021    Wavelet-Enhanced PaDiM for Industrial Anomaly Detection.
+benchmark on brain tumor segmentation and radiogenomic           IEEE Access, 14: 37702–37718.
+classification. arXiv preprint arXiv:2107.02314.                 Gong, T.; Chu, Q.; Liu, B.; Zhou, W.; and Yu, N. 2025.
+Bakas, S.; Akbari, H.; Sotiras, A.; Bilello, M.; Rozycki, M.;    FE-CLIP: Frequency Enhanced CLIP Model for Zero-Shot
+Kirby, J. S.; Freymann, J. B.; Farahani, K.; and Davatzikos,     Anomaly Detection and Segmentation. In Proceedings of
+C. 2017. Advancing The Cancer Genome Atlas glioma MRI            the IEEE/CVF International Conference on Computer Vision
+collections with expert segmentation labels and radiomic         (ICCV), 21220–21230.
+features. Scientific Data, 4: 170117.                            Gu, Z.; Zhu, B.; Zhu, G.; Chen, Y.; Li, H.; Tang, M.; and
+Bergmann, P.; Fauser, M.; Sattlegger, D.; and Steger, C. 2019.   Wang, J. 2024. Filo: Zero-shot anomaly detection by fine-
+MVTec AD — A Comprehensive Real-World Dataset for Un-            grained description and high-quality localization. In Pro-
+supervised Anomaly Detection. In 2019 IEEE/CVF Confer-           ceedings of the 32nd ACM International Conference on Mul-
+ence on Computer Vision and Pattern Recognition (CVPR).          timedia, 2041–2049.
+Bernal, J.; Sánchez, F. J.; Fernández-Esparrach, G.; Gil, D.;    Hicks, S. A.; Jha, D.; Thambawita, V.; Halvorsen, P.; Ham-
+de Miguel, C. R.; and Vilariño, F. 2015. WM-DOVA maps            mer, H. L.; and Riegler, M. A. 2021. The EndoTect 2020
+for accurate polyp highlighting in colonoscopy: Validation       challenge: evaluation and comparison of classification, seg-
+vs. saliency maps from physicians. Computerized medical          mentation and inference time for endoscopy. In International
+imaging and graphics : the official journal of the Computer-     Conference on Pattern Recognition, 263–274. Springer.
+ized Medical Imaging Society, 43: 99–111.                        Hou, Y.; Li, P.; Liu, Z.; Wang, Y.; Ruan, Y.; Qiu, J.; and Xu, K.
+Božič, J.; Tabernik, D.; and Skočaj, D. 2021. Mixed su-          2026. VisualAD: Language-Free Zero-Shot Anomaly Detec-
+pervision for surface-defect detection: From weakly to fully     tion via Vision Transformer. In Proceedings of the IEEE/CVF
+supervised learning. Computers in Industry, 129: 103459.         Conference on Computer Vision and Pattern Recognition
+                                                                 (CVPR), 21346–21356.
+Cao, Y.; Xu, X.; Sun, C.; Cheng, Y.; Du, Z.; Gao, L.; and
+                                                                 Jeong, J.; Zou, Y.; Kim, T.; Zhang, D.; Ravichandran, A.;
+Shen, W. 2023. Segment Any Anomaly without Training via
+                                                                 and Dabeer, O. 2023. WinCLIP: Zero-/Few-Shot Anomaly
+Hybrid Prompt Regularization. CoRR, abs/2305.10724.
+                                                                 Classification and Segmentation. In IEEE/CVF Conference
+Cao, Y.; Zhang, J.; Frittoli, L.; Cheng, Y.; Shen, W.; and Bo-   on Computer Vision and Pattern Recognition, CVPR, 19606–
+racchi, G. 2024. Adaclip: Adapting clip with hybrid learnable    19616. IEEE.
+prompts for zero-shot anomaly detection. In European con-        Jha, D.; Smedsrud, P. H.; Riegler, M. A.; Halvorsen, P.; de
+ference on computer vision, 55–72. Springer.                     Lange, T.; Johansen, D.; and Johansen, H. D. 2020. Kvasir-
+Caron, M.; Touvron, H.; Misra, I.; Jégou, H.; Mairal, J.;        SEG: A Segmented Polyp Dataset. In MultiMedia Modeling,
+Bojanowski, P.; and Joulin, A. 2021. Emerging properties         volume 11962 of Lecture Notes in Computer Science, 451–
+in self-supervised vision transformers. In Proceedings of        462. Springer.
+the IEEE/CVF international conference on computer vision,        Kermany, D. S.; Goldbaum, M.; Cai, W.; Valentim, C. C.;
+9650–9660.                                                       Liang, H.; Baxter, S. L.; McKeown, A.; Yang, G.; Wu, X.;
+Chen, X.; Han, Y.; and Zhang, J. 2023. April-gan: A zero-        Yan, F.; et al. 2018. Identifying medical diagnoses and treat-
+/few-shot anomaly classification and segmentation method         able diseases by image-based deep learning. Cell, 172(5):
+for cvpr 2023 vand workshop challenge tracks 1&2: 1st place      1122–1131.
+on zero-shot ad and 4th place on few-shot ad. arXiv preprint     Li, C.-L.; Sohn, K.; Yoon, J.; and Pfister, T. 2021. CutPaste:
+arXiv:2305.17382.                                                Self-Supervised Learning for Anomaly Detection and Lo-
+Chen, X.; Zhang, J.; Tian, G.; He, H.; Zhang, W.; Wang, Y.;      calization. 2021 IEEE/CVF Conference on Computer Vision
+Wang, C.; Wu, Y.; and Liu, Y. 2023. CLIP-AD: A Language-         and Pattern Recognition (CVPR), 9659–9669.
+Guided Staged Dual-Path Model for Zero-shot Anomaly De-          Li, H.; Zhuang, Z.; Lin, J.; Liu, Y.; Chen, Y.; Peng, Q.; Yu,
+tection. CoRR, abs/2311.00453.                                   L.; and Wang, L. 2026. FDP: A Frequency-Decomposition
+Preprocessing Pipeline for Unsupervised Anomaly Detection           Visual Models From Natural Language Supervision. In Pro-
+in Brain MRI. In Proceedings of the AAAI Conference on              ceedings of the 38th International Conference on Machine
+Artificial Intelligence, volume 40, 6118–6126.                      Learning, ICML, 8748–8763.
+Li, X.; Huang, Z.; Xue, F.; and Zhou, Y. 2024. Musc: Zero-          Rao, Y.; Zhao, W.; Zhu, Z.; Lu, J.; and Zhou, J. 2021. Global
+shot industrial anomaly classification and segmentation with        filter networks for image classification. Advances in neural
+mutual scoring of the unlabeled images. In The Twelfth              information processing systems, 34: 980–993.
+International Conference on Learning Representations.               Roth, K.; Pemula, L.; Zepeda, J.; Schölkopf, B.; Brox, T.;
+Li, X.; Sun, X.; Meng, Y.; Liang, J.; Wu, F.; and Li, J. 2020.      and Gehler, P. V. 2022. Towards Total Recall in Industrial
+Dice loss for data-imbalanced NLP tasks. In Proceedings of          Anomaly Detection. In IEEE/CVF Conference on Computer
+the 58th annual meeting of the association for computational        Vision and Pattern Recognition, CVPR 2022, New Orleans,
+linguistics, 465–476.                                               LA, USA, June 18-24, 2022.
+Lin, T.; Goyal, P.; Girshick, R. B.; He, K.; and Dollár, P.         Rudolph, M.; Wehrbein, T.; Rosenhahn, B.; and Wandt, B.
+2017. Focal Loss for Dense Object Detection. In IEEE                2022. Fully convolutional cross-scale-flows for image-based
+International Conference on Computer Vision, ICCV 2017,             defect detection. In Proceedings of the IEEE/CVF winter
+Venice, Italy, October 22-29, 2017, 2999–3007.                      conference on applications of computer vision, 1088–1097.
+                                                                    Salehi, M.; Sadjadi, N.; Baselizadeh, S.; Rohban, M. H.; and
+Liu, T.; Li, B.; Du, X.; Jiang, B.; Geng, L.; Wang, F.; and
+                                                                    Rabiee, H. R. 2021. Multiresolution knowledge distillation
+Zhao, Z. 2025. Simple and effective frequency-aware image
+                                                                    for anomaly detection. In Proceedings of the IEEE/CVF con-
+restoration for industrial visual anomaly detection. Advanced
+                                                                    ference on computer vision and pattern recognition, 14902–
+Engineering Informatics, 64: 103064.
+                                                                    14912.
+Ma, W.; Zhang, X.; Yao, Q.; Tang, F.; Wu, C.; Li, Y.; Yan,          Wang, Y.; Peng, J.; Zhang, J.; Yi, R.; Wang, Y.; and Wang, C.
+R.; Jiang, Z.; and Zhou, S. 2025. AA-CLIP: Enhancing                2023. Multimodal Industrial Anomaly Detection via Hybrid
+Zero-Shot Anomaly Detection via Anomaly-Aware CLIP.                 Fusion. In IEEE/CVF Conference on Computer Vision and
+2025 IEEE/CVF Conference on Computer Vision and Pattern             Pattern Recognition, CVPR 2023, Vancouver, BC, Canada,
+Recognition (CVPR), 4744–4754.                                      June 17-24, 2023.
+Menze, B.; Jakab, A.; Bauer, S.; Kalpathy-Cramer, J.; Fara-         Wieler, M.; Hahn, T.; and Hamprecht, F. A. 2007. Weakly Su-
+hani, K.; Kirby, J.; Burren, Y.; Porz, N.; Slotboom, J.; Wiest,     pervised Learning for Industrial Optical Inspection. DAGM
+R.; et al. 2014. The multimodal brain tumor image segmen-           2007 Dataset.
+tation benchmark (BRATS). IEEE transactions on medical
+                                                                    Xie, G.; Wang, J.; Liu, J.; Jin, Y.; and Zheng, F. 2023. Pushing
+imaging, 34(10): 1993–2024.
+                                                                    the Limits of Fewshot Anomaly Detection in Industry Vision:
+Mishra, P.; Verk, R.; Fornasier, D.; Piciarelli, C.; and Foresti,   Graphcore. In The Eleventh International Conference on
+G. L. 2021. VT-ADL: A Vision Transformer Network for Im-            Learning Representations, ICLR 2023, Kigali, Rwanda, May
+age Anomaly Detection and Localization. In 30th IEEE In-            1-5, 2023.
+ternational Symposium on Industrial Electronics, ISIE 2021,         Zhang, Q.; Shao, M.; Chen, X.; Lv, X.; and Xu, K. 2025.
+Kyoto, Japan, June 20-23, 2021, 1–6.                                Wave-MambaAD: Wavelet-driven State Space Model for
+Mou, S.; Gu, X.; Cao, M.; Bai, H.; Huang, P.; Shan, J.; and         Multi-class Unsupervised Anomaly Detection. In Proceed-
+Shi, J. 2023. RGI: robust GAN-inversion for mask-free image         ings of the IEEE/CVF International Conference on Computer
+inpainting and unsupervised pixel-wise anomaly detection.           Vision, 20868–20877.
+In The Eleventh International Conference on Learning Rep-           Zhao, J.; Yu, K.; Miao, Y.; Wang, Y.; Ma, Y.; Zhang, J.; Zhao,
+resentations, ICLR 2023, Kigali, Rwanda, May 1-5, 2023.             J.; Qiang, Y.; and Pei, B. 2025. Frequency Domain Nuances
+Oquab, M.; Darcet, T.; Moutakanni, T.; Vo, H.; Szafraniec,          Guided Parallel Transformer Model for Industrial Anomaly
+M.; Khalidov, V.; Fernandez, P.; Haziza, D.; Massa, F.; El-         Localization. Engineering Applications of Artificial Intelli-
+Nouby, A.; et al. 2024. DINOv2: Learning robust visual fea-         gence, 142: 109852.
+tures without supervision. Transactions on Machine Learn-           Zhou, Q.; Pang, G.; Tian, Y.; He, S.; and Chen, J. 2024.
+ing Research.                                                       AnomalyCLIP: Object-agnostic Prompt Learning for Zero-
+Qin, Z.; Zhang, P.; Wu, F.; and Li, X. 2021. Fcanet:                shot Anomaly Detection. In The Twelfth International Con-
+Frequency channel attention networks. In Proceedings of             ference on Learning Representations (ICLR), 1–33.
+the IEEE/CVF international conference on computer vision,           Zou, Y.; Jeong, J.; Pemula, L.; Zhang, D.; and Dabeer, O.
+783–792.                                                            2022. SPot-the-Difference Self-supervised Pre-training for
+Qu, Z.; Tao, X.; Prasad, M.; Shen, F.; Zhang, Z.; Gong, X.;         Anomaly Detection and Segmentation. In Computer Vision
+and Ding, G. 2024. VCP-CLIP: A visual context prompting             - ECCV 2022 - 17th European Conference, Tel Aviv, volume
+model for zero-shot anomaly segmentation. In European               13690, 392–408.
+Conference on Computer Vision.
+Radford, A.; Kim, J. W.; Hallacy, C.; Ramesh, A.; Goh, G.;
+Agarwal, S.; Sastry, G.; Askell, A.; Mishkin, P.; Clark, J.;
+Krueger, G.; and Sutskever, I. 2021. Learning Transferable
+

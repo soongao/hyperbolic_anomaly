@@ -1,0 +1,1250 @@
+                                                        Test-Time Prompt Tuning for Zero-Shot
+                                                       Generalization in Vision-Language Models
+
+
+                                                                Manli Shu1∗ Weili Nie2 De-An Huang2 Zhiding Yu 2
+                                                             Tom Goldstein 1 Anima Anandkumar2,3,† Chaowei Xiao2,4†
+                                                         1
+                                                           University of Maryland, 2 NVIDIA, 3 Caltech, 4 Arizona State University
+
+
+
+
+arXiv:2209.07511v1 [cs.CV] 15 Sep 2022
+                                                                                          Abstract
+
+                                                      Pre-trained vision-language models (e.g., CLIP) have shown promising zero-shot
+                                                      generalization in many downstream tasks with properly designed text prompts.
+                                                      Instead of relying on hand-engineered prompts, recent works learn prompts using
+                                                      the training data from downstream tasks. While effective, training on domain-
+                                                      specific data reduces a model’s generalization capability to unseen new domains.
+                                                      In this work, we propose test-time prompt tuning (TPT), a method that can learn
+                                                      adaptive prompts on the fly with a single test sample. For image classification, TPT
+                                                      optimizes the prompt by minimizing the entropy with confidence selection so that
+                                                      the model has consistent predictions across different augmented views of each test
+                                                      sample. In evaluating generalization to natural distribution shifts, TPT improves
+                                                      the zero-shot top-1 accuracy of CLIP by 3.6% on average, surpassing previous
+                                                      prompt tuning approaches that require additional task-specific training data. In
+                                                      evaluating cross-dataset generalization with unseen categories, TPT performs on
+                                                      par with the state-of-the-art approaches that use additional training data. Project
+                                                      page: https://azshue.github.io/TPT/.
+
+
+                                         1       Introduction
+
+                                         Recent advances in vision-language pre-training, such as CLIP [1] and ALIGN [2], present a
+                                         promising direction for developing foundation models for vision tasks [3]. These foundation models
+                                         encode a wide range of visual concepts after training on millions of noisy image-text pairs and can
+                                         be applied to downstream tasks in a zero-shot manner without task-specific training data [4–10].
+                                         This is made possible by appropriately designed instruction prompts. Take image classification in
+                                         Figure 1 as an example: We can prepend a category name with a prompt “a photo of a" (e.g., “a
+                                         photo of a dog"). Images can then be classified by using CLIP to measure their alignment with the
+                                         various class descriptions. Designing such prompts thus plays a crucial role in applying foundation
+                                         models to downstream tasks in a zero-shot manner. However, such hand-crafted prompts require
+                                         domain-specific heuristics and may not be optimal.
+                                         Recent works address this by proposing prompt tuning to directly learn prompts using training data
+                                         from downstream tasks [11]. We can fine-tune prompts with training data in the same way we fine-
+                                         tune model parameters since prompt embeddings are part of the model input and are differentiable
+                                         with respect to the loss function. Such an approach can find better prompts compared to hand-crafted
+                                         ones, but the learned prompts are limited to the distribution and tasks corresponding to training data
+                                         and may have limited generalization beyond that. In addition, this approach requires training data
+                                         with annotations, which can be expensive and is not available for zero-shot tasks.
+                                             ∗
+                                                 Work done during an internship at NVIDIA. manlis@cs.umd.edu.
+                                             †
+                                                 Equal advising
+
+
+                                         Preprint.
+                    Cat
+                    Dog                    text
+                    …                    encoder
+
+                    Bird
+
+        prompt p   class   A1
+
+                                                       𝑝𝐩 (𝑦|A1(X))
+
+                           A2                                             average
+                                                                                                           min 𝐇(𝑝𝐩 )
+                                                                                                            𝐩
+                                          image
+                                         encoder       𝑝𝐩 (𝑦|AN(X))
+                                                                                       𝑝𝐩 (𝑦|X)
+                                …                         …
+                           AN                                                       accept        reject
+
+                                                                                             Learnable Parameters
+                                                       𝑝𝐩 (𝑦|A2(X))
+
+                                                                                             Back Propagation
+        a single test image augmented views        confidence selection
+
+
+
+Figure 1: Test-time Prompt Tuning (TPT) for image classification. We tune adaptive prompts on
+the fly with a single test sample, without the need for additional training data or annotations. TPT
+optimizes the prompt to encourage consistent predictions across augmented views by minimizing the
+marginal entropy. We introduce confidence selection to filter out noisy augmentations.
+
+Our Approach. To address the aforementioned challenges, we propose test-time prompt tuning
+(TPT) that tunes the prompt on the fly using only the given test sample. The tuned prompt is adapted
+to each task, making it suitable for zero-shot generalization without requiring any task-specific
+training data or annotations. TPT retains the zero-shot generalization setting since no additional
+training data or annotations are used.
+We explore TPT on two different downstream tasks: image classification and context-dependent
+visual reasoning. For each downstream task, we design a customized test-time tuning strategy that
+fits the nature of the task. Without loss of generality, we consider CLIP [1] as our vision-language
+foundation model, for its simplicity in design and its wide applicability [12].
+For image classification, a test sample is an input image. Given a single sample at test time, we
+perform prompt tuning by generating multiple randomly augmented views, and optimizing the text
+prompt so that the model has consistent predictions across different augmented views. This is done by
+minimizing the marginal entropy among the outputs of the augmented views. In addition, since some
+augmentations may lead to misleading model predictions, we propose confidence selection to filter
+out those “noisy” augmented views. We discard augmented views with a high prediction entropy (i.e.,
+low confidence), and only include high confidence views in the consistency optimization.
+We evaluate the zero-shot generalization of TPT in two image classification settings: natural distribu-
+tion shifts [13] and cross-dataset generalization [14]. For the setting of evaluating natural distribution
+shifts, TPT boosts the Top-1 accuracy of CLIP in the zero-shot setting by 3.6% on average compared
+to using a hand-crafted prompt, achieving on-par accuracy with previous prompt tuning methods that
+require additional training data (i.e., ImageNet). TPT achieves a maximum improvement of 6.9%
+on ImageNet-A compared to using a hand-crafted prompt, surpassing the existing few-shot prompt
+tuning method by 5.1%. For the setting of evaluating cross-dataset generalization with possibly
+unseen categories, TPT achieves on-par performance with the state-of-the-art few-shot prompt tuning
+method [14] without the need for additional training data or annotations.
+For the second task of context-dependent visual reasoning, such as Bongard-HOI [15], a test sample
+contains two sets of support images and a query image for evaluation. The two sets of support images
+exemplify the presence and the absence of a human-object interaction (HOI) concept (e.g., “ride
+bike"). The model is then asked to infer whether the query image contains the underlying concept.
+Given such a test sample, we apply TPT by tuning prompts to better differentiate between the two
+support sets, so that the query image can be better classified. Despite the use of support sets, our
+approach is still considered zero-shot for visual reasoning, because we do not use either training tasks
+from other concepts or the annotation of the query image at test time to update the prompt of the test
+task. By adapting TPT to context-dependent visual reasoning, we outperform the state-of-the-art
+method [16] by 4.1% Bongard-HOI benchamrk [15].
+
+
+                                                      2
+We summarize our main contributions as follows:
+• We propose test-time prompt tuning (TPT) that does not need any training data or annotations to
+  optimize the prompt. To the best of our knowledge, we are the first to perform prompt tuning on a
+  single test sample in a zero-shot manner.
+• We introduce confidence selection as a simple plug-and-play module of TPT for image classification.
+  It improves entropy minimization among augmented views by filtering out “noisy" augmentations
+  that lead to low-confidence predictions.
+• We conduct extensive experiments on image classification under natural distribution shift, cross-
+  dataset generalization, and context-dependent visual reasoning. TPT improves CLIP in a zero-shot
+  manner to be on par with prompt tuning methods that require additional training data.
+
+2   Related Work
+
+Prompting for foundation models. Foundation models are those trained on large-scale hetero-
+geneous data, of which the knowledge can be transferred to various downstream tasks in natural
+language processing [17, 18], computer vision [1, 2, 19], etc. Recent work has proposed different
+ways to efficiently and effectively transfer such knowledge to downstream task [20–23]. Prompting
+is a heuristic way to directly apply foundation models to downstream tasks in a zero-shot manner.
+Prompt works as a part of the text input that instructs the model to perform accordingly on a specific
+task. However, such zero-shot generalization is highly dependent on a well-designed prompt. Prompt
+tuning [11, 24, 25] proposes to learn the prompt from downstream data in the continual input embed-
+ding space, which presents a parameter-efficient way of fine-tuning foundation models. Although
+initially developed for language models, prompt tuning has later been applied to other domains,
+including vision-language models [26, 14, 27] and continual learning [28]. CoOp[26] applies prompt
+tuning to CLIP. By tuning the prompt on a collection of training data, CoOp effectively improves
+CLIP’s performance on the corresponding downstream tasks. CoCoOp [14] points out that CoOp
+lacks in generalization to out-of-distribution data, and proposes to alleviate the problem by making
+the prompt conditioned on model inputs. Despite being effective on the given task, this line of work
+requires access to downstream training data with annotations, restricting the zero-shot knowledge
+transfer of foundation models. Another line of work proposes to tune the prompt in an unsupervised
+manner [29, 30]. However, it requires access to multiple samples from either the training or testing
+split. In this work, we propose test-time prompt tuning that works on a single test sample. Our
+method can directly work with the zero-shot applications of foundation models.
+
+Generalization under data distribution shifts. A reliable machine learning model is supposed to
+perform well under data distribution shifts for real-world applications. For a model trained on a given
+set of data, distribution shift refers to the discrepancy between the underlying distributions of the test
+and the training data. Distribution shifts can occur naturally in the real world due to variations in
+the environment [31] or the encounter of unseen concepts [32]. For example, in the meta-learning
+literature [33], each test sample consists of a novel task (i.e., distribution), and the models should be
+able to quickly adapt to the novel distributions. Even in the standard evaluation protocol for machine
+learning models, there exists a subtle difference in the data distribution between the training and
+testing splits [34, 35], which is also one type of distribution shift. Pre-trained vision-language models
+like CLIP can generalize to downstream tasks with various distribution shifts in a zero-shot manner.
+Such zero-shot generalization ability presents a promising direction for realizing reliable and generic
+machine learning models. Our method aims to improve CLIP towards a better generic model in
+this work, instead of adapting it to specific downstream tasks or target datasets. In our work, we
+leverage the assumption that a robust model should have decision boundaries lying in low-density
+data regions [36]. Consistency-regularization-based methods could achieve this goal by making the
+network outputs invariant to small input perturbations (e.g., augmentations). We use consistency
+regularization as our test-time prompt tuning objective with the confidence selection module.
+
+Test-time optimization. The idea of adapting machine learning models to test samples on the fly
+has been applied to different tasks [37–40]. This work mainly focuses on applying the technique to
+improve model generalization to data distribution shifts. One challenge in this area is to design an
+effective test-time objective. Test-time training and its variants [41, 42] modify the training process
+by adding a self-supervised multi-task branch, which computes an optimization objective at test time
+
+
+                                                    3
+and adapts the network to the test sample. TENT [43] proposes a test-time objective by minimizing
+the entropy of the batch-wise prediction probability distributions. Such an objective does not rely
+on a specific training process, and thus can be applied to a wide range of models. However, TENT
+needs more than one test sample to get a non-trivial solution. Zhang et al. [44] propose to bypass the
+multi-sample requirements using data augmentations. Another major challenge is to choose the right
+parameter group for optimization. Batch normalization (BN) layers have been shown to capture the
+domain discrepancies in image data [45, 46]. It is a straightforward way to directly adapt the BN
+statistics at test time to enhance model robustness against distribution shifts [47]. However, adapting
+BN layers puts restrictions on model architectures. Another choice is to update the feature extractor
+while freezing the prediction module [41, 48]. Zhang et al. [44] show that optimizing the entire model
+at test time can work as well. Our method addresses both of the challenges above. For the choice
+of parameter group, we optimize the text prompt while keeping the model intact. Our motivation
+is to avoid distorting the pre-trained features and to preserve the zero-shot generalization ability of
+pre-trained models. In section 5, we empirically show that the prompt works as the most effective
+parameter group for CLIP. Different from the previous single-point method [44], we refine the entropy
+minimization by proposing confidence selection, which helps filter out noisy augmentations that may
+lead to misleading predictions.
+
+3     TPT: Test-Time Prompt Tuning
+In this section, we first discuss how to apply CLIP to downstream tasks in a zero-shot manner with a
+hand-crafted prompt. Next, we briefly review recent progress in prompt tuning approaches for CLIP
+using downstream training data. Finally, we give a detailed introduction of how to apply our method
+to the image classification task. We also introduce TPT for context-dependent visual reasoning, along
+with the background knowledge of this application.
+
+3.1   Background
+
+Contrastive Language-Image Pre-training (CLIP). CLIP consists of two parallel encoders, one
+that maps the text input into a feature vector, and the other does the same for the image input. The
+model is trained with a contrastive loss that promotes similarity between the two vectors so that the
+text and image align in the feature space. We denote a CLIP model as F = {Evisual , Etext }, with
+Evisual and Etext being the image and text encoders.
+We first review how to apply CLIP to downstream tasks in a zero-shot manner with a hand-crafted
+prompt. We take image classification as an example. Consider a single test image Xtest of class
+y, where X ∈ RC×H×W and y ∈ RK for a K-class classification problem. In the baseline zero-
+shot setting, we prepend a hand-crafted prompt prefix, such as p =“a photo of a", to every yi in
+Y = {y1 , y2 , . . . , yK } to form the category-specific text inputs {p; yi }. We then feed these class
+descriptions to the text encoder to get the text features {t1 , t2 , . . . , tK }, where ti = Etext ({p; yi }).
+Each text feature ti is paired with the image feature v = Evisual (X ) to compute a similarity score
+si = sim(ti · v), where sim(, ) denotes the cosine similarity. The prediction probability on X can
+                                          i ·v)τ )
+be denoted by p(yi |X) = PKexp(sim(texp(sim(t ·v)τ )
+                                                     , where τ is the temperature of the softmax function.
+                               i=1          i
+
+
+
+Prompt tuning using downstream training data. Instead of using a hand-crafted prompt, prompt
+tuning methods train a prompt to maximize performance on a downstream task for which labeled data
+is available. Prompt tuning optimizes the prompt p ∈ RL×D in the text embedding space, with the
+number of tokens L and embedding size D, using training data with annotations Dtrain = {(Xi , yi )}
+from the downstream task. The goal is to obtain text inputs {p; Y} = {{p; yi } for yi ∈ Y} that can
+provide the model with the most helpful context information about the task. For image classification
+with cross-entropy loss L, the problem can be formulated as:
+                                p∗ = arg min E(X,y)∼Dtrain L(Fp (X), y),                                   (1)
+                                            p
+
+                          where Fp (X) = sim(Etext ({p; Y}), Evisual (X)).                                 (2)
+
+Context-dependent visual reasoning. For the task of context-dependent visual reasoning, such as
+Bongard-HOI [15], a test sample contains two sets of support images and a query image for evaluation.
+The two sets of support images exemplify the presence and the absence of a human-object interaction
+
+
+                                                      4
+(HOI) concept (e.g., “ride bike"). The model is then asked to infer whether the query image contains
+the underlying concept. Specifically, each concept in this task is a visual relationship c = hs, a, oi,
+with s being the subject (s =“human" for HOI tasks), a denoting the action and o for the object.
+Each test sample Xtest captures a concept by presenting c = hs, a, oi in one set of support images
+(positive examples), while having the other set (negative examples) to demonstrate c0 = hs, a0 , oi,
+where a0 6= a. Note that neither o nor a is given explicitly, and it relies on the model’s reasoning
+ability to predict whether the query image contains the featured concept c of the test sample.
+Existing methods [49, 50] approach the Bongard-HOI problem by training the model on a collection
+of similar tasks (using the Bongard-HOI training split) so that it can make similar inferences on test
+samples at test time. When applying CLIP to this task, we do not use additional training data because
+CLIP has learned abundant visual concepts and thus is a natural fit for such visual reasoning tasks.
+
+3.2   TPT: Test-Time Prompt Tuning
+
+Why optimize prompts? CLIP contains rich knowledge obtained from pre-training on a massive
+and diverse dataset. However, how to more effectively extract such knowledge remains an open
+question. A simple strategy is to directly fine-tune the model, either end-to-end or for a subset of
+layers, on a category of inputs. However, previous work has shown that such fine-tuning strategies
+result in domain-specific behaviors that lose the out-of-distribution generalization and robustness
+of foundation models [12, 51]. Prompts, on the other hand, work outside the pre-trained model by
+modifying the context of the model input, thus do not distort pre-trained features.
+In this work, our goal is to leverage the existing knowledge of CLIP to boost its generalization
+in a zero-shot manner. Therefore, prompt tuning serves as an ideal handle to approach the goal.
+Furthermore, we regard test-time prompt tuning as a way to provide the model with the context
+tailored to the single test sample, which helps precisely retrieve the knowledge of CLIP.
+At the inference stage, the only information available is the single test sample Xtest without label
+information. TPT, therefore, manages to optimize the prompt p at test time based on the single test
+sample. In general, our objective can be formulated in the form of
+                                     p∗ = arg min L(F, p, Xtest )                                  (3)
+                                                   p
+
+for some carefully constructed loss. Note that, unlike equation (1), our method does not require any
+labels or any data beyond the zero-shot test sample.
+
+TPT for image classification. Because labels are not available for test time tuning, we must select
+an unsupervised loss for prompt tuning. We design our TPT objective to promote the consistency
+of the model’s predictions across different augmented views of a given test image. Specifically, we
+generate N randomly augmented views of the test image using a family of random augmentations A,
+and minimize the entropy of the averaged prediction probability distribution:
+                                           K
+                                           X
+                          p∗ = arg min −          p̃p (yi |Xtest ) log p̃p (yi |Xtest ),           (4)
+                                     p
+                                            i=1
+                                                            N
+                                                       1 X
+                            where p̃p (yi |Xtest ) =         pp (yi |Ai (Xtest )).                 (5)
+                                                       N i=1
+
+Here, pp (y|Ai (Xtest )) is the vector of class probabilities produced by the model when provided with
+prompt p and the i-th augmented view of the test image.
+In addition, to reduce the noise from random augmentations, we propose confidence selection to filter
+out views that generate high-entropy (i.e., low-confidence) predictions. Such views of an image may
+lack important information needed to classify it correctly, e.g., a random crop may have removed
+important image content. We select confident samples with a prediction entropy below a threshold τ .
+We adapt τ for each test sample, by taking the entropy value at the ρ-percentile among the self-entropy
+of N augmented views ranked from low to high (i.e., confidence from high to low). With τ , the
+confidence selection can be written as a mask over the augmented samples 1[H(pi ) ≤ τ ], with H
+measuring the self-entropy of the prediction on an augmented view. Using confidence selection with
+
+
+                                                       5
+a cutoff percentile ρ on N augmented views, the averaged probability in Eq. (4) now becomes:
+                                                  N
+                                              1 X
+                           p̃p(y|Xtest ) =          1[H(pi ) ≤ τ ]pp (y|Ai (Xtest )),                   (6)
+                                             ρN i=1
+
+TPT for context-dependent visual reasoning. Different from image classification, where every
+image has one and only ground-truth label, the correctness of the prediction in Bongard-HOI depends
+on the context (i.e., example images), which is binary (containing the concept c or not). In the case of
+binary labels, a straightforward prompting strategy is to hand-craft “labels" for positive and negative
+examples, such as “True/False" or “Yes/No". With our proposed TPT, on the other hand, we can
+directly learn an optimal label token cls on the example images in the test sample. More importantly,
+for visual reasoning, TPT can explicitly learn the context (i.e., visual concept) in the form of text
+prompts, and assists visual reasoning of vision-language models with language context. Formally,
+given M support images in each test sample, the TPT objective for context-dependent reasoning can
+be written as:
+                                           1      X
+                           p∗ = arg min                    L(Fc,cls (X), y),                         (7)
+                                     p,cls M
+                                                      X∈{XP ,XN }
+
+where we assign y ∈ {0, 1} to negative and positive example images respectively for computing
+the cross-entropy loss L. Unlike in image classification, we tune the binary label tokens cls =
+{cls1 , cls2 }, clsi ∈ R1,D and prompt p ∈ RL,D simultaneously. For each image, we assemble the
+text input to CLIP as T = {T1 , T2 | Ti = {p, clsi }}.
+Note that the support set is an essential part of a Bongard-HOI sample, which provides the context for
+this context-dependent task. Therefore, our approach is still considered to work purely at test time,
+without training data or annotations (i.e., TPT has not been trained on a collection of similar tasks
+from the Bongard-HOI training split).
+     TPT for context-dependent visual reasoning (Bongard-HOI)
+
+
+
+                                                    text
+                                                  encoder
+
+             prompt p     class
+
+             support     query
+
+
+
+
+                                                   image                      min Lbongard(Xsupport)
+             positive
+                                                  encoder
+
+                            ?
+
+             negative                                                            Learnable Parameters
+           a single test sample with                                             Back Propagation
+           support and query images
+
+
+Figure 2: Test-time Prompt Tuning (TPT) for context-dependent visual reasoning on Bongard-
+HOI benchmark. A test sample in Bonagrd-HOI consists of several support images that exemplify
+a visual concept, and the model needs to predict whether the query image contains the concept. TPT
+tunes the prompt and class tokens simultaneously on the support images using the cross-entropy loss.
+
+
+4   Experiments
+In this section, we describe the tasks and benchmarks used for evaluating our method, along with the
+implementation details. Our main results cover three aspects of the model’s generalization: robustness
+to natural distribution shifts, cross-dataset generalization, and context-dependent visual reasoning.
+We also provide ablation experiments in section 5, analyzing different network components for
+test-time tuning, and other design choices of our method.
+
+
+                                                            6
+4.1   Robustness to Natural Distribution Shifts
+
+Datasets. CLIP has shown remarkable robustness to distribution shifts that can occur naturally in
+real-world scenarios, including variations in image style, data domains, etc. We follow the setting in
+Radford et al. [1] and evaluate the model’s robustness to natural distribution shifts on 4 ImageNet
+Variants as follows, which have been considered as out-of-distribution (OOD) data for ImageNet [52]
+in previous work.
+• ImageNet-V2 [53] is a independent test set containing natural images, collected from different
+  source, including 10,000 images of 1,000 ImageNet categories.
+• ImageNet-A [54] is a challenging test set of “natural adversarial examples" misclassified by a
+  standard ResNet-50 [55], consisting of 7,500 images of 200 of ImageNet categories.
+• ImageNet-R [13] collects images of ImageNet categories but with artistic renditions. There are
+  30,000 images in total, including 200 ImageNet categories.
+• ImageNet-Sketch [56] is a dataset of black and white sketches, collected independently from the
+  original ImageNet validation set. The dataset includes 50,000 images in total, covering 1,000
+  ImageNet categories.
+
+Baselines. We compare TPT with existing few-shot prompt tuning methods that are designed for
+CLIP. CoOp [26] is a few-shot prompt tuning baseline that tunes a fixed dataset-specific prompt
+on each downstream dataset. CoCoOp [14] is the state-of-the-art prompt tuning method for CLIP.
+It produces input-dependent prompts with a network module, of which the input is the image
+feature. The network module of CoCoOp is also trained on downstream data in a dataset-specific way.
+Following their original configuration, we train both methods on ImageNet using 16-shot training data
+per category with 4 learnable prompt tokens and directly test the tuned prompt on OOD benchmarks.
+We also include two versions of the baseline zero-shot performance of CLIP, using a default prompt
+“a photo of a", and the ensemble of 80 hand-crafted prompts from Radford et al. [1].
+
+Implementation details. For TPT, we initialize the prompt as the default hand-crafted one “a photo
+of a", and optimize the corresponding 4 tokens in the text input embedding space based on a single
+test image. We augment a single test image 63 times using random resized crops and construct a
+batch of 64 images, including the original one. Among the 64 predictions, we select the top 10%
+(ρ=0.1) confident samples (lowest 10% in self-entropy) and compute the entropy of the averaged
+probability of the selected predictions (i.e., marginal entropy). We optimize the prompt to minimize
+the marginal entropy for 1 step, using the AdamW optimizer with a learning rate of 0.005.
+
+Results. In Table 1, the standalone TPT achieves higher accuracy than both prompt ensemble
+and existing few-shot prompt tuning methods, including CoCoOp. Furthermore, since TPT works
+at test time, it is complementary to existing baseline methods. We show that by applying TPT to
+prompts learned by CoOp or CoCoOp, we can further improve the accuracy of their in-domain
+ImageNet data, as well as generalization ability to OOD data. We also compare TPT to the ensembles
+of baseline models in Appendix A.2, where we find that applying TPT to baseline methods can
+bring more substantial improvement than model ensembles. In addition, among the five datasets,
+few-shot prompt tuning methods bring the most accuracy gain on the ImageNet validation set and
+ImageNet-V2. However, on datasets with more significant distribution shifts, few-shot prompt tuning
+methods trained on ImageNet show no advantage over the ensemble of hand-crafted prompts.
+
+4.2   Cross-Datasets Generalization
+
+Pre-trained vision-language models like CLIP are ideal for “open-world" problems. For example,
+we can apply CLIP to classify arbitrary categories in a zero-shot manner in image classification..
+However, a prompt tuned on a specific downstream dataset can be less generalizable to categories
+outside its training set. In this section, we evaluate the cross-dataset generalization of existing
+few-shot prompt tuning methods (same as in section 4.1), and compare them with TPT, which is not
+dataset-specific.
+
+Setup. We conduct a cross-dataset evaluation on the task of image classification. We consider 10
+datasets, covering fine-grained classifications including species of plants or animals (Flower102 [57],
+OxfordPets [58]), scenes (SUN397 [59]), textures (DTD [60]), food (Food101 [61]), transportation
+
+
+                                                  7
+Table 1: Robustness to Natural Distribution Shifts. CoOp and CoCoOp are tuned on ImageNet
+using 16-shot training data per category. Baseline CLIP, prompt ensemble, and TPT do not require
+training data.
+                                                 ImageNet                             ImageNet-A                              ImageNet-V2.            ImageNet-R.                               ImageNet-Sketch
+ Method                                                                                                                                                                                                                                             Average                      OOD Average
+                                                Top1 acc. ↑                           Top1 acc. ↑                              Top1 acc. ↑             Top1 acc. ↑                                Top1 acc. ↑
+ CLIP-RN50                                              58.16                                  21.83                                     51.41                  56.15                                          33.37                                    44.18                               40.69
+ Ensemble                                               59.81                                  23.24                                     52.91                  60.72                                          35.48                                    46.43                               43.09
+ CoOp                                                   63.33                                  23.06                                     55.40                  56.60                                          34.67                                    46.61                               42.43
+ CoCoOp                                                 62.81                                  23.32                                     55.72                  57.74                                          34.48                                    46.81                               42.82
+ TPT                                                    60.74                                  26.67                                     54.70                  59.11                                          35.09                                    47.26                               43.89
+ TPT + CoOp                                             64.73                                  30.32                                     57.83                  58.99                                          35.86                                    49.55                               45.75
+ TPT + CoCoOp                                           62.93                                  27.40                                     56.60                  59.88                                          35.43                                    48.45                               44.83
+ CLIP-ViT-B/16                                          66.73                                  47.87                                     60.86                  73.98                                          46.09                                    59.11                                 57.2
+ Ensemble                                               68.34                                  49.89                                     61.88                  77.65                                          48.24                                    61.20                               59.42
+ CoOp                                                   71.51                                  49.71                                     64.20                  75.21                                          47.99                                    61.72                               59.28
+ CoCoOp                                                 71.02                                  50.63                                     64.07                  76.18                                          48.75                                    62.13                               59.91
+ TPT                                                    68.98                                  54.77                                     63.45                  77.06                                          47.94                                    62.44                               60.81
+ TPT + CoOp                                             73.61                                  57.95                                     66.83                  77.27                                          49.29                                    64.99                               62.83
+ TPT + CoCoOp                                           71.07                                  58.47                                     64.85                  78.65                                          48.47                                    64.30                               62.61
+
+
+
+    ) O R Z H U                                                                                 ) O R Z H U                                                                    
+               ' 7 '                                                                                          ' 7 '                                                                            
+                 3 H W V                                                                                        3 H W V                                                               
+                & D U V                                                                                        & D U V                                                                        
+        8 & )                                                                                       8 & )                                                                   
+   & D O W H F K                                                                               & D O W H F K                                                                             
+        ) R R G                                                                                     ) R R G                                                                    
+        6 8 1                                                                                        6 8 1                                                                                    
+         $ L U F U D I W                                                                                $ L U F U D I W                                                                 
+           H X U R V D W                                                                                  H X U R V D W                                                                 
+                                                                                                                                                                                                                                                                                                            
+  1 R Q H   7 3 7                                                                                       1 R Q H   7 3 7                                                        
+                                          U  
+                                         ' 7  
+                                           3 H  '                                                                                                                                              U  
+                                                                                                                                                                                              ' 7  
+                                                                                                                                                                                                3 H  '
+                                 8 &  & D U V
+                             & D  ) 
+                                 O W H        W V                                                                                                                                   8 &  & D U V
+                                                                                                                                                                                  & D  ) 
+                                                                                                                                                                                      O W H        W V
+                        Z H            F
+                                ) R  K   
+                                       R G
+                                 6 8    
+                                        1
+                                   $ L                                                                                                                                    Z H            F
+                                                                                                                                                                                     ) R  K   
+                                                                                                                                                                                            R G
+                                                                                                                                                                                      6 8    
+                                                                                                                                                                                             1
+                                                                                                                                                                                        $ L    
+                  ) O R                 U F
+                                     H X  U D I W
+                                 $ Y  U R V D W
+                                        H U D  J H                                                                                                                     ) O R                 U F
+                                                                                                                                                                                          H X  U D I W
+                                                                                                                                                                                      $ Y  U R V D W
+                                                                                                                                                                                             H U D  J H
+                                      (a) CoOp with CLIP-RN50.                                                                                                                        (b) CoCoOp with CLIP-RN50.
+Figure 3: Cross-dataset improvement normalized by the zero-shot baseline performance. In
+each matrix A, Ai,j is the normalized relative improvement on the jth dataset of using the prompt
+tuned on the i-th dataset. The value Ai,j stands for how well a method trained on a source dataset i
+performs on a target dataset j, in comparison with a zero-shot CLIP baseline (using a hand-crafted
+prompt). Thus, the higher, the better. The last row is the performance of TPT, which is not tuned
+on any source dataset. The last column summarizes the average improvement over 10 datasets,
+measuring the overall generalization ability across the 10 datasets.
+
+
+(StanfordCars [62], Aircraft [63]), human actions (UCF101 [64]), satellite images (EuroSAT [65]),
+and general objects (Caltech101 [66]). We consider two different settings of cross-dataset general-
+ization. In the first setting, we consider ImageNet with 1000 categories as a comprehensive source
+dataset, and use other fine-grained datasets as target datasets for evaluation. We implement CoOp
+and CoCoOp using the same setting as in section 4.1, and evaluate their generalization performance
+to the 10 datasets. In the second setting, we consider a more challenging scenario, where the source
+data for few-shot prompt tuning also comes from the specialized fine-grained datasets, and there is no
+overlapping in categories between a source-target pair.
+
+Implementation details. We implement CoOp and CoCoOp on each source dataset following their
+original configurations. For TPT, we use the same initialization of “a photo of a" on each of the
+fine-grained classification datasets. We adopt the same hyper-parameter setting as in section 4.1,
+by only optimizing the prompt for 1 step at test time. We use AugMix [67] as a stronger data
+augmentation for this task.
+
+
+                                                                                                                                                  8
+Table 2: Cross-dataset generalization from ImageNet to fine-grained classification datasets.
+CoOp and CoCoOp are tuned on ImageNet using 16-shot training data per category. Baseline
+CLIP, prompt ensemble, and TPT do not require training data or annotations. We report the top-1
+classification accuracy on each dataset.
+
+ Method                                                                                                                 Average
+                 Flower102   DTD     Pets     Cars    UCF101   Caltech101    Food101   SUN397     Aircraft    EuroSAT
+ CLIP-RN50         61.75     40.37   83.57    55.70    58.84       85.88      73.97     58.80      15.66        23.69    55.82
+ Ensemble          62.77     40.37   82.97    55.89    59.48       87.26      74.82     60.85      16.11        25.79    56.63
+ CoOp              61.55     37.29   87.00    55.32    59.05       86.53      75.59     58.15      15.12        26.20    56.18
+ CoCoOp            65.57     38.53   88.39    56.22    57.10       87.38       76.2     59.61      14.61        28.73    57.23
+ TPT               62.69     40.84   84.49    58.46    60.82       87.02      74.88     61.46      17.58        28.33    57.66
+ CLIP-ViT-B/16     67.44     44.27   88.25    65.48    65.13       93.35      83.65     62.59      23.67        42.01    63.58
+ Ensemble          66.99     45.04   86.92    66.11    65.16       93.55      82.86     65.63      23.22        50.42    64.59
+ CoOp              68.71     41.92   89.14    64.51    66.55       93.70      85.30     64.15      18.47        46.39    63.88
+ CoCoOp            70.85     45.45   90.46    64.90    68.44       93.79      83.97     66.89      22.29        39.23    64.63
+ TPT               68.98     47.75   87.79    66.87    68.04       94.16      84.67     65.5       24.78        42.44    65.10
+
+
+
+
+Results. In Table 2, we compare TPT with few-shot prompt tuning methods on generalization from
+ImageNet to fine-grained datasets. Note that TPT works in a zero-shot manner; thus it is not trained on
+ImageNet. Nonetheless, we find TPT to achieve on-par generalization as ImageNet trained CoCoOp.
+In Figure 3, we present the results of the more challenging setting of cross-dataset generalization,
+where there is no overlap between the source and target dataset. For better visualization, we plot the
+relative accuracy improvement acc0 = (acc − accbase )/accbase , normalized by the zero-shot baseline
+accuracy accbase of a CLIP-RN50. For example, baseline CLIP with a hand-crafted prompt achieves
+61.75% accuracy on Flower102, while CoOp trained on DTD only has 33.41% on Flower102. In
+this case, we calculate acc0 as (33.41 − 61.75)/61.75 = −0.46. From Figure 3, we can see that
+the averaged accuracy improvement (in the last column of each matrix) of few-shot prompt tuning
+methods is always negative, meaning that they do worse than the zero-shot baseline. TPT, on the
+other hand, shows consistent improvement in each of the 10 datasets.
+
+4.3   Context-dependent Visual Reasoning on Bongard-HOI
+
+Baselines. We include three previous methods for comparison: (1) The CNN-baseline [49] is a
+simple classifier trained on Bongard-HOI training data, for which the model is trained to map a
+training sample as a whole (including the support and query images) to a binary output, indicating
+whether the query image contains the corresponding concept; (2) The Meta-baseline [50] regards
+each sample in Bongard-HOI as a few-shot task and the model is trained on the Bongard-HOI training
+data with a meta-objective that aims to quickly adapt the model to new tasks; (3) HOITrans [16]
+is the previous best method on Bongard-HOI. It is a transformer-based HOI detection model that
+achieves state-of-the-art accuracy on various HOI detection benchmarks. It solves Bongard-HOI by
+comparing the detected HOIs of the query images to those of the support images.
+
+Table 3: Evaluation on the Bongard-HOI benchmark. CNN and Meta baselines are implemented
+based on a ResNet-50 (RN50). (∗ denotes that the method uses ground truth bounding boxes to assist
+the inference.)
+                                                                Test Splits
+             Method                     seen act.,     unseen act.,   seen act.,       unseen act.,     Average
+                                        seen obj.,      seen obj.,   unseen obj.,      unseen obj.,
+             CNN-baseline                    50.03        49.89             49.77         50.01              49.92
+             Meta-baseline∗                  58.82        58.75             58.56         57.04              58.30
+             HOITrans                        59.50        64.38             63.10         62.87              62.46
+             TPT (w/ CLIP-RN50)              66.39        68.50             65.98         65.48              66.59
+
+
+
+Implementation details. For each Bongard-HOI test sample, TPT tunes the prompt prefix and
+class tokens simultaneously from scratch. All learnable tokens are initialized in the text embedding
+space from a Gaussian distribution with σ = 0.02. We optimize the prompt on all support images
+of a test sample for 64 steps, using the AdamW optimizer with a learning rate of 0.005, and then
+infer the query image with the updated prompt. For other baselines, we directly report the results
+
+
+                                                               9
+from Jiang et al. [15], and we refer interested readers to this paper for more details. Note that the
+HOITrans model is trained on all possible HOI concepts, including the ones in the testing splits.
+
+Results. In Table 3, we follow the setup in Jiang et al. [15], and compare TPT with previous
+methods on 4 test splits of Bongard-HOI respectively. In Bongard-HOI, test images are split into four
+sets by their overlap in the HOI concept with the training data: whether the action a or the object o
+has appeared in the training data. Note that our CLIP-based TPT is not trained on the training split of
+Bongard-HOI, and thus the definition of the four splits is not strictly applicable to TPT.
+
+
+5    Ablation Study
+
+In this section, we provide an empirical analysis of our design choices and ablating the effects of
+different components of TPT. For simplicity, if not otherwise specified, analyses in this section are
+evaluated on the natural distribution shifts benchmarks. We first conduct test-time optimization on
+different parameter groups of CLIP, showing that prompt tuning achieves the most accuracy gain
+for CLIP. Next, we show the improvement brought by confidence selection and analyze how the
+confidence threshold affects performance. Lastly, we provide a quantitative analysis of TPT on the
+trade-off between efficiency and performance. Additional ablation studies on data augmentation
+can be found in Appendix A.2. We also provide a qualitative study on the effect of TPT on model
+prediction probability distributions in Appendix A.7.
+
+Test-time optimization on different parameter groups of CLIP. Existing test-time optimization
+methods have worked on different parameter groups of a model. Although there is a strong intuition
+for tuning prompts on CLIP, it is unclear whether it is the most effective choice. In Figure 4 (a),
+we evaluate different design choices of test-time optimization on CLIP. Inspired by MEMO [44],
+a single-point test-time optimization method that optimizes the entire network, we consider four
+different parameter groups: 1) the entire model, 2) the text encoder, 3) the visual encoder, and 4) the
+text prompt. For a fair comparison, we adopt the same setup as MEMO, using AugMix [67] as the
+data augmentation. Confidence selection is not used in this ablation study. For each design choice,
+we run a grid search for hyper-parameter tuning (on the learning rate and the number of optimization
+steps) and report the best result.
+From the results, we see that optimizing text prompts achieves the most performance gain compared
+to other parameter groups. In addition, we find optimizing the visual encoder to have the worst result.
+This observation is in alignment with previous work that suggests fine-tuning the image encoder can
+distort pre-trained features [68, 51].
+
+
+
+
+        $ Y H U D J H  7 R S    $ F F X U D F \                                                                                $ Y H U D J H  7 R S    $ F F X U D F \    
+                                                                                                                                                                                               
+                                                                               = H U R  V K R W  & / , 3
+                                                                
+                                                                                                                                                                                               
+                                                                
+
+                                                                                                                                                                                             
+                                                                      $ O O           9 L V X D O   7 H [ W   3 U R P S W                                                                                                    
+                                                                                     ( Q F R G H U   ( Q F R G H U                                                                                           & X W R I I  3 H U F H Q W L O H
+    (a) Test-time optimization on different modules.                                                                           (b) Different cutoff percentile in confidence selection.
+Figure 4: Ablating the effects of different components of TPT. We evaluate the top-1 accuracy on
+the distribution shifts benchmarks in section 4.1. Methods are implemented based on a CLIP-RN50.
+
+
+The effect of confidence selection. We present confidence selection as a major component of our
+method, which filters out “noisy" augmented views that provide little information. In Table 4, we
+provide the performance of TPT without confidence selection, in comparison with the full method.
+Confidence selection brings non-trivial performance improvement to our baseline TPT. We further
+show the effect of confidence threshold ρ in Figure 4 (b). The result suggests that using the top-
+10% confident sample leads to the highest average accuracy. In addition, we find that the effect of
+
+
+                                                                                                                              10
+confidence selection is generalizable to other entropy-based test-time optimization methods. More
+details about this analysis are included in appendix A.3
+ Table 4: The effect of confidence selection. The last row is the performance of our full method.
+                                                                              ImageNet                     ImageNet-A               ImageNet-V2.       ImageNet-R.                                                            ImageNet-Sketch
+ Method                                                                                                                                                                                                                                                      Average               OOD Average
+                                                                              Top1 acc. ↑                  Top1 acc. ↑              Top1 acc. ↑        Top1 acc. ↑                                                            Top1 acc. ↑
+ CLIP-RN50                                                                    58.16                        21.83                    51.41              56.15                                                                  33.37                          44.18                 40.69
+ baseline TPT                                                                 60.31                        23.65                    53.66              57.48                                                                  34.31                          45.88                 42.28
+ + confidence selection                                                       60.74 (+0.43)                26.67 (+3.02)            54.70 (+1.04)      59.11 (+1.63)                                                          35.09 (+0.78)                  47.26 (+1.38)         43.89 (+1.61)
+
+
+
+The trade-off between inference efficiency and accuracy. We analyze two factors that affect
+TPT’s efficiency: 1) The number of augmented views N that increases the actual number of test
+samples; 2) The number of optimization steps that increases the runtime and memory usage mainly
+induced by backpropagation. Figure 5 shows the relationship between the two factors and the average
+accuracy of TPT on natural distribution shifts.
+In Figure 5 (a), the accuracy increases as the number of augmented views grows until reaching a
+plateau at around N = 64. Even when N = 8, TPT still brings about over 2% average accuracy gain
+to the zero-shot CLIP, suggesting that TPT can be adapted for more efficient applications. In Figure 5
+(b), we find that increasing the number of optimization steps from 1 to 2 can slightly increase the
+accuracy (by 0.4%), while there is no significant performance gain from taking more than 2 steps.
+Considering that the performance gain comes at the expense of linearly increasing the inference time,
+we use 1-step TPT as our default setting, which is already capable of boosting the average accuracy
+of zero-shot CLIP by more than 3%.
+
+
+
+
+             $ Y H U D J H  7 R S    $ F F X U D F \                                                                                              $ Y H U D J H  7 R S    $ F F X U D F \    
+                                                                                                                                                                                                                  
+
+
+
+                                                                                                                                                                                                                  
+
+
+
+                                                                                                                                                                                                                                                             
+                                                                             W K H  Q X P E H U  R I  D X J P H Q W H G  Y L H Z V                                                                                            W K H  Q X P E H U  R I  7 3 7  V W H S V
+           (a) Different number of augmented views.                                                                                                     (b) Different number of optimization steps.
+Figure 5: Analysis on the trade-off between efficiency and accuracy. We evaluate the top-1
+accuracy on the distribution shifts benchmarks in section 4.1. Results are based on a CLIP-RN50.
+
+
+6     Conclusion
+In this work, we investigated how to fully exploit the potential of pre-trained vision-language
+foundation models as better zero-shot learners. We developed Test-time Prompt Tuning (TPT), a
+new prompt tuning method that can learn adaptive prompts on the fly with a single test sample. We
+demonstrated the effectiveness of our method on the robustness to natural distribution shifts and
+cross-dataset generalization, by using CLIP as the foundation model. Without the need for any
+training data or annotations, TPT improves the zero-shot generalization ability of CLIP.
+
+Limitations. While TPT does not require training data or annotations, our method requires a
+one-step backpropagation when optimizing the prompt at test time. Since TPT generates multiple
+augmented views of a single test sample, it increases the memory cost during inference.
+
+Future directions. The idea of TPT can be applied to other foundation models for various down-
+stream tasks, including other vision-language models [5, 69] and foundation models of other modali-
+ties (e.g., pre-trained large-scale language models [18, 17]) to further boost their zero-shot generaliza-
+tion. The most interesting part of this direction is to design a test-time objective that fits the nature
+of the model and the downstream task. Besides, it is also interesting to explore how to reduce the
+memory cost of TPT and make it more computationally efficient.
+
+
+                                                                                                                                                  11
+7   Acknowledgements
+This work was supported by Nvidia Research. Shu and Goldstein were supported by the ONR MURI
+program and DARPA GARD.
+
+References
+ [1] Alec Radford, Jong Wook Kim, Chris Hallacy, Aditya Ramesh, Gabriel Goh, Sandhini Agar-
+     wal, Girish Sastry, Amanda Askell, Pamela Mishkin, Jack Clark, Gretchen Krueger, and Ilya
+     Sutskever. Learning transferable visual models from natural language supervision. In ICML,
+     2021. 1, 2, 3, 7, 18
+ [2] Chao Jia, Yinfei Yang, Ye Xia, Yi-Ting Chen, Zarana Parekh, Hieu Pham, Quoc V. Le, Yun-
+     Hsuan Sung, Zhen Li, and Tom Duerig. Scaling up visual and vision-language representation
+     learning with noisy text supervision. In ICML, 2021. 1, 3
+ [3] Rishi Bommasani, Drew A Hudson, Ehsan Adeli, Russ Altman, Simran Arora, Sydney von
+     Arx, Michael S Bernstein, Jeannette Bohg, Antoine Bosselut, Emma Brunskill, et al. On the
+     opportunities and risks of foundation models. arXiv preprint arXiv:2108.07258, 2021. 1
+ [4] Aishwarya Kamath, Mannat Singh, Yann LeCun, Gabriel Synnaeve, Ishan Misra, and Nicolas
+     Carion. MDETR - modulated detection for end-to-end multi-modal understanding. In ICCV,
+     2021. 1
+ [5] Liunian Harold Li, Pengchuan Zhang, Haotian Zhang, Jianwei Yang, Chunyuan Li, Yiwu Zhong,
+     Lijuan Wang, Lu Yuan, Lei Zhang, Jenq-Neng Hwang, Kai-Wei Chang, and Jianfeng Gao.
+     Grounded language-image pre-training. In CVPR, 2022. 11
+ [6] Or Patashnik, Zongze Wu, Eli Shechtman, Daniel Cohen-Or, and Dani Lischinski. Styleclip:
+     Text-driven manipulation of stylegan imagery. In ICCV, 2021.
+ [7] Aditya Ramesh, Prafulla Dhariwal, Alex Nichol, Casey Chu, and Mark Chen. Hierarchical
+     text-conditional image generation with CLIP latents. CoRR, abs/2204.06125, 2022.
+ [8] Zhaowei Cai, Gukyeong Kwon, Avinash Ravichandran, Erhan Bas, Zhuowen Tu, Rahul Bhotika,
+     and Stefano Soatto. X-DETR: A versatile architecture for instance-wise vision-language tasks.
+     CoRR, abs/2204.05626, 2022.
+ [9] Tianyi Liu, Zuxuan Wu, Wenhan Xiong, Jingjing Chen, and Yu-Gang Jiang. Unified multimodal
+     pre-training and prompt-based tuning for vision-language understanding and generation. CoRR,
+     abs/2112.05587, 2021.
+[10] Mengde Xu, Zheng Zhang, Fangyun Wei, Yutong Lin, Yue Cao, Han Hu, and Xiang Bai. A
+     simple baseline for zero-shot semantic segmentation with pre-trained vision-language model.
+     CoRR, abs/2112.14757, 2021. 1
+[11] Brian Lester, Rami Al-Rfou, and Noah Constant. The power of scale for parameter-efficient
+     prompt tuning. In EMNLP, 2021. 1, 3
+[12] Mitchell Wortsman, Gabriel Ilharco, Mike Li, Jong Wook Kim, Hannaneh Hajishirzi, Ali
+     Farhadi, Hongseok Namkoong, and Ludwig Schmidt. Robust fine-tuning of zero-shot models.
+     CoRR, abs/2109.01903, 2021. 2, 5
+[13] Dan Hendrycks, Steven Basart, Norman Mu, Saurav Kadavath, Frank Wang, Evan Dorundo,
+     Rahul Desai, Tyler Zhu, Samyak Parajuli, Mike Guo, Dawn Song, Jacob Steinhardt, and Justin
+     Gilmer. The many faces of robustness: A critical analysis of out-of-distribution generalization.
+     In ICCV, 2021. 2, 7, 18
+[14] Kaiyang Zhou, Jingkang Yang, Chen Change Loy, and Ziwei Liu. Conditional prompt learning
+     for vision-language models. In CVPR, 2022. 2, 3, 7, 18, 19
+[15] Huaizu Jiang, Xiaojian Ma, Weili Nie, Zhiding Yu, Yuke Zhu, and Anima Anandkumar.
+     Bongard-hoi: Benchmarking few-shot visual reasoning for human-object interactions. In CVPR,
+     2022. 2, 4, 10
+
+
+                                                 12
+[16] Cheng Zou, Bohan Wang, Yue Hu, Junqi Liu, Qian Wu, Yu Zhao, Boxun Li, Chenguang Zhang,
+     Chi Zhang, Yichen Wei, and Jian Sun. End-to-end human object interaction detection with HOI
+     transformer. In CVPR, 2021. 2, 9
+[17] Jacob Devlin, Ming-Wei Chang, Kenton Lee, and Kristina Toutanova. BERT: pre-training of
+     deep bidirectional transformers for language understanding. In NAACL-HLT. Association for
+     Computational Linguistics, 2019. 3, 11
+[18] Tom B. Brown, Benjamin Mann, Nick Ryder, Melanie Subbiah, Jared Kaplan, Prafulla Dhariwal,
+     Arvind Neelakantan, Pranav Shyam, Girish Sastry, Amanda Askell, Sandhini Agarwal, Ariel
+     Herbert-Voss, Gretchen Krueger, Tom Henighan, Rewon Child, Aditya Ramesh, Daniel M.
+     Ziegler, Jeffrey Wu, Clemens Winter, Christopher Hesse, Mark Chen, Eric Sigler, Mateusz
+     Litwin, Scott Gray, Benjamin Chess, Jack Clark, Christopher Berner, Sam McCandlish, Alec
+     Radford, Ilya Sutskever, and Dario Amodei. Language models are few-shot learners. In
+     NeurIPS, 2020. 3, 11
+[19] Ting Chen, Simon Kornblith, Mohammad Norouzi, and Geoffrey E. Hinton. A simple framework
+     for contrastive learning of visual representations. In ICML, 2020. 3
+[20] Elad Ben Zaken, Shauli Ravfogel, and Yoav Goldberg. Bitfit: Simple parameter-efficient
+     fine-tuning for transformer-based masked language-models. In ACL, 2022. 3
+[21] Renrui Zhang, Rongyao Fang, Wei Zhang, Peng Gao, Kunchang Li, Jifeng Dai, Yu Qiao, and
+     Hongsheng Li. Tip-adapter: Training-free clip-adapter for better vision-language modeling.
+     CoRR, abs/2111.03930, 2021.
+[22] Renrui Zhang, Longtian Qiu, Wei Zhang, and Ziyao Zeng. VT-CLIP: enhancing vision-language
+     models with visual-guided texts. CoRR, abs/2112.02399, 2021.
+[23] Zhecan Wang, Noel Codella, Yen-Chun Chen, Luowei Zhou, Jianwei Yang, Xiyang Dai, Bin
+     Xiao, Haoxuan You, Shih-Fu Chang, and Lu Yuan. CLIP-TD: CLIP targeted distillation for
+     vision-language tasks. CoRR, abs/2201.05729, 2022. 3
+[24] Xiang Lisa Li and Percy Liang. Prefix-tuning: Optimizing continuous prompts for generation.
+     In ACL/IJCNLP. Association for Computational Linguistics, 2021. 3
+[25] Zhuofeng Wu, Sinong Wang, Jiatao Gu, Rui Hou, Yuxiao Dong, V. G. Vinod Vydiswaran, and
+     Hao Ma. IDPG: an instance-dependent prompt generation method. In NAACL, 2022. 3
+[26] Kaiyang Zhou, Jingkang Yang, Chen Change Loy, and Ziwei Liu. Learning to prompt for
+     vision-language models. CoRR, abs/2109.01134, 2021. 3, 7, 18
+[27] Yu Du, Fangyun Wei, Zihe Zhang, Miaojing Shi, Yue Gao, and Guoqi Li. Learning to prompt
+     for open-vocabulary object detection with vision-language model. In CVPR, 2022. 3
+[28] Zifeng Wang, Zizhao Zhang, Chen-Yu Lee, Han Zhang, Ruoxi Sun, Xiaoqi Ren, Guolong Su,
+     Vincent Perot, Jennifer G. Dy, and Tomas Pfister. Learning to prompt for continual learning.
+     CoRR, abs/2112.08654, 2021. 3
+[29] Tony Huang, Jack Chu, and Fangyun Wei. Unsupervised prompt learning for vision-language
+     models. CoRR, abs/2204.03649, 2022. 3
+[30] Chunting Zhou, Junxian He, Xuezhe Ma, Taylor Berg-Kirkpatrick, and Graham Neubig. Prompt
+     consistency for zero-shot task generalization. CoRR, abs/2205.00049, 2022. 3
+[31] Pang Wei Koh, Shiori Sagawa, Henrik Marklund, Sang Michael Xie, Marvin Zhang, Akshay
+     Balsubramani, Weihua Hu, Michihiro Yasunaga, Richard Lanas Phillips, Irena Gao, Tony Lee,
+     Etienne David, Ian Stavness, Wei Guo, Berton Earnshaw, Imran Haque, Sara M. Beery, Jure
+     Leskovec, Anshul Kundaje, Emma Pierson, Sergey Levine, Chelsea Finn, and Percy Liang.
+     WILDS: A benchmark of in-the-wild distribution shifts. In ICML, 2021. 3
+[32] Akshay Raj Dhamija, Manuel Günther, and Terrance E. Boult. Reducing network agnostophobia.
+     In NeurIPS 2018, 2018. 3
+
+
+                                               13
+[33] Chelsea Finn, Pieter Abbeel, and Sergey Levine. Model-agnostic meta-learning for fast adapta-
+     tion of deep networks. In Doina Precup and Yee Whye Teh, editors, ICML, 2017. 3
+[34] Dimitris Tsipras, Shibani Santurkar, Logan Engstrom, Alexander Turner, and Aleksander Madry.
+     Robustness may be at odds with accuracy. In ICLR, 2019. 3
+[35] Hongyang Zhang, Yaodong Yu, Jiantao Jiao, Eric P. Xing, Laurent El Ghaoui, and Michael I.
+     Jordan. Theoretically principled trade-off between robustness and accuracy. In ICML, 2019. 3
+[36] Olivier Chapelle and Alexander Zien. Semi-supervised classification by low density separation.
+     In Proceedings of the Tenth International Workshop on Artificial Intelligence and Statistics,
+     AISTATS, 2005. 3
+[37] Assaf Shocher, Nadav Cohen, and Michal Irani. "zero-shot" super-resolution using deep internal
+     learning. In CVPR, 2018. 3
+[38] David Bau, Hendrik Strobelt, William S. Peebles, Jonas Wulff, Bolei Zhou, Jun-Yan Zhu, and
+     Antonio Torralba. Semantic photo manipulation with a generative image prior. ACM Trans.
+     Graph., 2019.
+[39] Jogendra Nath Kundu, Naveen Venkat, Rahul M. V., and R. Venkatesh Babu. Universal
+     source-free domain adaptation. In CVPR, 2020.
+[40] Yujia Huang, James Gornet, Sihui Dai, Zhiding Yu, Tan M. Nguyen, Doris Y. Tsao, and Anima
+     Anandkumar. Neural networks with recurrent generative feedback. In NeurIPS, 2020. 3
+[41] Yu Sun, Xiaolong Wang, Zhuang Liu, John Miller, Alexei A. Efros, and Moritz Hardt. Test-time
+     training with self-supervision for generalization under distribution shifts. In ICML, 2020. 3, 4
+[42] Yuejiang Liu, Parth Kothari, Bastien van Delft, Baptiste Bellot-Gurlet, Taylor Mordan, and
+     Alexandre Alahi. Ttt++: When does self-supervised test-time training fail or thrive? In NeurIPS,
+     2021. 3
+[43] Dequan Wang, Evan Shelhamer, Shaoteng Liu, Bruno A. Olshausen, and Trevor Darrell. Tent:
+     Fully test-time adaptation by entropy minimization. In ICLR, 2021. 4, 18
+[44] Marvin Zhang, Sergey Levine, and Chelsea Finn. MEMO: test time robustness via adaptation
+     and augmentation. CoRR, abs/2110.09506, 2021. 4, 10, 17
+[45] Yanghao Li, Naiyan Wang, Jianping Shi, Jiaying Liu, and Xiaodi Hou. Revisiting batch
+     normalization for practical domain adaptation. In ICLR Workshop, 2017. 4
+[46] Manli Shu, Zuxuan Wu, Micah Goldblum, and Tom Goldstein. Encoding robustness to image
+     style via adversarial feature perturbations. In NeurIPS, 2021. 4
+[47] Steffen Schneider, Evgenia Rusak, Luisa Eck, Oliver Bringmann, Wieland Brendel, and Matthias
+     Bethge. Improving robustness against common corruptions by covariate shift adaptation. In
+     NeurIPS, 2020. 4
+[48] Jian Liang, Dapeng Hu, and Jiashi Feng. Do we really need to access the source data? source
+     hypothesis transfer for unsupervised domain adaptation. In ICML, 2020. 4
+[49] Weili Nie, Zhiding Yu, Lei Mao, Ankit B. Patel, Yuke Zhu, and Anima Anandkumar. Bongard-
+     logo: A new benchmark for human-level concept learning and reasoning. In NeurIPS, 2020. 5,
+     9
+[50] Yinbo Chen, Xiaolong Wang, Zhuang Liu, Huijuan Xu, and Trevor Darrell. A new meta-baseline
+     for few-shot learning. CoRR, abs/2003.04390, 2020. 5, 9
+[51] Ananya Kumar, Aditi Raghunathan, Robbie Jones, Tengyu Ma, and Percy Liang. Fine-tuning
+     can distort pretrained features and underperform out-of-distribution. CoRR, abs/2202.10054,
+     2022. 5, 10
+[52] J. Deng, W. Dong, R. Socher, L.-J. Li, K. Li, and L. Fei-Fei. ImageNet: A Large-Scale
+     Hierarchical Image Database. In CVPR09, 2009. 7, 18
+
+
+                                                 14
+[53] Benjamin Recht, Rebecca Roelofs, Ludwig Schmidt, and Vaishaal Shankar. Do imagenet
+     classifiers generalize to imagenet? In Kamalika Chaudhuri and Ruslan Salakhutdinov, editors,
+     ICML, 2019. 7, 18
+[54] Dan Hendrycks, Kevin Zhao, Steven Basart, Jacob Steinhardt, and Dawn Song. Natural
+     adversarial examples. In CVPR, pages 15262–15271, 2021. 7, 18
+[55] Kaiming He, Xiangyu Zhang, Shaoqing Ren, and Jian Sun. Deep residual learning for image
+     recognition. In CVPR, 2016. 7
+[56] Haohan Wang, Songwei Ge, Zachary Lipton, and Eric P Xing. Learning robust global represen-
+     tations by penalizing local predictive power. In NeurIPS, 2019. 7, 18
+[57] Maria-Elena Nilsback and Andrew Zisserman. Automated flower classification over a large
+     number of classes. In Indian Conference on Computer Vision, Graphics and Image Processing,
+     Dec 2008. 7
+[58] Omkar M. Parkhi, Andrea Vedaldi, Andrew Zisserman, and C. V. Jawahar. Cats and dogs. In
+     CVPR, 2012. 7, 18
+[59] J. Xiao, J. Hays, K. A. Ehinger, A. Oliva, and A. Torralba. Sun database: Large-scale scene
+     recognition from abbey to zoo. In 2010 IEEE Computer Society Conference on Computer Vision
+     and Pattern Recognition, June 2010. 7, 18
+[60] M. Cimpoi, S. Maji, I. Kokkinos, S. Mohamed, , and A. Vedaldi. Describing textures in the
+     wild. In Proceedings of the IEEE Conf. on Computer Vision and Pattern Recognition (CVPR),
+     2014. 7, 18
+[61] Lukas Bossard, Matthieu Guillaumin, and Luc Van Gool. Food-101 – mining discriminative
+     components with random forests. In European Conference on Computer Vision, 2014. 7
+[62] Jonathan Krause, Michael Stark, Jia Deng, and Li Fei-Fei. 3d object representations for
+     fine-grained categorization. In ICCV Workshops, 2013. 8, 18
+[63] S. Maji, J. Kannala, E. Rahtu, M. Blaschko, and A. Vedaldi. Fine-grained visual classification
+     of aircraft. Technical report, 2013. 8, 18
+[64] Khurram Soomro, Amir Roshan Zamir, and Mubarak Shah. UCF101: A dataset of 101 human
+     actions classes from videos in the wild. CoRR, abs/1212.0402, 2012. 8
+[65] Patrick Helber, Benjamin Bischke, Andreas Dengel, and Damian Borth. Eurosat: A novel
+     dataset and deep learning benchmark for land use and land cover classification. IEEE J. Sel.
+     Top. Appl. Earth Obs. Remote. Sens., 2019. 8
+[66] Li Fei-Fei, Rob Fergus, and Pietro Perona. Learning generative visual models from few
+     training examples: An incremental bayesian approach tested on 101 object categories. In CVPR
+     Workshops, 2004. 8
+[67] Dan Hendrycks, Norman Mu, Ekin Dogus Cubuk, Barret Zoph, Justin Gilmer, and Balaji
+     Lakshminarayanan. Augmix: A simple data processing method to improve robustness and
+     uncertainty. In ICLR, 2020. 8, 10
+[68] Xiaohua Zhai, Xiao Wang, Basil Mustafa, Andreas Steiner, Daniel Keysers, Alexander
+     Kolesnikov, and Lucas Beyer. Lit: Zero-shot transfer with locked-image text tuning. In
+     CVPR, 2022. 10
+[69] Junnan Li, Dongxu Li, Caiming Xiong, and Steven C. H. Hoi. BLIP: bootstrapping
+     language-image pre-training for unified vision-language understanding and generation. CoRR,
+     abs/2201.12086, 2022. 11
+
+
+
+
+                                                15
+A        Appendix
+A.1      Broader Impact
+
+We introduce TPT to promote the generalization of vision-language foundation models. We believe it
+is worth exploring the zero-shot robustness and generalization of large-scale foundation models as
+they present a promising direction toward more reliable machine learning systems. In this work, to
+better leverage the knowledge of pre-trained foundation models, we explore the idea of prompt tuning
+because it does not alter the inner representations of pre-trained models. We hope this work inspires
+future studies in reaching the full potential of foundation models, especially in their robustness and
+generalization.
+
+A.2      More Experiments.
+
+Analysis on error bars. We run TPT multiple times using 3 different random seeds and report the
+average accuracy with standard deviation. The randomness of TPT mainly comes from random data
+augmentation and one-step optimization. In addition, we report error bars for few-shot prompt tuning
+methods (CoOp and CoCoOp). The randomness of these methods mainly comes from the random
+few-shot sampling of the training data. We provide error bar analysis for the results in Table 1 and
+Table 2 in the main paper.
+
+Table 5: Robustness to natural distribution shifts. We report the accuracy with an error bar
+(standard deviation) obtained from three runs with different random seeds.
+                         ImageNet               ImageNet-A         ImageNet-V2.            ImageNet-R.           ImageNet-Sketch
+ Method                                                                                                                                         Average            OOD Average
+                        Top1 acc. ↑             Top1 acc. ↑         Top1 acc. ↑             Top1 acc. ↑            Top1 acc. ↑
+ CLIP-RN50                     58.16               21.83                   51.41                 56.15                    33.37                   44.18                    40.69
+ CoOp                  63.27 (± .07)            23.23 (± .19)       55.50 (± .09)          57.08 (± .42)            34.68 (± .03)             46.75(± .12)         42.62 (± .17)
+ CoCoOp                62.86 (± .11)            23.38 (± .50)       55.59 (± .14)          57.55 (± .23)            34.74 (± .29)            46.82 (± .21)         42.82 (± .23)
+ TPT                   60.77 (± .03)            26.60(± .13)        54.70 (± .11)          59.08 (± .03)            35.17 (± .08)            47.27 (± .004)        43.89 (± .003)
+ CLIP-ViT-B/16                 66.73               47.87                   60.86                 73.98                    46.09                   59.11                    57.2
+ CoOp                  71.71 (± .19)            49.99 (± .29)       64.49 (± .39)          75.51 (± .26)            48.10 (± .14)            61.96 (± .25)          59.52 (± .26)
+ CoCoOp                70.70 (± .32)            50.76 (± .13)       63.93 (± .19)          76.09 (± .29)            48.60 (± .38)            62.02 (± .20)          59.85 (± .19)
+ TPT                   68.96 (± .03)            54.47 (± .26)       63.46 (± .07)          77.10 (± .04)            47.93 (± .03)            62.38 (± .05)          60.74 (± .06)
+
+
+
+
+Table 6: Cross-dataset generalization from ImageNet to fine-grained classification datasets.
+CoOp and CoCoOp are tuned on ImageNet using 16-shot training data per category. Baseline CLIP
+and TPT do not require training data or annotations. We report the averaged top-1 accuracy on each
+dataset, with standard deviations obtained from three runs using different random seeds.
+Method                                                                                                                                                                       Average
+                 Flower102          DTD             Pets           Cars         UCF101          Caltech101      Food101        SUN397         Aircraft       EuroSAT
+CLIP-RN50          61.75            40.37           83.57          55.70           58.84           85.88          73.97           58.80         15.66          23.69           55.82
+CoOp            61.62 (± .2)     37.77 (± .9)    87.24 (± .2)   55.72 (± .8)   59.89 (± .8)     87.23 (± .6)   75.86 (± .2)   59.28 (± .9)   15.20 (± .4)   25.43 (± 4)     56.52 (± .7)
+CoCoOp          65.11 (± 1)      39.14 (± .7)    87.83 (± .6)   56.40 (± .3)   58.57 (± 1)      86.95 (± .5)   76.18 (± .5)   60.62 (± .9)   15.13 (± .5    28.79 (± .9)    57.47 (± .2)
+TPT             62.80 (± .3)     41.43 (± .5)    84.42 (± .1)   58.53 (± .1)   60.64 (± .3)     87.23 (± .2)   75.02 (± .1)   61.46 (± .0)   17.60 (± .4)   28.46 (± .1)    57.76 (± .1)
+CLIP-ViT-B/16      67.44            44.27           88.25          65.48           65.13           93.35          83.65           62.59         23.67          42.01           63.58
+CoOp            68.25 (± 0.5)    42.34 (± 2)     89.38 (± .2)   63.35 (± 1)    67.17 (± 1)      92.82 (± .5)   83.74 (± .4)   64.51 (± .6)   19.99 (± 2)    40.22 (± 4)     63.18 (± .7)
+CoCoOp          71.59 (± .6)     45.48 (± .2)    90.20 (± .2)   65.17 (± .2)   68.77 (± .8)     94.15 (± .3)   84.83 (± 1)    67.07 (± .3)   22.95 (± .7)   42.13 (± 3)     65.23 (± .6)
+TPT             68.79 (± .1)     46.79 (± .1)    87.09 (± .1)   66.38 (± .2)   67.86 (± .1)     94.13 (± .1)   84.67 (± .1)   65.41 (± .1)   23.44 (± .3)   42.78 (± .3)    64.73 (± .1)
+
+
+
+From Table 5, our conclusion for remains the same as in Table 1, that TPT achieves higher accuracy
+than few-shot prompt tuning methods on OOD benchmarks. In addition, we find that on average TPT
+has a smaller standard deviation than other methods.
+In Table 6, we provide the same error bar analysis for the cross-dataset generalization experiment,
+corresponding to Table 2 in Section 4. Similar to the observation above, our conclusion for cross-
+dataset evaluation remains the same. On average, we find TPT to have a smaller standard deviation
+than few-shot prompt tuning methods.
+
+Comparison with model ensembles. We include more comparisons with conventional model
+ensembles of the baselines in Table 1. Note that there exists a fundamental difference between
+our "ensemble" (e.g., TPT + CoOp) and conventional model ensemble (e.g., naive "hand-crafted"
+
+
+                                                                                           16
+ensemble, CoCoOp with different seeds, etc.). As our method (TPT) works solely at test time and
+uses a pre-defined prompt (which may come from a hand-crafted prompt, CoOp, or CoCoOp) as the
+initialization, it is complementary to CoOp, CoCoOp, and hand-crafted prompts.
+Specifically, taking "TPT + CoCoOp" as an example, it is done in the following steps: (1). Using
+the prompt output by CoCoOp as the prompt initialization; (2). Running TPT to tune this prompt at
+test time to get the final result. However, conventional model ensembles aggregate the predictions
+obtained from different prompts.
+
+Table 7: Robustness to Natural Distribution Shifts.. CoOp and CoCoOp are tuned on ImageNet
+using 16-shot training data per category. Baseline CLIP, prompt ensemble, and TPT do not require
+training data.
+                                   ImageNet     ImageNet-A    ImageNet-V2.       ImageNet-R.    ImageNet-Sketch
+ Method                                                                                                             Average    OOD Average
+                                  Top1 acc. ↑   Top1 acc. ↑    Top1 acc. ↑        Top1 acc. ↑     Top1 acc. ↑
+ CLIP-RN50                           58.16         21.83         51.41              56.15            33.37           44.18        40.69
+ Hand-crafted ensemble               59.81         23.24         52.91              60.72            35.48           46.43        43.09
+ CoOp                                63.33         23.06         55.40              56.60            34.67           46.61        42.43
+ CoOp (ensemble 3 seeds)             61.66         22.96         54.14              57.89            34.94           46.32        42.48
+ CoOp + hand-crafted ensemble        63.60         23.23         55.63              57.07            34.84           46.87        42.69
+ CoCoOp                              62.81         23.32         55.72              57.74            34.48           46.81        42.82
+ CoCoOp (ensemble 3 seeds)           63.34         24.27         56.12              58.24            35.46           47.49        43.52
+ CoCoOp + hand-crafted ensemble      63.03         24.16         55.73              57.88            35.22           47.20        43.25
+ CoCoOp + CoOp                       63.86         23.69         56.45               57.7             35.5           47.44        43.34
+ TPT (ours)                          60.74         26.67          54.7              59.11            35.09           47.26        43.89
+ TPT + CoOp                          64.73         30.32         57.83              58.99            35.86           49.55        45.75
+ TPT + CoCoOp                        62.93          27.4          56.6              59.88            35.43           48.45        44.83
+
+
+As shown in the table above, ensembles of existing baselines (e.g., CoOp + CoCoOp) fail to bring
+improvement as substantial as their combination with TPT (e.g. CoOp + TPT or CoCoOp + TPT).
+
+Other baselines using data augmentation. To ablate the contribution of data augmentation in
+our method, we include two additional baselines that are based on data augmentations without
+any optimization (and without TPT). The averaged prediction baseline is to run inference on the
+augmented images and then average the probability. The majority vote baseline runs the majority
+vote in the predictions of augmented images and takes the results as the final prediction.
+We find that both methods fail to achieve comparable improvement as TPT. It suggests that it is
+non-trivial to design an algorithm for using augmented images.
+
+Table 8: Out-of-distribution evaluation of data augmentation baselines. We include two addi-
+tional baselines that are based on data augmentations without any optimization (and without TPT).
+The limited performance of these baselines suggests that it is non-trivial to design an algorithm for
+using augmented images.
+                       ImageNet       ImageNet-A     ImageNet-V2.        ImageNet-R.        ImageNet-Sketch
+ Method                                                                                                           Average     OOD Average
+                       Top1 acc. ↑    Top1 acc. ↑    Top1 acc. ↑         Top1 acc. ↑        Top1 acc. ↑
+ CLIP-RN50             58.16          21.83          51.41               56.15              33.37                 44.18       40.69
+ averaged prediction   57.94          22.71          52.02               51.25              29.51                 42.69       38.87
+ majority vote         59.53          25.67          53.56               54.77              32.27                 45.16       41.57
+ TPT (Ours)            60.74          26.67          54.70               59.11              35.09                 47.26       43.89
+
+
+
+A.3       Apply Confidence Selection to Other Methods
+
+In section 5, we show that confidence selection is an important part of TPT that improves the baseline
+entropy minimization. In this section, we further show that confidence selection can also benefit
+other entropy-based test-time optimization methods, which work on different model architectures and
+optimize different parameter groups. MEMO [44] minimizes the marginal entropy of the model’s
+predictions across augmented views at test time, by adapting all parameters of a network model.
+In Table 9, we implement MEMO based on a standard ResNet-50 from PyTorch, following their
+original hyper-parameter configurations. To apply confidence selection to a method, we try different
+cutoff percentile ρ that controls the threshold for confidence selection (smaller ρ means a higher con-
+
+
+                                                                 17
+fidence threshold). We find MEMO can also benefit from confidence selection and the improvement
+increases as the threshold increases (i.e. ρ becomes smaller).
+Table 9: Apply confidence selection to other test-time methods. All methods are based on a
+standard ResNet-50. ρ denotes applying confidence selection to a method with a cutoff percentile ρ.
+                   ImageNet     ImageNet-A      ImageNet-V2.     ImageNet-R.    ImageNet-Sketch
+ Method                                                                                           Average     OOD Average
+                  Top1 acc. ↑   Top1 acc. ↑      Top1 acc. ↑      Top1 acc. ↑     Top1 acc. ↑
+ ResNet-50          76.13          0.00             63.20           36.17            24.09           39.92       30.87
+ MEMO               77.23          0.75             65.03           41.34            27.72           42.41       33.71
+ MEMO (ρ = 0.7)     77.56          0.92             65.51           41.93            28.20           42.82       34.14
+ MEMO (ρ = 0.5)     77.72          1.15             65.77           42.29            28.55           43.10       34.44
+ MEMO (ρ = 0.3)     77.57          1.43             65.85           42.64            28.33           43.16       34.56
+ MEMO (ρ = 0.1)     77.38          2.59             65.37           42.90            28.04           43.26       34.72
+
+
+
+
+A.4   License information of the assets used in this work.
+
+Datasets. Below are the datasets used in this paper that have known license information:
+The following datasets used in this paper are under the MIT License: ImageNet-A [54], Ima-
+geNetV2 [53], ImageNet-R [13], ImageNet-Sketch [56].
+The following datasets used in this paper are under the CC BY-SA 4.0 License: Oxford-IIIT Pets [58].
+The following datasets used in this paper are for research purposes only (term of access): Ima-
+geNet [52], DTD [60], StanfordCars [62], SUN397 [59], FGVC-Aircraft [63].
+
+Source code. We use the implementation of existing baseline methods for reporting their results in
+this paper. Below are their license information: Source code used in this paper that are under the MIT
+License: CLIP [1], CoOp [26], CoCoOp [14], TENT [43].
+
+A.5   An overview of different prompting strategies for CLIP.
+
+In addition to our discussion on related work in Section 2, we summarize the differences between
+existing prompting strategies for CLIP in Table 10. We focus on three preferred properties of a
+prompting strategy and use them to categorize the methods.
+
+Table 10: An overview of different prompting strategies for CLIP. “learnable" means the prompt
+is optimized based on certain objective functions. “no training data" means that no additional data are
+needed for tuning the prompt. “input-dependent" means the prompt is adaptive to each input instance.
+                  Prompt Type             learnable         no training data       input-dependent
+                  Hand-crafted [1]              7                   3                        7
+                  CoOp [26]                     3                   7                        7
+                  CoCoOp [14]                   3                   7                        3
+                  TPT (ours)                    3                   3                        3
+
+
+Comparison of training and inference budgets. We include a comparison of training and infer-
+ence budgets for prompting strategies of CLIP.
+
+   Table 11: Comparison of training and testing budgets of prompting strategies for CLIP.
+                                              Hand-crafted [1]        CoOp [26]       CoCoOp [14]            TPT (Ours)
+ Inference speed (seconds/iter)                     0.10                  0.10                0.11              0.25
+ Number of training samples                           0                   16K                 16K                 0
+ Number of training iterations                        0                  12.5K               800K                 0
+ Number of additional parameters                      0                     0                65.8K                0
+
+The major computation overhead of TPT comes from the 1-step optimization, which involves back
+propagations through the text encoder of CLIP. Another overhead comes from the data augmentation,
+
+
+                                                            18
+which can be parallelized with little memory increase, as the CLIP’s image branch does not require
+backpropagation. However, note that TPT works solely at test time, and therefore it does not have
+any training budget. In addition, as shown by our empirical results, prompt tuning without training
+data can generalize better to unseen distributions.
+
+A.6   Reproducibility
+
+The code for experiments in this paper can be found here: https://tinyurl.com/yr3zmhma. (The
+code is also included in the supplemental materials.)
+For evaluation on natural distribution shifts, we use a single V100 GPU with 32GB memory. For all
+other experiments, we use a single V100 GPU with 16GB memory.
+
+Details of hyper-parameter tuning. For the OOD experiments on ImageNet variants, we follow
+the setting from [14]. We find the optimal set of hyper-parameters on the original ImageNet validation
+set (not including any of the out-of-distribution data). For the fine-grained image classification, each
+dataset comes with a validation split and a testing split, and we use the former for hyperparameter
+tuning. Among the 10 fine-grained datasets, we choose a set of hyper-parameter that achieves the
+best average validation accuracy.
+
+A.7   Qualitative Analysis
+
+In this section, we provide a qualitative analysis of the effect of TPT on the probability distribution of
+the augmented views of a test sample. In each figure, the top left panel shows the test image, and the
+bar plot on the top right shows CLIP’s prediction on the test image before (on the left) and after (on
+the right) we apply TPT. The bottom two panels show the probability distribution among 200 classes
+(of ImageNet-R) of 64 augmented views. Each peak of a prediction curve indicates a high probability
+in the corresponding class. The prediction probability of the original test sample is at the bottom, and
+we mark the index of the ground-truth class on the x-axis. From the example images, we find that
+TPT can effectively make the predictions more consistent across different augmented views.
+
+                                                                                               French Bulldog                                                       pug
+                                                                                                           pug                                                 cabbage
+                                                                                                    cabbage                                               French Bulldog
+                                                                                               hippopotamus                                                            pig
+                                                                                                             pig                                          hippopotamus
+                                                                                                                     0.0           0.2              0.4                  0.0        0.2           0.4
+                                                                                                                            Prediction before TPT                              Prediction after TPT
+                                 Probability distribution of the augmented images before TPT                                             Probability distribution of the augmented images after TPT
+
+
+
+
+             Augmented Samples                                                                          Augmented Samples
+
+
+
+
+                                            groudtruth                                                                                                    groudtruth
+                                                         Class Index                                                                                                    Class Index
+
+
+
+
+                                                                                                 19
+                                                                                               pig                                                 snail
+                                                                                           snail                                                     pig
+                                                                                         acorn                                                    acorn
+                                                                                    hermit crab                                              hermit crab
+                                                                                           vase                                                     bee
+                                                                                                      0.00        0.05          0.10                       0.0   0.1      0.2      0.3
+                                                                                                               Prediction before TPT                             Prediction after TPT
+                      Probability distribution of the augmented images before TPT                                            Probability distribution of the augmented images after TPT
+
+
+
+
+Augmented Samples                                                                         Augmented Samples
+
+
+
+
+                    groudtruth                                                                                        groudtruth
+                                            Class Index                                                                                                Class Index
+
+
+
+
+                                                                                      accordion                                               harmonica
+                                                                                     harmonica                                                 accordion
+                                                                                            harp                                                   harp
+                                                                                    grand piano                                              grand piano
+                                                                                            flute                                                  flute
+                                                                                                        0.0        0.2           0.4                       0.0      0.2         0.4
+                                                                                                               Prediction before TPT                             Prediction after TPT
+                      Probability distribution of the augmented images before TPT                                            Probability distribution of the augmented images after TPT
+
+
+
+
+Augmented Samples                                                                          Augmented Samples
+
+
+
+
+                                                               groudtruth                                                                                                             groudtruth
+                                            Class Index                                                                                                Class Index
+
+
+
+
+                                                                                     birdhouse                                                porcupine
+                                                                                     porcupine                                                birdhouse
+                                                                                             hen                                                    hen
+                                                                                        toucan                                                   toucan
+                                                                                       peafowl                                                  goldfish
+                                                                                                       0.0             0.2             0.4             0.0       0.2      0.4       0.6
+                                                                                                               Prediction before TPT                             Prediction after TPT
+                      Probability distribution of the augmented images before TPT                                            Probability distribution of the augmented images after TPT
+
+
+
+
+Augmented Samples                                                                         Augmented Samples
+
+
+
+
+                                            groudtruth                                                                                                 groudtruth
+                                            Class Index                                                                                                Class Index
+
+
+
+
+                                                                                    20
+

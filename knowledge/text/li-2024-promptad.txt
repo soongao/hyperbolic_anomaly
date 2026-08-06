@@ -1,0 +1,1182 @@
+                                                          PromptAD: Learning Prompts with only Normal Samples for
+                                                                       Few-Shot Anomaly Detection
+
+                                          Xiaofan Li1 , Zhizhong Zhang1 , Xin Tan1,2,†, Chengwei Chen2 , Yanyun Qu3 , Yuan Xie1,2 , Lizhuang Ma1
+                                                                     1
+                                                                       East China Normal University, Shanghai, China
+                                                         2
+                                                           Chongqing Institute of East China Normal University, Chongqing, China
+                                                                 3
+                                                                   The Navy Military Medical University, Shanghai, China
+
+
+
+
+arXiv:2404.05231v2 [cs.CV] 16 Jul 2024
+                                                                             4
+                                                                               Xiamen University, Fujian, China
+                                                              {funzi}@stu.ecnu.edu.cn, {zzzhang, xtan, yxie, lzma}@cs.ecnu.edu.cn
+                                                                                {timchen}91@aliyun.com, {yyqu}@xmu.edu.cn
+
+
+
+                                                                     Abstract                               Sample (class1)    Sample (class2)
+                                                                                                                                                 Sample (classn)
+                                                                                                                                               ...
+
+
+                                             The vision-language model has brought great improve-                                       ...      Prompt (classn)
+                                         ment to few-shot industrial anomaly detection, which usu-         Prompt (class1) Prompt (class )
+                                                                                                                                        2
+
+
+                                         ally needs to design of hundreds of prompts through prompt          a. Prompt learning in many-class setting
+
+                                         engineering. For automated scenarios, we first use con-             Sample (normal)
+
+                                                                                                                                          Prompt (anomalyn)
+                                         ventional prompt learning with many-class paradigm as the
+                                         baseline to automatically learn prompts but found that it                                       ...
+                                                                                                                                     Prompt (normal)
+                                         can not work well in one-class anomaly detection. To ad-          Prompt (anomaly1)
+
+                                         dress the above problem, this paper proposes a one-class             b. Prompt learning in one-class setting
+
+                                         prompt learning method for few-shot anomaly detection,
+                                                                                                         Figure 1. Left: Prompt learning under many-class and one-class
+                                         termed PromptAD. First, we propose semantic concatena-
+                                                                                                         settings. Right: The prompt-guided results of WinCLIP using
+                                         tion which can transpose normal prompts into anomaly
+                                                                                                         different numbers of prompts, and the prompt-guided results of the
+                                         prompts by concatenating normal prompts with anomaly            baseline and our PromptAD under one-shot for prompt learning.
+                                         suffixes, thus constructing a large number of negative sam-     All results are on the MVTec.
+                                         ples used to guide prompt learning in one-class setting.
+                                         Furthermore, to mitigate the training challenge caused by
+                                                                                                         [41] setting. In this framework, only normal samples are
+                                         the absence of anomaly images, we introduce the con-
+                                                                                                         available during training, but in the testing phase, the model
+                                         cept of explicit anomaly margin, which is used to explic-
+                                                                                                         is expected to identify anomalous samples. Since industrial
+                                         itly control the margin between normal prompt features
+                                                                                                         anomaly detection typically customizes a model for various
+                                         and anomaly prompt features through a hyper-parameter.
+                                                                                                         industrial production lines, the ability to rapidly train mod-
+                                         For image-level/pixel-level anomaly detection, PromptAD
+                                                                                                         els with few samples holds significant promise for practical
+                                         achieves first place in 11/12 few-shot settings on MVTec
+                                                                                                         applications.
+                                         and VisA. Code is available at https://github.com/FuNz-
+                                                                                                             Due to the strong zero-shot ability of the foundation
+                                         0/PromptAD.git
+                                                                                                         models [27, 36, 38], WinCLIP [21] was proposed as the first
+                                                                                                         work utilizing the vision-language foundation model (i.e.,
+                                                                                                         CLIP [37]) to enhance the model’s anomaly detection per-
+                                         1. Introduction                                                 formance in few-shot settings. To better leverage prompt
+                                         Anomaly detection (AD) [4, 39, 52] is a critical task in com-   guidance, WinCLIP introduces a prompt engineer strat-
+                                         puter vision [26, 29, 32, 33], with widespread applications     egy called “Prompt Ensemble” which combines a sufficient
+                                         of defect detection in industry and medicine. This paper fo-    number of manually-designed prompts. For example, some
+                                         cuses on unsupervised industrial anomaly detection, which       manual prompts (e.g., a cropped photo of a [],
+                                         poses a challenge known as a one-class classification (OCC)     a blurry photo of the [], etc.) are combined to-
+                                                                                                         gether as the normal prompts. As shown in Figure 1 (right),
+                                           † Corresponding author.                                       with the number of prompts increasing, WinCLIP’s perfor-
+mance improves, reaching a saturation point at around 1000             vantages, it can be seen that (compared with the WinCLIP
+prompts. Other methods like SAA+ [7] and AnoVL [13]                    [21] and Baseline [59]) PromptAD achieves 91.3%(↑1.2%
+also employ prompt engineering to enhance model perfor-                and ↑9.8%)/92.5%(↑7.7% and ↑3.7%) image-level/pixel-
+mance, which has become a rite of prompt-guided anomaly                level anomaly detection results with only 10∼20 (↓ ∼980
+detection. Prompt engineering involves human intervention              and ↓ 0) prompts.
+and requires careful design, which does not meet the au-                  To summarize, the main contributions of this paper are:
+tomation requirements of industrial scenarios.                         • We explore the feasibility of prompt learning in one-class
+    As illustrated in Fig.1 (left a.), prompt learning [59] aims         anomaly detection, and propose a one-class prompt learn-
+to automatically learn prompts through contrastive learn-                ing method termed PromptAD, which thoroughly beats
+ing [8, 18] for guiding image classification. The idea of                conventional many-class prompt learning.
+prompt learning for anomaly detection is intriguing. How-              • Semantic concatenation (SC) is proposed, which can
+ever, as shown in Figure 1 (right), due to the one-class set-            transpose the semantics of normal prompts by concatenat-
+ting of anomaly detection, using the above prompt learn-                 ing anomaly suffixes, so as to construct enough negative
+ing paradigm [59] as the baseline does not work well and                 prompts for normal samples.
+is inferior to WinCLIP [21] with manual prompts on the                 • Explicit anomaly margin (EAM) is proposed, which can
+image-level result. The main challenges are as follows: 1)               explicitly control the distance between normal prompt
+prompt learning relies on contrastive learning, how to de-               features and anomaly prompt features through a hyper-
+sign prompts to complete the contrastive learning in the                 parameter.
+one-class setting? 2) With the absence of anomaly sam-                 • For image-level/pixel-level anomaly detection, Promp-
+ples, how to control the marginal distance between normal                tAD achieves first place in 11/12 few-shot settings on
+prompts and anomaly prompts?                                             MVTec [4] and VisA [61].
+    In this paper, we propose the one-class prompt learning
+with only normal samples for AD termed PromptAD. To                    2. Related Work
+solve the first challenge above, we propose semantic con-
+catenation (SC). Intuitively, concatenating a prompt with              Vision-Language Model. Leveraging contrastive learning
+antisense texts can transpose its semantics. According to              [8, 18] and vision transformer [61], some vision-language
+this idea, as illustrated in Figure 1 (left b.), SC first designs      models (VLM) [2, 23, 27, 37] have recently achieved great
+a learnable normal prompt such as [P1 ][P2 ] . . . [PEN ][obj.]        success. CLIP is one of the most commonly used VLMs,
+for normal samples, and then manually concatenate var-                 which is trained on web-scale image-text and shows strong
+ious texts related to anomalies with the normal prompt                 zero-shot classification ability. The code of CLIP for
+such as [P1 ][P2 ] . . . [PEN ][obj.][with][f law] which is con-       LAION-400M [43] and LAION-5B [44] scale pre-training
+verted into an anomaly prompt and can be used as a neg-                is open-scoured by OpenCLIP [20]. With the pre-trained
+ative prompt of normal sample during prompt learning.                  CLIP and prompt engineer, huge leaps were made for some
+Due to the manually annotated anomalous texts are very                 downstream tasks [9, 28, 51, 60]. Influenced by the success
+limited. To expand the richness of anomaly information,                of prompt learning [24, 46] in Natural Language Processing
+SC also designs learnable anomaly prompts by concatenat-               (NLP), there has been a surge of prompt learning methods
+ing a suffix of learnable tokens with a normal prompt, for             [15, 50, 58, 59] in recent times for few-shot image classifi-
+instance [P1 ][P2 ] . . . [PEN ][obj.][A1 ][A2 ] . . . [AEA ], where   cation tasks. These methods aim to automatically learn bet-
+[Ai ] is learnable token. The distribution of learnable                ter prompts through contrastive learning [8, 18] for guiding
+anomaly prompts and manual anomaly prompts are aligned                 image classification based on CLIP.
+to ensure that the learnable anomaly prompts learn more                Anomaly Detection. Most of the AD methods mainly
+correct anomaly information.                                           focus on three paradigms: feature embedding paradigm,
+    Furthermore, in anomaly detection, anomaly samples                 knowledge distillation paradigm, and reconstruction-based
+are unavailable, making it impossible to explicitly con-               paradigm. The feature embedding paradigm [1, 11, 12,
+trol the margin between normal and anomaly prompt fea-                 34, 35, 39, 40, 53] extracts the patch features of the im-
+tures through contrastive loss. To address the second chal-            age through the neural network and then performs anomaly
+lenge, we propose the concept of Explicit Anomaly Mar-                 detection,. The knowledge distillation paradigm [3, 16, 42,
+gin (EAM), where a hyper-parameter is introduced to en-                49, 49, 56] lets the student network only learn the knowl-
+sure that the distance between normal features and nor-                edge of the normal samples of the teacher network, and
+mal prompt features is smaller than the distance between               complete anomaly detection through the difference between
+normal features and anomaly prompt features. Thus en-                  the teacher and the student. The reconstruction paradigm
+suring a sufficient margin between normal prompts and                  [17, 54, 55] hopes that the model can reconstruct the
+anomaly prompts. Figure 1 (right) illustrates our great ad-            anomaly image into a normal image, and realize anomaly
+                            Frozen parameters                                 Normal visual memory
+
+                            VIT Layer           VIT Layer           VIT Layer
+                                                                                               ...                  VIT Layer                  VIT Layer        VIT Layer
+
+
+
+      K-shot
+   normal images
+                   Semantic Concatenation (SC)                                                           Explicit Anomaly Margin (EAM)
+          Normal prompt (NP)
+                                                                                                                                           Normal prompt
+     N×     Normal prefix   +   obj.                                                                                                         prototype
+
+
+
+
+                                                                            Text Encoder
+          Manual abnormal prompt (MAP)                                                                       Normal prompt
+                                                                                                                              Anomaly prompt
+ (N×M)×     Normal prefix   +   obj.   +    Manual anomaly suffix                                               features
+                                                                                                                                 prototype
+                                                                                                                                                           Normal feature map
+          Learnable abnormal prompt (LAP)
+                                                                                                                                       Normal visual
+ (N×L)×    Normal prefix    +   obj.   + Learnable anomaly suffix                                                                         feature
+                                                                                                             Anomaly prompt
+                                                                                           Prompt features                                                 Normal CLS feature
+   + Concatenate                Frozen tokens            Learnable tokens
+                                                                                                                features           Explicit margin
+
+
+
+Figure 2. Illustration of PromptAD, which includes two novel modules: SC and EAM. The visual encoder has been transformed with v-v
+attention. The original branch is used to extract CLS feature, while the v-v attention branch is used to extract the feature map.
+
+detection by the difference between the reconstructed im-                                   aiming to automatically learn efficient prompts for CLIP.
+age and the anomaly image.                                                                  Specifically, the prompt used in CoOp is not the frozen text
+                                                                                            description, but a set of trainable parameters:
+Few-Shot Anomaly Detection. TDG [45] and RegAD [19]
+are the first to explore few-shot anomaly detection methods,                                                    sk = [P1 ][P2 ] . . . [PEP ][classk ],                          (2)
+and PatchCore [39] and DifferNet [40] also demonstrated
+the performance in few-shot settings. WinCLIP [21] and                                      where [P1 ][P2 ] . . . [PEP ] are trainable tokens and [classk ]
+RWDA [47] introduce the CLIP model to anomaly detec-                                        is k-th class name which is not trainable. Prompt learn-
+tion and greatly improve the performance in the few-shot                                    ing aims to automatically train effective prompts to improve
+setting. The latest FastRecon [14] reconstructs anomaly                                     CLIP performance on downstream classification tasks.
+features by regression with distribution regularization and
+achieves excellent performance.                                                             3.2. CLIP Surgery
+
+3. Preliminaries                                                                            As a classification model, CLIP is far less adaptive in
+                                                                                            prompt-guided image localization tasks without fine-tuning.
+3.1. CLIP and Prompt Learning                                                               To find out why CLIP fails to image localization tasks,
+                                                                                            some CLIP explainable works [31, 57] analyze the mech-
+Contrastive Language Image Pre-training termed CLIP
+                                                                                            anism that how CLIP extracts visual features. These works
+[37] is a large-scale vision-language model which is famous
+                                                                                            observed that the global feature extraction of Q-K self-
+for its zero-shot classification ability. Specifically, giving
+                                                                                            attention [48] affects the localization ability of CLIP, which
+an unknown image i, and K text-prompts {s1 , s2 , ..., sK },
+                                                                                            is as follows:
+CLIP can predict the distribution of i belonging to these K
+text-prompts:
+                                                                                                 Attn(Q, K, V) = sof tmax(Q · KT · scale) · V.                                  (3)
+                            exp < f (i), g(sy )/τ >
+             p(y|i) = PK                                      ,          (1)                To this end, CLIP-Surgery [31] proposes a V-V attention
+                            i=1 exp < f (i), g(si )/τ >                                     mechanism to enhance the model’s attention to local fea-
+where f (·) and g(·) are visual and text encoder respec-                                    tures without destroying the original structure. As shown
+tively. < ·, · > represents cosine similarity, τ is the tem-                                in Figure 2, the feature extraction process is described as
+perature hyper-parameter. The initial text prompt used                                      follows:
+for CLIP zero-shot classification is still simple, such as                                                  Zl−1
+                                                                                                              ori = [tcls ; t1 ; t2 , ...; tT ],    (4)
+a photo of [class], etc., slightly better than di-
+rectly using the name of the class as the prompt.                                                                   Zl−1 = [t′cls ; t′1 ; t′2 , ...; t′T ],                     (5)
+Prompt Learning. Inspired by the success of prompt learn-                                                    [Ql , Kl , Vl ] = QKV P roj.l (Zl−1                                (6)
+                                                                                                                                             ori ),
+ing in natural language processing (NLP) [24, 46], CoOp
+[59] introduces this paradigm into few-shot classification,                                             Zl = P roj.l (Attn(Vl , Vl , Vl )) + Zl−1 ,                             (7)
+where Zl−1ori denotes the (l − 1)-th layer output of the origi-   by concatenating. For example, a photo of cable
+nal CLIP visual encoder and Z(l−1) denotes the local-aware        has normal semantics, and after concatenating it with a
+output of layer l − 1, QKV P roj.l and P roj l denote the         suffix, a photo of cable with flaw is converted
+QKV projection and output projection whose parameters             into anomaly semantics. In this way, we propose seman-
+are initialized by the visual encoder parameters of the origi-    tic concatenation (SC) which can transpose normal prompts
+nal CLIP. The final original outputs and local-aware outputs      to anomaly prompts by concatenating normal prompts with
+are Zori and Z, the CLS feature Zori [0] ∈ Rd is used for         anomaly suffixes, so as to construct sufficient contrast
+image-level anomaly detection and the local feature map           prompts based on learnable normal prompts. Specifically,
+Z[1 :] ∈ RT ×d is used for pixel-level anomaly detection.         following the format of CoOp [59], the learnable normal
+In this paper, we use modified CLIP as the backbone and           prompt (NP) is designed as follows:
+term it VV-CLIP.
+                                                                                  sn = [P1 ][P2 ] . . . [PEN ][obj.],                (9)
+4. Methodology                                                    where EN denotes the length of the learnable normal pre-
+                                                                  fix and [obj.] represents the name of the object being de-
+4.1. Overview                                                     tected. The learnable normal prompt can be transposed to
+An overview of our proposed PromptAD is illustrated in            an anomaly prompt after concatenating with the anomaly
+Figure 2. PromptAD is built on VV-CLIP whose visual               suffixes. In particular, we generated anomaly suffixes
+encoder is used to extract global and local features. The         from the anomaly labels of the datasets [4, 61], such as
+proposed semantic concatenation (SC) is used to design            [] with color stain, [] with crack, etc., and
+prompts. Specifically, N learnable normal prefixes and            then concatenate these texts with the NP to obtain the man-
+the objective name are concatenated to get normal prompts         ual anomaly prompt (MAP):
+(NPs), then N normal prompts are concatenated with M
+                                                                    sm = [P1 ][P2 ] . . . [PEN ][obj.][with][color][stain], (10)
+manual anomaly suffixes and L learnable anomaly suffixes
+respectively to obtain N × M manual anomaly prompts               where the prefix is a trainable NP and the suffix is a manual
+(MAPs) and N × L learnable anomaly prompts (LAPs).                anomaly text. In addition, we combine NP with a learnable
+The visual features and prompt features are used to com-          token suffix to design the learnable anomaly prompt (LAP):
+plete prompt learning by contrastive loss and the proposed
+                                                                        sl = [P1 ][P2 ] . . . [PEN ][obj.][A1 ] . . . [AEA ],       (11)
+explicit anomaly margin (EMA) loss. EMA can control
+the explicit margin between the normal prompt features and        where EA denotes the length of learnable anomaly suf-
+anomaly prompt features through a hyper-parameter. Fi-            fix. It should be noted that the parameters of prompts con-
+nally, the prompts obtained by prompt learning are used for       catenated by the same normal prefix or anomaly suffix are
+prompt-guided anomaly detection (PAD).                            shared. During training, NPs move close to normal visual
+   In addition to PAD, referring to WinCLIP+ [21], we also        features, while MAPs and LAPs move away from normal
+introduce vision-guided anomaly detection (VAD). Specif-          visual features. The training loss for prompt learning is con-
+ically, as shown in Figure 2, during training, the i-th layer     sistent with the CLIP training loss as follows:
+features (without CLS feature) output by the visual encoder                                                                     
+are stored as normal visual memory which is denoted as R.                                                      n
+                                                                                                   exp(<z,  w̄   /τ >)
+In the testing phase, the ith layer feature map F ∈ Rh×w×d        Lclip = Ez −log                                               ,
+                                                                                     exp < z, w̄n /τ > +
+                                                                                                             P
+                                                                                                                  exp < z, w/τ >
+of a query image is compared with R to obtain the anomaly                                                       w∈W
+score map M ∈ [1, 0]h×w :                                                                                               (12)
+                                                                                                                         PN        n
+                                                                                                                   n        i=1 g(si )
+                                                                  where z denotes normal visual feature, w̄ =       N     is
+                        1                                         the prototype of normal prompt features, W = {g(s)|s ∈
+              Mij = min (1− < Fij , r >).                  (8)
+                    r∈R 2                                         MAPs ∪ LAPs} is a set containing all anomaly prompt fea-
+In practice, we use the intermediate features of two lay-         tures. Since more negative samples can produce a better
+ers as memory to get two score maps for each query image          contrastive learning effect [18], each anomaly prompt fea-
+and then average the two score maps to get the final vision-      ture is compared with the visual feature.
+guided score map Mv .                                             Remark. In the one-class anomaly detection, conventional
+                                                                  prompt learning can only design learnable normal prompts,
+4.2. Semantic Concatenation
+                                                                  which is not conducive to the effect of contrastive loss. The
+Only normal samples are obtainable during anomaly de-             proposed semantic concatenation can transform the seman-
+tection training, which leads to no negative samples for          tics of normal prompts into anomaly semantics with shared
+guiding prompt learning and thus impairs its effect. We           parameters, which can make normal samples contrast with
+found that the semantics of prompts can be changed                the semantic transposes (anomaly prompts).
+4.3. Explicit Anomaly Margin                                       maximum value of Mv and St are fused to obtain the image-
+                                                                   level anomaly score:
+Due to the lack of anomaly visual samples in the training,
+the MAPs and LAPs can only take normal visual features                            Mpix = 1.0/(1.0/Mv + 1.0/Mt ),             (17)
+as negative samples for contrast and lack an explicit mar-
+gin between the normal and anomaly prompts. Therefore,                          Simg = 1.0/(1.0/ max Mv + 1.0/St ),          (18)
+                                                                                                     ij
+we propose the explicit anomaly margin (EAM) for AD
+prompt learning, which can control the margin between nor-          where the fusion method we use is harmonic mean, which
+mal prompt features and anomaly prompt features. EAM                is more sensitive to smaller values [21].
+is actually a regularization loss implemented via a margin
+hyper-parameter, which is defined as:                               5. Experiments
+                                    w̄n                   w̄a       We complete the comparison experiments between Promp-
+                                                               
+                             z                      z
+Lema = Ez max 0, d(              ,   n   ) −  d(        ,  a   ) , tAD and the latest methods under 1, 2, and 4-shot set-
+                           ∥z∥2 ∥w̄ ∥2           ∥z∥2 ∥w̄ ∥2
+                                                            (13)    tings, which include both image-level and pixel-level re-
+where d(·, ·) represents euclidean distance, and w̄a is the         sults. In addition, we also compare the many-shot and full-
+prototype of all anomaly prompt features:                           shot methods to show the powerful few-shot performance
+                   PN ×M              PN ×L                         of PromptAD. Finally, we conduct ablation experiments to
+               a     i=1   g(sm i )+    i=1 g(si )
+                                                  l
+                                                            (14)    verify the improvement of prompt learning by the proposed
+            w̄ =                                      .
+                         N ×M +N ×L                                 SC and EAM, and show the impact of different CLIP trans-
+                                                                    formation methods [31, 57] and hyper-parameters.
+In CLIP, the final features are all projected onto the unit
+hyper-sphere, thus the features in Lema are also normalized,        Dataset. In this paper, the benchmarks we use are MVTec
+and the margin is fixed to zero. Compared to contrastive            [4] and VisA [61]. Both benchmarks contain multiple sub-
+loss (Lclip ), EMA loss guarantees a larger distance between        sets with only one object per subset. MVTec contains 15
+normal samples and the anomaly prototype than between               objects with 7002 − 9002 pixels per image, and VisA con-
+normal samples and the normal prototype, resulting in an            tains 12 objects with roughly 1.5K × 1K pixels per image.
+explicit discrimination between normal and anomaly proto-           Anomaly detection is a one-class task, so the training set
+types.                                                              contains only normal samples, while the test set contains
+   In addition, since MAPs contain sufficient anomaly in-           normal samples and anomaly samples with image-level and
+formation while LAPs are initialized without any semantic           pixel-level annotations. In addition, the anomaly category
+guidance, aligning them helps LAPs to mimic the distribu-           present for each object is also annotated.
+tion of MAPs. Specifically, we align the means of the two
+                                                                    Evaluation metrics. We follow the literature [4] in report-
+distributions using the squared l2 norm:
+                                                                    ing the Area Under the Receiver Operation Characteristic
+                                                 2                  (AUROC) for both image-level and pixel-level anomaly de-
+                               w̄m        w̄l
+              Lalign = λ ·       m   −     l
+                                                    ,       (15)    tection.
+                            ∥w̄ ∥2      ∥w̄ ∥2 2
+                                                                    Implementation details. We used the OpenCLIP [20] im-
+where w̄m and w̄l are the feature means of MAPs and                 plementation of CLIP and its pre-trained parameters, in ad-
+LAPs, respectively, and λ is a hyper-parameter controlling          dition to the default values of the hyper-parameter τ . Refer-
+the alignment degree of MAPs and LAPs.                              ring to WinCLIP [21], we used LAION-400M [43] based
+4.4. Anomaly Detection                                              CLIP with ViT-B/16+.
+
+In the testing phase, w̄n is used as the normal prototype and      5.1. Image-level Comparison Results
+w̄a is used as the anomaly prototype to complete prompt-           The Image-level comparative experimental results of
+guided anomaly detection. The image-level score St ∈               PromptAD and current methods are recorded in Table 1,
+[0, 1] and pixel-level score map Mt ∈ [0, 1]h×w are cal-           where SPADE [11], PaDiM [12], and PatchCore [39] are
+culated through:                                                   the reformulations of traditional full-shot methods in the
+                        exp < zt , w̄n /τ >                        few-shot settings. It can be seen that the Image-level AD
+  score =                                            ,   (16)      performance of these methods is very limited. Both Win-
+            exp < zt , w̄n /τ > +exp < zt , w̄a /τ >
+                                                                   CLIP+ [21] and RWDA [47] introduce CLIP [37], which
+where zt is a global/local image feature for image-                greatly improves the performance of Image-level AD un-
+level/pixel-level anomaly detection.                               der few-shot settings. Compared with the above methods,
+   Finally, vision-guided Mv and prompt-guided Mt are              PromptAD achieves significant improvement in three set-
+fused to obtain the pixel-level anomaly score map, and the         tings of the two benchmarks. Compared with WinCLIP+
+                                                                        MVTec                                                VisA
+      Method                    Public
+                                                      1-shot             2-shot             4-shot        1-shot             2-shot            4-shot
+      SPADE [11]                arXiv’2020           81.0±2.0           82.9±2.6           84.8±2.5      79.5±4.0           80.7±5.0       81.7±3.4
+      PaDiM [12]                ICPR’2020            76.6±3.1           78.9±3.1           80.4±2.4      62.8±5.4           67.4±5.1       72.8±2.9
+      PatchCore [39]            CVPR’2022            83.4±3.0           86.3±3.3           88.8±2.6      79.9±2.9           81.6±4.0       85.3±2.1
+      WinCLIP+†[21]             CVPR’2023            93.1±2.0           94.4±1.3           95.2±1.3      83.8±4.0           84.6±2.4       87.3±1.8
+      RWDA†[47]                 BMVC’2023            93.3±0.5           94.0±0.7           94.5±0.7      83.4±1.7           85.6±1.4       86.6±0.9
+      FastRcon [14]             ICCV’2023                -                91.0               94.2            -                  -              -
+      PromptAD†                      -               94.6±1.7           95.7±1.5           96.6±0.9      86.9±2.3           88.3±2.0       89.1±1.7
+
+Table 1. Comparison of image-level anomaly detection in AUROC on MVTec and VisA benchmarks. The best and second-best results are
+respectively marked in bold and underlined. † indicates CLIP-based methods.
+
+       Method          Public            Setting     image      pixel                       PAD                        MVTec                  VisA
+                                                                                                         VAD
+    PromptAD           -                  1-shot      94.6      95.9                  SC        EAM                 image     pixel    image         pixel
+    PromptAD           -                  4-shot      96.6      96.5                   ✗             ✗   ✗          81.5      87.8     72.6          85.5
+    DiffNet [40]       WACV’2021         16-shot      87.3       -                     ✓             ✗   ✗          90.4      91.7     81.3          90.5
+    TDG [45]           ICCV’2021         10-shot      78.0       -                     ✓             ✓   ✗          91.3      92.5     83.2          91.8
+    RegAD [19]         ECCV2022           8-shot      91.2      96.7                   ✗             ✗   ✓          85.1      93.2     82.7          95.2
+    FastRecon [14]     ICCV’2023          8-shot      95.2      97.3                   ✓             ✓   ✓          94.6      95.9     86.9          96.7
+    MKD [42]           CVPR’2021         full-shot    87.8      90.7
+    P-SVDD [53]        ACCV’2021         full-shot    95.2      96.0               Table 3. Image-level/pixel-level results (AUROC) of ablation
+    PatchCore [39]     CVPR’2022         full-shot    99.1      98.1               study under 1-shot setting. PAD and VAD are prompt-guided
+    SimpleNet [34]     CVPR’2023         full-shot    99.6      98.1
+                                                                                   and vision-guided anomaly detection, respectively, SC is semantic
+                                                                                   concatenation, and EAM is explicit anomaly margin.
+Table 2. Comparison with exiting many-shot methods in AUROC
+(image and pixel level) on MVTec. Results below our 1-shot are
+marked in red, and those below our 4-shot are marked in blue.                      shot settings are recorded. It can be seen that compared
+                                                                                   with some methods under many-shot settings, PromptAD
+and RWDA, PromptAD achieves 1.3%, 1.3%, and 1.4%                                   achieves better image-level results, and the pixel-level re-
+(2.9%, 2.7%, 1.8%) improvement under the 1, 2, and 4-                              sults are also competitive, which fully verifies the strong
+shot Settings of MVTec (and VisA), respectively. In ad-                            ability of PromptAD in the few-shot settings. In addition,
+dition, PromptAD uses a smaller number of prompts than                             PromptAD is superior to the early full-shot AD methods,
+WinCLIP+ and RWDA.                                                                 MKD [42] and P-SVDD [53], but there is still a certain gap
+                                                                                   between PromptAD and the latest full-shot AD methods,
+5.2. Pixel-level Comparison Results                                                PatchCore [39] and SimpleNet [34].
+The pixel-level comparative experimental results are
+recorded in Table 4. It can be seen that the CLIP-based                            5.4. Ablation Study
+method (WinCLIP+ [21]) and other methods perform com-
+                                                                                   We verify the impact of different modules of different pro-
+parably on pixel-level AD, and the improvement brought
+                                                                                   posed methods on the overall performance of PromptAD
+by the introduction of CLIP [37] is not as obvious as that
+                                                                                   under 1-shot setting on MVTec [4] and VisA [61]. These
+on image-level AD. PromptAD achieves the best place on
+                                                                                   include semantic concatenation (SC) and explicit anomaly
+MVTec/VisA in the 1-shot and 2-shot settings, which are
+                                                                                   margin (EMA). Meanwhile, we also verified the effect of
+0.7%/0.3% and 0.2%/0.3% higher than WinCLIP+, respec-
+                                                                                   vision-guided anomaly detection (VAD). Results of the ab-
+tively. In the 4-shot setting, while PromptAD ranks first
+                                                                                   lation study are recorded in Table 3.
+on VisA, it takes second place on MVTec, narrowly outper-
+formed by FastRecon [14] with a 0.5% margin.                                       Semantic Concatenation (SC). The number of negative
+   The quantitative results of anomaly localization are                            samples plays a crucial role in contrastive learning [8, 18].
+shown in Figure 3. Compared with PatchCore [39] and                                Without the proposed SC, the conventional prompt learn-
+WinCLIP+ [21], PromptAD has a better anomaly localiza-                             ing paradigm [59] loses negative prompts for contrast, so
+tion capability for both objects and textures in the 1-shot                        the effect of prompt learning will be greatly reduced. As
+setting. In addition, PromptAD can also locate some very                           shown in Table 3, there is a significant drop in image and
+small anomaly areas very accurately.                                               pixel level results on both MVTec [4] and VisA [61] when
+                                                                                   SC is not used. After using SC, the image-level/pixel-level
+5.3. Compared With Many-shot Methods
+                                                                                   results on MVTec (and VisA) are improved by 8.9%/3.9%
+In Table 2, the comparison results of PromptAD under                               (8.9%/5.0%), which indicates that SC can greatly improve
+few-shot settings with other methods under many-shot/full-                         the applicability of prompt learning in anomaly detection.
+        Image            GT        PatchCore       WinCLIP      PromptAD                   Image          GT           PatchCore      WinCLIP   PromptAD
+
+
+                                                                           Cashew
+Cable
+
+
+
+
+                                                                           Chewing Gum
+Grid
+
+
+
+
+Wood                                                                       PCB3
+
+
+                              (a) MVTec (1-shot)                                                                (b) VisA (1-shot)
+                 Figure 3. Qualitative comparison results of 1-shot pixel-level anomaly detection on MVTec [4] and VisA [61].
+
+                                                                     MVTec                                                          VisA
+        Method                   Public
+                                                      1-shot          2-shot                    4-shot          1-shot              2-shot       4-shot
+        SPADE [11]               arXiv’2020          91.2±0.4        92.0±0.3                  92.7±0.3        95.6±0.4            96.2±0.4     96.6±0.3
+        PaDiM [12]               ICPR’2020           89.3±0.9        91.3±0.7                  92.6±0.7        89.9±0.8            92.0±0.7     93.2±0.5
+        PatchCore [39]           CVPR’2022           92.0±1.0        93.3±0.6                  94.3±0.5        95.4±0.6            96.1±0.5     96.8±0.3
+        WinCLIP+† [21]           CVPR’2023           95.2±0.5        96.0±0.3                  96.2±0.3        96.4±0.4            96.8±0.3     97.2±0.2
+        FastRecon [14]           ICCV’2023               -             95.9                      97.0              -                   -            -
+        PromptAD†                     -              95.9±0.5        96.2±0.3                  96.5±0.2        96.7±0.4            97.1±0.3     97.4±0.3
+
+Table 4. Comparison of pixel-level anomaly detection in AUROC on MVTec and VisA benchmarks. The best and second-best results are
+respectively marked in bold and underlined. † indicates CLIP-based methods.
+
+Explicit Anomaly Margin (EAM). Since anomaly sam-                                               Method                              MVTec        VisA
+ples are absent during the training phase, it is hard to estab-                                 CLIP [37]                            22.5         24.6
+lish an explicit margin between the features of normal and                                      CLIP [37] + ours                     79.9         80.4
+                                                                                                CLIP+Linear [10] + ours              79.4         77.2
+anomaly prompts. EAM uses a hyper-parameter to control
+                                                                                                MaskCLIP [57]                        85.5         80.5
+the margin between normal and anomaly prompt features,                                          MaskCLIP [57] + ours                 91.6         91.2
+which can make up for the lack of contrastive loss. Table                                       VV-CLIP [31]                         86.7         82.9
+3 shows that after using EAM, the image-level/pixel-level                                       VV-CLIP [31] + ours                  92.5         91.8
+results on MVTec (and VisA) are improved by 0.9%/0.8%
+(1.9%/0.7%), respectively.                                                               Table 5. Pixel-level results (AUROC) of using different CLIP
+                                                                                         transformations on MVTec and VisA under 0-shot/1-shot settings.
+Vision-guided Anomaly Detection (VAD). PAD intro-
+duces more high-level semantic information but ignores
+                                                                                         anomaly detection, where about 1000 prompts are used in
+many local details, which is not conducive to pixel-level
+                                                                                         0-shot setting and our prompt learning method is used in 1-
+anomaly detection. On the contrary, VAD using normal
+                                                                                         shot setting. MaskCLIP [57] drops the QKV attention and
+feature memory focuses on more local detail information.
+                                                                                         leaves only V P roj. and P roj., and then embed local fea-
+In Table 3, PAD has better image-level results, while VAD
+                                                                                         tures after each layer of the visual encoder as in VV-CLIP.
+has better pixel-level results, and the two have a good com-
+                                                                                         CLIP+Linear [10] adds a learnable linear layer to the vi-
+plementarity. Under the 1-shot setting, the results of PAD
+                                                                                         sual encoder after each block to align the local features with
+and VAD are fused by harmonic mean, and 94.6%/95.9%
+                                                                                         prompt features.
+(86.8%/96.7%) image-level/pixel-level results are achieved
+on MVTec (and VisA).                                                                        As shown in Table 5, the results of the original CLIP
+                                                                                         under 0-shot are 22.5%/24.6% on MVTec/Visa, which is
+5.5. Results of Different CLIP Transformations                                           lower than the random prediction (50.0%). This is caused
+                                                                                         by the opposite visual activation [30, 31] of CLIP. After the
+Due to the inability of CLIP to directly complete prompt-                                transformation of attention, MaskCLIP [57] and VV-CLIP
+guided localization tasks, some works have explored the                                  [31] achieve a huge improvement of 63.0%/55.9% and
+transformations of CLIP [31, 57]. Table 5 records the re-                                64.2%/58.3% on MVTec/Visa, respectively. The improve-
+sults of different CLIP transformations under pixel-level                                ment of VV-CLIP is more obvious than that of MaskCLIP.
+                                                                                                                                                                           , P D J H  O H Y H O  I H D W X U H V                                 3 L [ H O  O H Y H O  I H D W X U H V
+                                                                                                                                                                                                                                 15
+                                                             88                                                                  97.0                      30
+                                                                                                                                                                                                                                 10
+
+
+                                                                   $ 8 5 2 &                                                      $ 8 5 2 &   
+                                                            87                                                                  96.5                       20                                                                    5
+                                                            86                                                                  96.0                       10                                                                    0
+                                                            85                                                                  95.5                        0
+                                                                                                                                                                                                                                  5
+                                                            84                                                                  95.0                                                                                             10
+                                                        4                                                                   4                              10                                                                    15
+                         3                                                                                 3                                                                                             NP text feature                   NP text feature
+      1 2              2 L                                                             1 2               2 L                                               20                                            MAP text feature
+                                                                                                                                                                                                         LAP text feature
+                                                                                                                                                                                                                                 20        MAP text feature
+                                                                                                                                                                                                                                           LAP text feature
+             3 4 1                                                                            3 4 1                                                        30                                            Normal visual feature   25        Normal visual feature
+          N                                                                               N                                                                     30   20        10        0        10        20       30               20          10          0          10           20     30
+       (a) Image-level results.                                                         (b) Pixel-level results.
+Figure 4. Image-level/pixel-level results on VisA [61] in 1-shot                                                                                       Figure 6. Feature visualization results using T-SNE in 1-shot set-
+setting using different N and L.                                                                                                                       ting. The feature used is “cable” from the MVTec [4].
+
+                                                 S L [ H O  O H Y H O                       L P D J H  O H Y H O                                     5.7. Visualization Results
+                                
+
+                                
+                                                                                                                                                       To quantify the effect of PromptAD, we visualize the visual
+          $ 8 5 2 &   
+                                
+                                                                                                                                                       and textual features after L2 normalization. Specifically, we
+                                
+                                                                                                                                                       visualize 3 NPs, 3×13 MAPs, and 3×10 LAPs as well as
+                                
+
+                                
+                                                                                                                                                       100 image-level/pixel-level normal visual features. Figure
+                                                         10 4                     10 3          10 2              10 1                              6 shows the visualization results, it can be seen that there is
+                                                                                                                                                       very clear discrimination between normal prompt features
+Figure 5. Image-level/pixel-level results on MVTec [4] in the 1-                                                                                       and anomaly prompt features, and the overlap between nor-
+shot setting using different hyper-parameter λ.                                                                                                        mal prompt features and normal visual features is very high,
+                                                                                                                                                       which intuitively verifies the effectiveness of PromptAD. In
+We speculate that this is because VV-attention retains a cer-                                                                                          addition, it’s worth noting that the 3 normal prompt features
+tain information interaction while focusing on local infor-                                                                                            do not collapse to one point, but fit the overall distribution
+mation, while MaskCLIP completely removes attention.                                                                                                   of normal visual features as much as possible.
+   After using our method, the pixel-level results of
+MaskCLIP and VV-CLIP are increased by 6.1%/10.7%, and
+5.8%/9.8% on MVTec/Visa, respectively. Furthermore, it is
+                                                                                                                                                       6. Conclusion
+worth noting that prompt learning also leads to a significant                                                                                          In this paper, we propose a novel anomaly detection method
+57.4%/55.8% improvement in pixel-level results of the orig-                                                                                            termed PromptAD which automatically learns prompts with
+inal CLIP. However, when prompt learning is added with                                                                                                 only normal samples in the few-shot anomaly detection
+learnable linear layers, the effect decreases, which may be                                                                                            scenario. First, in order to cope with the challenge un-
+because there is mutual interference between prompt learn-                                                                                             der the one-class task, we propose semantic concatena-
+ing and the training of linear layers.                                                                                                                 tion to construct enough anomaly prompts through con-
+                                                                                                                                                       catenating normal prompts and anomaly suffixes to guide
+5.6. Hyper-parameter Analysis
+                                                                                                                                                       prompt learning. Second, we propose the explicit anomaly
+We complete the effect of N , L and λ on PromptAD. λ                                                                                                   margin loss, which explicitly determines the margin be-
+is the hyper-parameter of the loss Lalgin , which controls                                                                                             tween normal prompt features and anomaly prompt features
+the degree of alignment between MAPs and LAPs feature                                                                                                  through a hyper-parameter. Finally, for image-level/pixel-
+distributions. N is the number of NPs. L is the number of                                                                                              level anomaly detection, PromptAD achieves first place in
+anomaly prompt suffixes, and N ×L is the number of LAPs.                                                                                               11/12 few-shot tasks.
+    Figure 4 illustrates the effect of, N and L on PromptAD.                                                                                           Acknowledgments This work is supported by the National
+In Image-level results, N does not have a great influence,                                                                                             Natural Science Foundation of China No. 62176092,
+and there is no significant difference between N = 1 and                                                                                               62222602, U23A20343, 62106075, 62302167, Shanghai
+N = 4. While, L has a significant influence, and larger                                                                                                Sailing Program (23YF1410500), Natural Science Founda-
+L can lead to higher results. In pixel-level results, the ef-                                                                                          tion of Shanghai (23ZR1420400), Science and Technology
+fects of both N and L are relatively small, and larger L                                                                                               Commission of Shanghai No.21511100700, Natural Sci-
+slightly improves the results. Figure 5 records the image-                                                                                             ence Foundation of Chongqing, China (CSTB2023NSCQ-
+level/pixel-level results with different λ. It can be seen that                                                                                        JQX0007, CSTB2023NSCQ-MSX0137), CCF-Tencent
+the results are worse when the λ is equal to 0 or larger. This                                                                                         Rhino-Bird Young Faculty Open Research Fund
+indicates that the distributions of MAPs and LAPs need to                                                                                              (RAGR20230121), China Postdoctoral Science Foun-
+be aligned, but not over-aligned, which will reduce the di-                                                                                            dation funded project (2023M734270), and Development
+versity of the anomaly prompts and thus reduce the model’s                                                                                             Project of Ministry of Industry and Information Technology
+perception of anomaly image features.                                                                                                                  (ZTZB.23-990-016).
+References                                                                shot anomaly localization. arXiv preprint arXiv:2308.15939,
+                                                                          2023.
+ [1] Jaehyeok Bae, Jae-Han Lee, and Seyun Kim. Pni: indus-           [14] Zheng Fang, Xiaoyang Wang, Haocheng Li, Jiejie Liu, Qi-
+     trial anomaly detection using position and neighborhood in-          ugui Hu, and Jimin Xiao. Fastrecon: Few-shot indus-
+     formation. In Proceedings of the IEEE/CVF International              trial anomaly detection via fast feature reconstruction. In
+     Conference on Computer Vision, pages 6373–6383, 2023.                Proceedings of the IEEE/CVF International Conference on
+ [2] Hangbo Bao, Wenhui Wang, Li Dong, Qiang Liu,                         Computer Vision, pages 17481–17490, 2023.
+     Owais Khan Mohammed, Kriti Aggarwal, Subhojit Som,              [15] Peng Gao, Shijie Geng, Renrui Zhang, Teli Ma, Rongyao
+     Songhao Piao, and Furu Wei. Vlmo: Unified vision-language            Fang, Yongfeng Zhang, Hongsheng Li, and Yu Qiao.
+     pre-training with mixture-of-modality-experts. Advances in           Clip-adapter: Better vision-language models with feature
+     Neural Information Processing Systems, 35:32897–32912,               adapters. International Journal of Computer Vision, pages
+     2022.                                                                1–15, 2023.
+ [3] Kilian Batzner, Lars Heckler, and Rebecca König. Efficien-     [16] Zhihao Gu, Liang Liu, Xu Chen, Ran Yi, Jiangning Zhang,
+     tad: Accurate visual anomaly detection at millisecond-level          Yabiao Wang, Chengjie Wang, Annan Shu, Guannan Jiang,
+     latencies. arXiv preprint arXiv:2303.14535, 2023.                    and Lizhuang Ma. Remembering normality: Memory-
+ [4] Paul Bergmann, Michael Fauser, David Sattlegger, and                 guided knowledge distillation for unsupervised anomaly de-
+     Carsten Steger. Mvtec ad–a comprehensive real-world                  tection. In Proceedings of the IEEE/CVF International Con-
+     dataset for unsupervised anomaly detection. In Proceedings           ference on Computer Vision, pages 16401–16409, 2023.
+     of the IEEE/CVF conference on computer vision and pattern       [17] Hewei Guo, Liping Ren, Jingjing Fu, Yuwang Wang,
+     recognition, pages 9592–9600, 2019.                                  Zhizheng Zhang, Cuiling Lan, Haoqian Wang, and Xinwen
+ [5] Paul Bergmann, Michael Fauser, David Sattlegger, and                 Hou. Template-guided hierarchical feature restoration for
+     Carsten Steger. Uninformed students: Student-teacher                 anomaly detection. In Proceedings of the IEEE/CVF Inter-
+     anomaly detection with discriminative latent embeddings. In          national Conference on Computer Vision, pages 6447–6458,
+     Proceedings of the IEEE/CVF conference on computer vi-               2023.
+     sion and pattern recognition, pages 4183–4192, 2020.            [18] Kaiming He, Haoqi Fan, Yuxin Wu, Saining Xie, and
+ [6] Paul Bergmann, Kilian Batzner, Michael Fauser, David Sat-            Ross B. Girshick. Momentum contrast for unsupervised vi-
+     tlegger, and Carsten Steger. Beyond dents and scratches:             sual representation learning. In 2020 IEEE/CVF Confer-
+     Logical constraints in unsupervised anomaly detection and            ence on Computer Vision and Pattern Recognition, CVPR
+     localization. International Journal of Computer Vision, 130          2020, Seattle, WA, USA, June 13-19, 2020, pages 9726–
+     (4):947–969, 2022.                                                   9735. Computer Vision Foundation / IEEE, 2020.
+ [7] Yunkang Cao, Xiaohao Xu, Chen Sun, Yuqi Cheng, Zongwei          [19] Chaoqin Huang, Haoyan Guan, Aofan Jiang, Ya Zhang,
+     Du, Liang Gao, and Weiming Shen. Segment any anomaly                 Michael W. Spratling, and Yan-Feng Wang. Registration
+     without training via hybrid prompt regularization. arXiv             based few-shot anomaly detection. In Computer Vision -
+     preprint arXiv:2305.10724, 2023.                                     ECCV 2022: 17th European Conference, Tel Aviv, Israel,
+ [8] Ting Chen, Simon Kornblith, Mohammad Norouzi, and Ge-                October 23-27, 2022, Proceedings, Part XXIV, pages 303–
+     offrey Hinton. A simple framework for contrastive learning           319. Springer, 2022.
+     of visual representations. In International conference on ma-   [20] Gabriel Ilharco, Mitchell Wortsman, Ross Wightman, Cade
+     chine learning, pages 1597–1607. PMLR, 2020.                         Gordon, Nicholas Carlini, Rohan Taori, Achal Dave,
+ [9] Wentao Chen, Chenyang Si, Zhang Zhang, Liang Wang,                   Vaishaal Shankar, Hongseok Namkoong, John Miller, Han-
+     Zilei Wang, and Tieniu Tan. Semantic prompt for few-shot             naneh Hajishirzi, Ali Farhadi, and Ludwig Schmidt. Open-
+     image recognition. In Proceedings of the IEEE/CVF Con-               clip, 2021.
+     ference on Computer Vision and Pattern Recognition, pages       [21] Jongheon Jeong, Yang Zou, Taewan Kim, Dongqing Zhang,
+     23581–23591, 2023.                                                   Avinash Ravichandran, and Onkar Dabeer. Winclip: Zero-
+[10] Xuhai Chen, Yue Han, and Jiangning Zhang. A zero-/few-               /few-shot anomaly classification and segmentation. In Pro-
+     shot anomaly classification and segmentation method for              ceedings of the IEEE/CVF Conference on Computer Vision
+     cvpr 2023 vand workshop challenge tracks 1&2: 1st place              and Pattern Recognition, pages 19606–19616, 2023.
+     on zero-shot ad and 4th place on few-shot ad. arXiv preprint    [22] Stepan Jezek, Martin Jonak, Radim Burget, Pavel Dvorak,
+     arXiv:2305.17382, 2023.                                              and Milos Skotak. Deep learning-based defect detection of
+[11] Niv Cohen and Yedid Hoshen. Sub-image anomaly detec-                 metal parts: evaluating current methods in complex condi-
+     tion with deep pyramid correspondences. arXiv preprint               tions. In 2021 13th International congress on ultra mod-
+     arXiv:2005.02357, 2020.                                              ern telecommunications and control systems and workshops
+[12] Thomas Defard, Aleksandr Setkov, Angelique Loesch, and               (ICUMT), pages 66–71. IEEE, 2021.
+     Romaric Audigier. Padim: a patch distribution modeling          [23] Chao Jia, Yinfei Yang, Ye Xia, Yi-Ting Chen, Zarana Parekh,
+     framework for anomaly detection and localization. In Inter-          Hieu Pham, Quoc Le, Yun-Hsuan Sung, Zhen Li, and Tom
+     national Conference on Pattern Recognition, pages 475–489.           Duerig. Scaling up visual and vision-language representa-
+     Springer, 2021.                                                      tion learning with noisy text supervision. In International
+[13] Hanqiu Deng, Zhaoxiang Zhang, Jinan Bao, and Xingyu Li.              conference on machine learning, pages 4904–4916. PMLR,
+     Anovl: Adapting vision-language models for unified zero-             2021.
+[24] Zhengbao Jiang, Frank F Xu, Jun Araki, and Graham Neu-               IEEE/CVF International Conference on Computer Vision,
+     big. How can we know what language models know? Trans-               pages 6285–6295, 2023.
+     actions of the Association for Computational Linguistics, 8:    [36] Alec Radford, Karthik Narasimhan, Tim Salimans, Ilya
+     423–438, 2020.                                                       Sutskever, et al. Improving language understanding by gen-
+[25] Muhammad Uzair Khattak, Hanoona Abdul Rasheed,                       erative pre-training. 2018.
+     Muhammad Maaz, Salman H. Khan, and Fahad Shahbaz                [37] Alec Radford, Jong Wook Kim, Chris Hallacy, Aditya
+     Khan. Maple: Multi-modal prompt learning. In IEEE/CVF                Ramesh, Gabriel Goh, Sandhini Agarwal, Girish Sastry,
+     Conference on Computer Vision and Pattern Recognition,               Amanda Askell, Pamela Mishkin, Jack Clark, et al. Learning
+     CVPR 2023, Vancouver, BC, Canada, June 17-24, 2023,                  transferable visual models from natural language supervi-
+     pages 19113–19122. IEEE, 2023.                                       sion. In International conference on machine learning, pages
+[26] Xia Kong, Zuodong Gao, Xiaofan Li, Ming Hong, Jun Liu,               8748–8763. PMLR, 2021.
+     Chengjie Wang, Yuan Xie, and Yanyun Qu. En-compactness:         [38] Robin Rombach, Andreas Blattmann, Dominik Lorenz,
+     Self-distillation embedding & contrastive generation for gen-        Patrick Esser, and Björn Ommer. High-resolution image
+     eralized zero-shot learning. In Proceedings of the IEEE/CVF          synthesis with latent diffusion models. In Proceedings of
+     Conference on Computer Vision and Pattern Recognition,               the IEEE/CVF conference on computer vision and pattern
+     pages 9306–9315, 2022.                                               recognition, pages 10684–10695, 2022.
+[27] Junnan Li, Dongxu Li, Caiming Xiong, and Steven Hoi.            [39] Karsten Roth, Latha Pemula, Joaquin Zepeda, Bernhard
+     Blip: Bootstrapping language-image pre-training for uni-             Schölkopf, Thomas Brox, and Peter Gehler. Towards to-
+     fied vision-language understanding and generation. In In-            tal recall in industrial anomaly detection. In Proceedings of
+     ternational Conference on Machine Learning, pages 12888–             the IEEE/CVF Conference on Computer Vision and Pattern
+     12900. PMLR, 2022.                                                   Recognition, pages 14318–14328, 2022.
+[28] Siyuan Li, Li Sun, and Qingli Li. Clip-reid: exploiting         [40] Marco Rudolph, Bastian Wandt, and Bodo Rosenhahn. Same
+     vision-language model for image re-identification without            same but differnet: Semi-supervised defect detection with
+     concrete text labels. In Proceedings of the AAAI Conference          normalizing flows. In IEEE Winter Conference on Applica-
+     on Artificial Intelligence, pages 1405–1413, 2023.                   tions of Computer Vision, WACV 2021, Waikoloa, HI, USA,
+[29] Xiaofan Li, Yachao Zhang, Shiran Bian, Yanyun Qu, Yuan               January 3-8, 2021, pages 1906–1915. IEEE, 2021.
+     Xie, Zhongchao Shi, and Jianping Fan. Vs-boost: Boosting        [41] Lukas Ruff, Robert Vandermeulen, Nico Goernitz, Lucas
+     visual-semantic association for generalized zero-shot learn-         Deecke, Shoaib Ahmed Siddiqui, Alexander Binder, Em-
+     ing. In Proceedings of the Thirty-Second International Joint         manuel Müller, and Marius Kloft. Deep one-class classifica-
+     Conference on Artificial Intelligence, IJCAI 2023, 19th-25th         tion. In International conference on machine learning, pages
+     August 2023, Macao, SAR, China, pages 1107–1115. ij-                 4393–4402. PMLR, 2018.
+     cai.org, 2023.                                                  [42] Mohammadreza Salehi, Niousha Sadjadi, Soroosh
+[30] Yi Li, Hualiang Wang, Yiqun Duan, Hang Xu, and Xi-                   Baselizadeh, Mohammad H Rohban, and Hamid R Ra-
+     aomeng Li.        Exploring visual interpretability for con-         biee. Multiresolution knowledge distillation for anomaly
+     trastive language-image pre-training.        arXiv preprint          detection.      In Proceedings of the IEEE/CVF confer-
+     arXiv:2209.07046, 2022.                                              ence on computer vision and pattern recognition, pages
+[31] Yi Li, Hualiang Wang, Yiqun Duan, and Xiaomeng Li. Clip              14902–14912, 2021.
+     surgery for better explainability with enhancement in open-     [43] Christoph Schuhmann, Richard Vencu, Romain Beaumont,
+     vocabulary tasks. arXiv preprint arXiv:2304.05653, 2023.             Robert Kaczmarczyk, Clayton Mullis, Aarush Katta, Theo
+[32] Zhenguang Liu, Haoming Chen, Runyang Feng, Shuang Wu,                Coombes, Jenia Jitsev, and Aran Komatsuzaki. Laion-400m:
+     Shouling Ji, Bailin Yang, and Xun Wang. Deep dual consec-            Open dataset of clip-filtered 400 million image-text pairs.
+     utive network for human pose estimation. In Proceedings              arXiv preprint arXiv:2111.02114, 2021.
+     of the IEEE/CVF conference on computer vision and pattern       [44] Christoph Schuhmann, Romain Beaumont, Richard Vencu,
+     recognition, pages 525–534, 2021.                                    Cade Gordon, Ross Wightman, Mehdi Cherti, Theo
+[33] Zhenguang Liu, Runyang Feng, Haoming Chen, Shuang                    Coombes, Aarush Katta, Clayton Mullis, Mitchell Worts-
+     Wu, Yixing Gao, Yunjun Gao, and Xiang Wang. Tempo-                   man, et al. Laion-5b: An open large-scale dataset for training
+     ral feature alignment and mutual information maximization            next generation image-text models. Advances in Neural In-
+     for video-based human pose estimation. In Proceedings of             formation Processing Systems, 35:25278–25294, 2022.
+     the IEEE/CVF conference on computer vision and pattern          [45] Shelly Sheynin, Sagie Benaim, and Lior Wolf. A hier-
+     recognition, pages 11006–11016, 2022.                                archical transformation-discriminating generative model for
+[34] Zhikang Liu, Yiming Zhou, Yuansheng Xu, and Zilei Wang.              few shot anomaly detection. In 2021 IEEE/CVF Interna-
+     Simplenet: A simple network for image anomaly detection              tional Conference on Computer Vision, ICCV 2021, Mon-
+     and localization. In Proceedings of the IEEE/CVF Confer-             treal, QC, Canada, October 10-17, 2021, pages 8475–8484.
+     ence on Computer Vision and Pattern Recognition, pages               IEEE, 2021.
+     20402–20411, 2023.                                              [46] Taylor Shin, Yasaman Razeghi, Robert L Logan IV, Eric
+[35] Declan McIntosh and Alexandra Branzan Albu. Inter-                   Wallace, and Sameer Singh. Autoprompt: Eliciting knowl-
+     realization channels: Unsupervised anomaly detection be-             edge from language models with automatically generated
+     yond one-class classification.       In Proceedings of the           prompts. arXiv preprint arXiv:2010.15980, 2020.
+[47] Masato Tamura. Random word data augmentation with              [60] Ziqin Zhou, Yinjie Lei, Bowen Zhang, Lingqiao Liu, and
+     clip for zero-shot anomaly detection.        arXiv preprint         Yifan Liu. Zegclip: Towards adapting clip for zero-shot se-
+     arXiv:2308.11119, 2023.                                             mantic segmentation. In Proceedings of the IEEE/CVF Con-
+[48] Ashish Vaswani, Noam Shazeer, Niki Parmar, Jakob Uszko-             ference on Computer Vision and Pattern Recognition, pages
+     reit, Llion Jones, Aidan N Gomez, Łukasz Kaiser, and Illia          11175–11185, 2023.
+     Polosukhin. Attention is all you need. Advances in neural      [61] Yang Zou, Jongheon Jeong, Latha Pemula, Dongqing Zhang,
+     information processing systems, 30, 2017.                           and Onkar Dabeer. Spot-the-difference self-supervised pre-
+[49] Guodong Wang, Shumin Han, Errui Ding, and Di Huang.                 training for anomaly detection and segmentation. In Eu-
+     Student-teacher feature pyramid matching for anomaly de-            ropean Conference on Computer Vision, pages 392–408.
+     tection. In 32nd British Machine Vision Conference 2021,            Springer, 2022.
+     BMVC 2021, Online, November 22-25, 2021, page 306.
+     BMVA Press, 2021.
+[50] Runqi Wang, Hao Zheng, Xiaoyue Duan, Jianzhuang Liu,
+     Yuning Lu, Tian Wang, Songcen Xu, and Baochang Zhang.
+     Few-shot learning with visual distribution calibration and
+     cross-modal distribution alignment. In Proceedings of the
+     IEEE/CVF Conference on Computer Vision and Pattern
+     Recognition, pages 23445–23454, 2023.
+[51] Zhaoqing Wang, Yu Lu, Qiang Li, Xunqiang Tao, Yandong
+     Guo, Mingming Gong, and Tongliang Liu. Cris: Clip-
+     driven referring image segmentation. In Proceedings of
+     the IEEE/CVF conference on computer vision and pattern
+     recognition, pages 11686–11695, 2022.
+[52] Yao Wu, Mingwei Xing, Yachao Zhang, Yuan Xie, Zongze
+     Wu, and Yanyun Qu. Perturbed progressive learning for
+     semisupervised defect segmentation. IEEE Transactions on
+     Neural Networks and Learning Systems, 2023.
+[53] Jihun Yi and Sungroh Yoon. Patch svdd: Patch-level svdd
+     for anomaly detection and segmentation. In Proceedings of
+     the Asian conference on computer vision, 2020.
+[54] Vitjan Zavrtanik, Matej Kristan, and Danijel Skočaj. Draem-
+     a discriminatively trained reconstruction embedding for sur-
+     face anomaly detection. In Proceedings of the IEEE/CVF
+     International Conference on Computer Vision, pages 8330–
+     8339, 2021.
+[55] Xinyi Zhang, Naiqi Li, Jiawei Li, Tao Dai, Yong Jiang,
+     and Shu-Tao Xia. Unsupervised surface anomaly detection
+     with diffusion probabilistic model. In Proceedings of the
+     IEEE/CVF International Conference on Computer Vision,
+     pages 6782–6791, 2023.
+[56] Xuan Zhang, Shiyu Li, Xi Li, Ping Huang, Jiulong Shan,
+     and Ting Chen. Destseg: Segmentation guided denoising
+     student-teacher for anomaly detection. In Proceedings of
+     the IEEE/CVF Conference on Computer Vision and Pattern
+     Recognition, pages 3914–3923, 2023.
+[57] Chong Zhou, Chen Change Loy, and Bo Dai. Extract free
+     dense labels from clip. In European Conference on Com-
+     puter Vision, pages 696–712. Springer, 2022.
+[58] Kaiyang Zhou, Jingkang Yang, Chen Change Loy, and Ziwei
+     Liu. Conditional prompt learning for vision-language mod-
+     els. In Proceedings of the IEEE/CVF Conference on Com-
+     puter Vision and Pattern Recognition, pages 16816–16825,
+     2022.
+[59] Kaiyang Zhou, Jingkang Yang, Chen Change Loy, and Ziwei
+     Liu. Learning to prompt for vision-language models. In-
+     ternational Journal of Computer Vision, 130(9):2337–2348,
+     2022.
+                 PromptAD: Learning Prompts with only Normal Samples for
+                              Few-Shot Anomaly Detection
+                                                     Supplementary Material
+A. Experimental details                                                       0.001. Referring to CoOp [59], the optimizer parameters
+                                                                              of prompt learning: learning rate, momentum, and weight
+Data pre-processing. Referring to WinCLIP [21], we em-                        decay are set to 0.002, 0.9, and 0.0005, respectively.
+ploy the data pre-processing pipeline specified in Open-
+                                                                              Manual anomaly suffixes. We used two kinds of man-
+CLIP [20] for both the MVTec [4] and VisA [61] datasets
+                                                                              ual anomaly suffixes: generic anomaly suffixes and object-
+to mitigate potential train-test discrepancies. This in-
+                                                                              customized anomaly suffixes. Generic anomaly suffixes are
+volves channel-wise standardization using precomputed
+                                                                              manually designed and object-customized anomaly suffixes
+mean [0.48145466, 0.4578275, 0.40821073] and standard
+                                                                              are generated through anomaly labels in the datasets [4, 61].
+deviation [0.26862954, 0.26130258, 0.27577711] after nor-
+                                                                              The specific details are shown in Figure 7.
+malizing each RGB image to [0, 1]. Subsequently, bicubic
+resizing is performed based on the Pillow implementa-                         Evaluation metrics. In addition to the results for the Area
+tion. As a default, we set the input resolution to 240 for                    Under the Receiver Operator Curve documented in the body
+the shorter edge resulting from resizing, aligning with ViT-                  of the paper, We also supplement the image-level Precision-
+B/16± in our experiments.                                                     Recall (AUPR) results and pixel-level Per-region-overlap
+Hyper-parameter. The length of trainable tokens in normal                     (PRO) [4, 5] results.
+prompts (EN ) is set to 4, and the length of trainable tokens                 Other details. Since model performance in the few-shot
+in learnable anomaly prompts (EA ) is set to 1. For each                      setting is affected by random sampling, we report the mean
+detection object, the number of normal prompts (N ) is set                    and standard deviation over 5 random seeds for each mea-
+to 1, the number of learnable anomaly suffixes (L) is set to                  surement. In addition, the few-shot results of SPADE [11],
+4, and the number of manual anomaly suffixes (M ) depends                     PaDiM [12], and PatchCore [39] in the experiments adopt
+on the number of anomaly labels in the dataset. λ is set to                   the results recorded in WinCLIP [21].
+
+
+  1. Generic anomaly suffixes
+  'damaged {}', 'broken {}', '{} with flaw', '{} with defect', '{} with damage'
+
+  2. Object-customized anomaly suffixes (MVTec)
+  'bottle': ['{} with large breakage', '{} with small breakage', '{} with contamination'],
+  'toothbrush': ['{} with defect', '{} with anomaly'],
+  'carpet': ['{} with hole', '{} with color stain', '{} with metal contamination', '{} with thread residue', '{} with thread', '{} with cut'],
+  'hazelnut': ['{} with crack', '{} with cut', '{} with hole', '{} with print'],
+  'leather': ['{} with color stain', '{} with cut', '{} with fold', '{} with glue', '{} with poke'],
+  'cable': ['{} with bent wire', '{} with missing part', '{} with missing wire', '{} with cut', '{} with poke'],
+  'capsule': ['{} with crack', '{} with faulty imprint', '{} with poke', '{} with scratch', '{} squeezed with compression'],
+  'grid': ['{} with breakage', '{} with thread residue', '{} with thread', '{} with metal contamination', '{} with glue', '{} with a bent shape'],
+  'pill': ['{} with color stain', '{} with contamination', '{} with crack', '{} with faulty imprint', '{} with scratch', '{} wi th abnormal type'],
+  'transistor': ['{} with bent lead', '{} with cut lead', '{} with damage', '{} with misplaced transistor'],
+  'metal_nut': ['{} with a bent shape ', '{} with color stain', '{} with a flipped orientation', '{} with scratch'],
+  'screw': ['{} with manipulated front', '{} with scratch neck', '{} with scratch head'],
+  'zipper': ['{} with broken teeth', '{} with fabric border', '{} with defect fabric', '{} with broken fabric', '{} with split teeth',
+             '{} with squeezed teeth'],
+  'tile': ['{} with crack', '{} with glue strip', '{} with gray stroke', '{} with oil', '{} with rough surface'],
+  'wood': ['{} with color stain', '{} with hole', '{} with scratch', '{} with liquid'],
+
+  3. Object-customized anomaly suffixes (VisA)
+  'candle': ['{} with melded wax', '{} with foreign particals', '{} with extra wax', '{} with chunk of wax missing', '{} with w eird candle wick',
+             '{} with damaged corner of packaging', '{} with different colour spot'],
+  'capsules': ['{} with scratch', '{} with discolor', '{} with misshape', '{} with leak', '{} with bubble'],
+  'cashew': ['{} with breakage', '{} with small scratches', '{} with burnt', '{} with stuck together', '{} with spot'],
+  'chewinggum': ['{} with corner missing', '{} with scratches', '{} with chunk of gum missing', '{} with colour spot', '{} with cracks'],
+  'fryum': ['{} with breakage', '{} with scratches', '{} with burnt', '{} with colour spot', '{} with fryum stuck together', '{ } with colour spot'],
+  'macaroni1': ['{} with color spot', '{} with small chip around edge', '{} with small scratches', '{} with breakage', '{} with cracks'],
+  'macaroni2': ['{} with color spot', '{} with small chip around edge', '{} with small scratches', '{} with breakage', '{} with cracks'],
+  'pcb1': ['{} with bent', '{} with scratch', '{} with missing', '{} with melt'],
+  'pcb2': ['{} with bent', '{} with scratch', '{} with missing', '{} with melt'],
+  'pcb3': ['{} with bent', '{} with scratch', '{} with missing', '{} with melt'],
+  'pcb4': ['{} with scratch', '{} with extra', '{} with missing', '{} with wrong place', '{} with damage', '{} with burnt', '{} with dirt'],
+  'pipe_fryum': ['{} with breakage', '{} with small scratches', '{} with burnt', '{} with stuck together', '{} with colour spot ', '{} with cracks']
+
+
+
+                                               Figure 7. Illustration of manual anomaly suffixes.
+                                    MVTec                                                          VisA
+             Bottle      Cable      Capsule      Carpet        Grid          Candle     Capsules          Cashew   Chewinggum
+
+
+Normal
+
+
+
+
+Anomaly
+ query
+
+
+
+
+  GT
+
+
+
+
+ Prompt
+ (1-shot)
+
+            Hazelnut    Leather     Metal nut     Pill        Screw          Fryum     Macaroni1      Macaroni2      PCB1
+
+
+Normal
+
+
+
+
+Anomaly
+ query
+
+
+
+
+  GT
+
+
+
+
+ Prompt
+ (1-shot)
+
+              Tile     Toothbrush   Transistor   Wood         Zipper         PCB2         PCB3            PCB4     Pipe fryum
+
+
+ Normal
+
+
+
+
+Anomaly
+ query
+
+
+
+
+  GT
+
+
+
+
+ Prompt
+ (1-shot)
+
+
+
+
+             Figure 8. Additional qualitative results from PromptAD (1-shot), tested on MVTec [4] and VisA [61].
+             Cable       Metal nut     Transistor    Transistor                   Candle      Capsules      Macaroni1           Macaroni2
+
+
+
+ Normal                                                            Normal
+
+
+             Swap           Flip       Misplaced     Misplaced                   Color spot   Discolor      Color spot    Chip around edge
+
+
+Anomaly                                                           Anomaly
+ query                                                             query
+
+
+
+
+   GT                                                                GT
+
+
+
+
+  Prompt                                                            Prompt
+  (1-shot)                                                          (1-shot)
+
+
+
+   Figure 9. Qualitative results of logical anomaly detection.    Figure 10. Qualitative results of extremely small anomaly detec-
+                                                                  tion.
+
+B. Additional Qualitative Results
+                                                                  tual prompt engineering (CPE). PromptAD not only out-
+In Figure 8, we provide further qualitative results obtained      performs the classical prompt learning method in anomaly
+from our (1-shot) PromtAD for pixel-level anomaly detec-          detection tasks, but also, compared with CPE, brings im-
+tion in MVTec [4] and VisA [61]. It can be seen that Promp-       provements of 0.8%/5.8% and 5.0%/8.9% on MVTec and
+tAD can accurately locate both large-area surface defects         VisA respectively (image-level/pixel-level).
+and small-area surface defects. In addition, as shown in
+Figure 9, we also provide quantitative results of PromptAD                                               MVTec              VisA
+on some logical anomalies. Logical anomalies are mainly                           Method
+found in some industrial components in MVTec. It can be                                           image     pixel    image          pixel
+
+                                                                     0-shot
+seen that PromptAD has poor detection results on the swap                      CPE+WinCLIP         91.8      85.1        78.1       79.6
+anomaly of “cable” and missing anomaly of “transistor”,                        CPE+VV-CLIP         90.5      86.7        77.2       82.9
+while PromptAD has good localization results on the flip                       CoOp+VV-CLIP        81.5      87.8        72.6       85.5
+
+                                                                     1-shot
+anomaly of “Metal nut” and misplaced anomaly of “Tran-                        CoCoOp+VV-CLIP       60.6      52.1        61.6       72.3
+sistor”. Figure 10 shows PromptAD’s detection results for                          Maple           66.8      64.9        60.5       61.5
+extremely small anomalies, which are usually hard to de-                         PromptAD          91.3      92.5        83.2       91.8
+tect by humans. For the convenience of viewing, we circle
+the anomaly positions in red circles, and it can be seen that       Table 6. Results (AUROC) of different methods (w/o VAD).
+PromptAD has difficulty in completing the accurate local-
+ization of extremely small anomalies.
+                                                                  D. Ablation Study
+C. Comparison with Other Prompt Learning
+    Methods                                                       We further evaluate the impact of MAPs and LAPs
+                                                                  on PromptAD, respectively. For better comparison, we
+PromptAD is the first prompt design paradigm for one class        removed the effect of vision-guided anomaly detection
+classification (OCC) promblem, which overcomes the poor           (VAD). Table 7 (second row) shows that without MAPs,
+performance of other prompt learning methods in anomaly           the performance degradation is more pronounced, but it is
+detection. See Table 6, the classical prompt learning meth-       still better than CPE, indicating that PromptAD can still au-
+ods (1-shot) perform relatively poorly in anomaly detec-          tomatically learn effective anomaly prompts even without
+tion tasks, and except for the pixel-level results of CoOp        using any manually annotated anomaly description suffix.
+[59] on MVTec and VisA, the results of CoOp [59], Co-             Table 7 (third row) shows that there is also a slight decrease
+CoOp [58] and Maple [25] are even worse than contex-              in performance without LAPs, which indicates that LAPs
+                               MVTec               VisA                             screw    grid    transistor   mean
+             Method
+                            image     pixel   image     pixel           6th +9th     91.7    58.8       84.9       92.0
+    1    CPE+VV-CLIP         90.5     86.7    77.2      82.9            3th +8th     89.6    81.8       87.2       93.2
+    2   Prompt w/o MAPs      87.6     89.8    78.8      86.2
+    3   Prompt w/o LAPs      90.5     91.3    82.5      90.3     Table 10. Pixel-level results (AUROC) of using different layer
+    4      PromptAD          91.3     92.5    83.2      91.8     features as the feature memory.
+
+Table 7. Effects (AUROC) of MAPs and LAPs (1-shot & w/o
+VAD).                                                            F. Detailed Comparison Results
+                                                                 In this section, we report the detailed subset-level results of
+    Backbone    Dataset    1-shot       2-shot        4-shot     PromptAD. In addition, we evaluate PromptAD’s results on
+   ResNet101    MVTec     85.8/93.0    87.6/94.3     90.3/94.8   Image-level AUPR and pixel-level PRO. Specifically, the
+    ViT-L/14    MVTec     92.4/95.5    93.8/95.8     94.9/96.2   results for MVTec are recorded in Table 11,12,15,16 and
+   ViT-B/16+    MVTec     94.6/95.9    95.7/96.2     96.6/96.5   the results for VisA are recorded in Table 13,14,17,18 with
+   ResNet101     VisA     80.4/95.1    84.5/96.3     85.3/96.9   the first place marked in bold and the second place mean
+    ViT-L/14     VisA     85.2/96.8    86.3/97.2     86.7/97.4   underlined.
+   ViT-B/16+     VisA     86.9/96.7    88.3/97.1     89.1/97.4
+                                                                 G. Visualization Results of Attention Map
+Table 8. Image-level/pixel-level results (AUROC) with other
+backbones.                                                       To further analyze the working mechanism of CLIP [37],
+                                                                 we provide visualization results of the attention map in the
+                                                                 CLIP visual encoder (ViT-B/16+). Figure 11 is the visu-
+    Method      Dataset    1-shot       2-shot        4-shot     alization result of the original QK attention map. It can be
+   PatchCore    MPDD      59.2/78.5    59.6/79.2     79.9/79.8   seen that QK attention in the shallow layers focuses more on
+   WinCLIP+     MPDD      68.2/92.6    69.3/94.7     75.2/96.0   local information (main diagonal activations). From layer
+   PromptAD     MPDD      80.7/96.2    85.3/97.2     87.2/97.3   5, QK attention starts to focus on more global information.
+   PatchCore    LOCO      64.9/70.3    65.4/71.5     68.7/72.2   Both global and local information play an important role in
+   WinCLIP+     LOCO      68.0/71.2    69.7/71.9     71.3/72.8   anomaly detection. Therefore, to preserve both local and
+   PromptAD     LOCO      71.2/73.0    72.6/74.1     73.5/74.5   global information, PromptAD uses the features of the 3th
+                                                                 and 8th layers instead of the features of the 6th and 9th
+Table 9. Image-level/pixel-level results (AUROC) on MPDD and     layers used by PatchCore [39] when storing visual features.
+LOCO.                                                            The comparison results are reported in Table 10, compared
+                                                                 with 6th +9th features, there is a 1.2% improvement using
+                                                                 the 3th +8th features. Figure 12 shows the visualization re-
+can expand the set of exception hints and thus improve the       sults of the VV attention map, it can be seen that compared
+model performance.                                               with QK attention, VV attention focuses on local informa-
+   In addition, we explore the impact of CLIP’s different vi-    tion from the first layer to the last layer, which is more con-
+sual backbones on PromptAD. The results of using different       ducive to completing the localization task. While, most lay-
+backbones are recorded in Table 8, where the self-attention      ers of QK attention focus on global information, which is
+modules of VIT add the vv-attention branches, and the at-        more conducive to classification tasks.
+tention pooling of ResNet101 adopts V-V attention. All of
+the backbones require no additional training. The overall
+performance of ViT is better than ResNet, VIT-L/14 shows
+better pixel-wise anomaly detection than VIT-B/16+.
+
+E. Results on Other Benchmarks
+In addition to the two datasets MVTec [4] and VisA [61], we
+also evaluate PromptAD in the few-shot setting on MPDD
+[22] and LOCO [6]. We reproduce the results of PatchCore
+and WinCLIP+. As shown in Table 9, compared with Patch-
+Core and WinCLIP+, PromptAD achieves the first place in
+few-shot settings of both datasets
+   MVTec                                   1-shot                                                         2-shot                                                         4-shot
+Image-AUROC    SPADE        PaDiM       PatchCore   WinCLIP+     PromptAD     SPADE        PaDiM       PatchCore    WinCLIP+     PromptAD      SPADE       PaDiM      PatchCore    WinCLIP+    PromptAD
+   Bottle      98.7±0.6    97.4±0.7      99.4±0.4    98.2±0.9     99.8±0.3   99.5±0.1     98.5±1.0     99.2±0.3      99.3±0.3     99.4±0.1    99.5±0.2     98.8±0.2    99.2±0.3     99.3±0.4    99.8±0.2
+   Cable       71.2±3.3    57.7±4.6      88.8±4.2    88.9±1.9     94.2±1.2   76.2±5.2     62.3±5.9     91.0±2.7      88.4±0.7     91.8±1.5    83.4±3.1     70.0±6.1    91.0±2.7     90.9±0.9    95.4±0.9
+  Capsule      70.2±3.0    57.7±7.3      67.8±2.9    72.3±6.8     84.6±6.7   70.9±6.1     64.3±3.0     72.8±7.0      77.3±8.8     91.3±7.7    78.9±5.5     65.2±2.5    72.8±7.0     82.3±8.9    91.5±1.5
+   Carpet      98.1±0.2    96.6±1.0      95.3±0.8    99.8±0.3    100.0±0.0   98.3±0.4     97.8±0.5     96.6±0.5      99.8±0.3    100.0±0.0    98.6±0.2     97.9±0.4    96.6±0.5    100.0±0.0   100.0±0.0
+    Grid       40.0±6.8    54.2±6.7     63.6±10.3    99.5±0.3     99.8±0.9   41.3±3.6     67.2±4.2     67.7±8.3      99.4±0.2     99.9±1.2    44.6±6.6     68.1±3.8    67.7±8.3     99.6±0.1    98.8±0.5
+  Hazelnut     95.8±1.3    88.3±2.6      88.3±2.7    97.5±1.4     99.8±0.8   96.2±2.1     90.8±0.8     93.2±3.8      98.3±0.7    100.0±0.6    98.4±1.3     91.9±1.2    93.2±3.8     98.4±0.4    99.8±0.2
+  Leather     100.0±0.0    97.5±0.7      97.3±0.7    99.9±0.0    100.0±0.0   100.0±0.0    97.5±0.9     97.9±0.7      99.9±0.0    100.0±0.1    100.0±0.0    98.5±0.2    97.9±0.7    100.0±0.0   100.0±0.1
+  Metal nut    71.0±2.2    53.0±3.8      73.4±2.9    98.7±0.8     99.1±0.5   77.0±7.9     54.8±3.8     77.7±8.5      99.4±0.2     98.6±0.7    77.8±5.7     60.7±5.2    77.7±8.5     99.5±0.2   100.0±0.1
+    Pill       86.5±3.1    61.3±3.8      81.9±2.8    91.2±2.1     92.6±1.5   84.8±0.9     59.1±6.4     82.9±2.9      92.3±0.7     93.6±0.8    86.7±0.3     54.9±2.7    82.9±2.9     92.8±1.0    92.9±0.8
+   Screw       46.7±2.5    55.0±2.5      44.4±4.6    86.4±0.9     65.0±2.9   46.6±2.2     54.0±4.4     49.0±3.8      86.0±2.1     71.0±2.0    50.5±5.4     50.0±4.1    49.0±3.8     87.9±1.2    83.6±2.3
+    Tile       99.9±0.1    92.2±2.2      99.0±0.9    99.9±0.0    100.0±0.0   99.9±0.1     93.3±1.1     98.5±1.0      99.9±0.2    100.0±0.1    100.0±0.0    93.1±0.6    98.5±1.0     99.9±0.1   100.0±0.1
+ Toothbrush    71.7±2.6    82.5±1.2      83.3±3.8    92.2±4.9     98.9±1.0   78.6±3.2     87.6±4.2     85.9±3.5      97.5±1.6     97.5±1.5    78.8±5.2     89.2±2.5    85.9±3.5     96.7±2.6    98.1±0.6
+ Transistor    77.2±2.0    73.3±6.0      78.1±6.9    83.4±3.8     94.0±6.5   81.3±3.7     72.8±6.3     90.0±4.3      85.3±1.7     97.4±4.0    81.4±2.1     82.4±6.5    90.0±4.3     85.7±2.5    95.6±3.8
+   Wood        98.8±0.3    96.1±1.2      97.8±0.3    99.9±0.1     97.9±0.3   99.2±0.4     96.9±0.5     98.3±0.6      99.9±0.1     98.7±0.1    98.9±0.6     97.0±0.2    98.3±0.6     99.8±0.3    98.6±0.3
+   Zipper      89.3±1.9    85.8±2.7      92.3±0.5    88.8±5.9     93.9±3.2   93.3±2.9     86.3±2.6     94.0±2.1      94.0±1.4     95.8±1.7    95.1±1.3     88.3±2.0    94.0±2.1     94.5±0.5    95.0±2.3
+   Mean        81.0±2.0    76.6±3.1     83.4±3.0     93.1±2.0     94.6±1.7    82.9±2.6    78.9±3.1     86.3±3.3      94.4±1.3     95.7±1.5    84.8±2.5     80.4±2.5    88.8±2.6    95.2±1.3    96.6±0.9
+
+
+                      Table 11. Comparison of image-level anomaly detection in terms of subset-wise AUROC on MVTec.
+
+   MVTec                                  1-shot                                                         2-shot                                                          4-shot
+Pixel-AUROC   SPADE        PaDiM       PatchCore    WinCLIP+     PromptAD    SPADE       PaDiM        PatchCore     WinCLIP+     PromptAD     SPADE       PaDiM       PatchCore    WinCLIP+    PromptAD
+   Bottle     95.3±0.2    96.1±0.5     97.9±0.1     97.5±0.2     99.6±0.2    95.7±0.2    96.9±0.1     98.1±0.0      97.7±0.1     99.5±0.1     96.1±0.0    97.1±0.1    98.2±0.0     97.8±0.0    99.5±0.1
+   Cable      86.4±0.2    88.4±1.2     95.5±0.8     93.8±0.6     98.4±0.5    87.4±0.3    90.0±0.8     96.4±0.3      94.3±0.4     97.6±0.3     88.2±0.2    92.1±0.4    97.5±0.3     94.9±0.1    98.2±0.2
+  Capsule     96.3±0.2    94.5±0.6     95.6±0.4     94.6±0.8     99.5±0.7    96.7±0.1    95.2±0.5     96.5±0.4      96.4±0.3     99.3±0.5     97.0±0.2    96.2±0.4    96.8±0.6     96.2±0.5    99.3±0.3
+   Carpet     98.2±0.0    97.8±0.2     98.4±0.1     99.4±0.0     95.9±0.0    98.3±0.0    98.2±0.0     98.5±0.1      99.3±0.0     96.1±0.0     98.4±0.0    98.4±0.0    98.6±0.1     99.3±0.0    96.2±0.0
+    Grid      80.7±1.3    70.2±2.8     58.8±4.9     96.8±1.0     95.1±0.5    83.5±1.0    70.8±2.0     62.6±3.2      97.7±0.8     95.5±0.4     87.2±1.1    77.0±1.8    69.4±1.3     98.0±0.2    95.2±0.3
+  Hazelnut    97.2±0.1    95.4±0.7     95.8±0.6     98.5±0.2     97.3±0.4    97.6±0.1    96.8±0.3     96.3±0.6      98.7±0.1     97.6±0.3     97.7±0.1    97.2±0.2    97.6±0.1     98.8±0.0    97.9±0.2
+  Leather     99.1±0.0    98.5±0.1     98.8±0.2     99.3±0.0     93.3±0.0    99.1±0.0    98.7±0.1     99.0±0.1      99.3±0.0     93.2±0.0     99.1±0.0    98.8±0.0    99.1±0.0     99.3±0.0    93.9±0.0
+  Metal nut   83.8±0.7    74.6±1.1     89.3±1.4     90.0±0.6     97.3±0.7    85.8±1.1    80.3±2.1     94.6±1.4      91.4±0.4     97.4±0.7     87.1±0.7    82.7±3.9    95.9±1.8     92.9±0.4    97.7±0.5
+    Pill      89.4±0.4    84.8±1.0     93.1±1.1     96.4±0.3     98.4±0.4    89.9±0.2    87.3±0.7     94.2±0.3      97.0±0.2     98.5±0.3     90.7±0.2    88.9±0.5    94.8±0.4     97.1±0.0    98.5±0.2
+   Screw      94.8±0.2    83.3±0.7     89.6±0.5     94.5±0.4     91.4±0.5    95.6±0.4    89.8±0.8     90.0±0.7      95.2±0.3     95.1±0.7     96.4±0.4    90.8±0.2    91.3±1.0     96.0±0.5    94.9±0.8
+    Tile      91.7±0.3    84.1±1.1     94.1±0.5     96.3±0.2     92.8±0.1    92.0±0.1    87.7±0.2     94.4±0.2      96.5±0.1     94.1±0.1     92.2±0.1    88.9±0.3    94.6±0.1     96.6±0.1    94.1±0.1
+ Toothbrush   94.6±0.6    97.3±0.3     97.3±0.4     97.8±0.1     94.0±0.2    96.2±0.3    97.7±0.3     97.5±0.2      98.1±0.1     95.5±0.1     97.0±0.6    98.4±0.2    98.4±0.4     98.4±0.5    96.2±0.0
+ Transistor   71.4±1.3    90.2±2.8     84.9±2.7     85.0±1.8     99.1±1.9    72.8±0.9    92.3±2.1     89.6±0.9      88.3±1.0     99.0±1.1     73.4±0.7    94.0±2.7    90.7±1.4     88.5±1.2    99.0±0.6
+   Wood       93.4±0.1    90.7±0.4     92.7±0.9     94.6±1.0     89.4±0.3    93.8±0.1    91.9±0.1     93.2±0.7      95.3±0.4     89.1±0.2     93.9±0.1    92.2±0.1    93.5±0.3     95.4±0.2    90.6±0.1
+   Zipper     94.9±0.3    93.9±0.8     97.4±0.4     93.9±0.8     96.6±0.5    95.8±0.2    95.4±0.3     98.0±0.1      94.1±0.7     95.5±0.4     96.2±0.1    96.1±0.2    98.1±0.1     94.2±0.4    96.6±0.3
+   Mean       91.2±0.4    89.3±0.9     92.0±1.0     95.2±0.5     95.9±0.5    92.0±0.3    91.3±0.7     93.3±0.6      96.0±0.3     96.2±0.3     92.7±0.3    92.6±0.7    94.3±0.5     96.2±0.3    96.5±0.2
+
+
+                         Table 12. Comparison of pixel-level anomaly detection in terms of subset-wise AUROC on MVTec.
+
+
+
+
+    VisA                                  1-shot                                                          2-shot                                                          4-shot
+Image-AUROC    SPADE        PaDiM       PatchCore    WinCLIP+     PromptAD     SPADE        PaDiM       PatchCore    WinCLIP+     PromptAD      SPADE       PaDiM      PatchCore   WinCLIP+    PromptAD
+   Candle      86.1±5.6     70.8±4.1     85.1±1.4     93.4±1.4    90.3±2.7   91.3±3.3      75.8±2.1      85.3±1.5     94.8±1.0     91.0±1.2    92.8±2.1    77.5±1.6    87.8±0.8     95.1±0.3   93.0±1.2
+  Capsules     73.3±7.5     51.0±7.8     60.0±7.6     85.0±3.1    84.5±3.5   71.7±11.2    51.7±4.6       57.8±5.4     84.9±0.8     84.9±3.7    73.4±7.1    52.7±3.4    63.4±5.4     86.8±1.7   80.6±2.1
+  Cashew       95.9±1.1     62.3±9.9     89.5±4.4     94.0±0.4    95.6±1.0   97.3±1.4      74.6±3.6      93.6±0.6     94.3±0.5     94.7±1.4    96.4±1.3    77.7±3.2    93.0±1.5     95.2±0.8   93.6±2.2
+Chewinggum     92.1±2.0     69.9±4.9     97.3±0.3     97.6±0.8    96.4±1.2   93.4±1.0      82.7±2.1      97.8±0.6     97.3±0.8     96.6±0.6    93.5±1.4    83.5±3.7    98.3±0.3     97.7±0.3   96.8±0.4
+   Fryum       81.1±4.0     58.3±5.9     75.0±4.8     88.5±1.9    90.3±1.8   90.5±3.9      69.2±9.0      83.4±2.4     90.5±0.4     89.2±0.9    92.9±1.6    71.2±5.9    88.6±1.3     90.8±0.5   89.0±2.3
+ Macaroni1    66.0±10.5     62.1±4.6     68.0±3.4     82.9±1.5    88.6±3.1   69.1±8.2      62.2±5.0      75.6±4.6     83.3±1.9     84.2±2.5    65.8±1.2    65.9±3.9    82.9±2.7     85.2±0.9   88.2±2.5
+ Macaroni2     55.8±6.1     47.5±5.9     55.6±4.6     70.2±0.9    69.1±3.0   58.3±4.4      50.8±2.9      57.3±5.6     71.8±2.0     82.6±0.9    56.7±3.2    55.0±2.9    61.7±1.8     70.9±2.2   81.2±1.8
+   PCB1        87.2±2.3     76.2±1.2     78.9±1.1    75.6±23.0    88.7±0.7   86.7±1.1     62.4±10.8     71.5±20.0     76.7±5.2     90.9±5.4    83.4±8.5    82.6±1.5    84.7±6.7     88.3±1.7   90.9±2.5
+   PCB2        73.5±3.7     61.2±2.0     81.5±0.8     62.2±3.9    71.6±4.1   70.3±8.1      66.8±2.0      84.3±1.7     62.6±3.7     73.0±3.0    71.7±7.0    73.5±2.4    84.3±1.0     67.5±2.6   78.6±2.5
+   PCB3        72.2±1.0    51.4±12.2     82.7±2.3     74.1±1.1    79.1±3.6   75.8±5.7      67.3±3.8      84.8±1.2     78.8±1.9     76.2±2.2    79.0±4.1    65.9±1.9    87.0±1.1     83.3±1.7   80.3±1.7
+   PCB4        93.4±1.3     76.1±3.6     93.9±2.8     85.2±8.9    91.4±3.2   86.1±8.2     69.3±13.7      94.3±3.2     82.3±9.9     97.5±2.4    95.4±2.3    85.4±2.0    95.6±1.6     87.6±8.0   97.8±1.4
+ Pipe fryum    77.9±3.2     66.7±2.2     90.7±1.7     97.2±1.1    96.9±0.2   78.1±3.0      75.3±1.8      93.5±1.3     98.0±0.6     98.9±0.3    79.3±0.9    82.9±2.2    96.4±0.7     98.5±0.4   98.6±0.2
+   Mean       79.5±4.0     62.8±5.4      79.9±2.9    83.8±4.0     86.9±2.3    80.7±5.0     67.4±5.1     81.6±4.0      84.6±2.4     88.3±2.0    81.7±3.4    72.8±2.9    85.3±2.1     87.3±1.8   89.1±1.7
+
+
+                          Table 13. Comparison of image-level anomaly detection in terms of subset-wise AUROC on VisA.
+
+    VisA                                  1-shot                                                         2-shot                                                          4-shot
+Pixel-AUROC   SPADE        PaDiM       PatchCore    WinCLIP+     PromptAD    SPADE       PaDiM        PatchCore     WinCLIP+     PromptAD     SPADE       PaDiM       PatchCore    WinCLIP+    PromptAD
+   Candle     97.9±0.3    91.7±2.2     97.2±0.2     97.4±0.2     95.8±0.2    98.1±0.2    94.9±0.8     97.7±0.3      97.7±0.1     95.9±0.1     98.2±0.1    95.4±0.2    97.9±0.1     97.8±0.2    96.0±0.1
+  Capsules    95.5±0.5    70.9±1.1     93.2±0.9     96.4±0.6     95.4±0.9    96.5±0.9    75.7±1.7     94.0±0.2      96.8±0.3     96.1±0.7     97.7±0.1    79.1±0.7    94.8±0.5     97.1±0.2    96.8±0.6
+  Cashew      95.9±0.5    95.5±0.6     98.1±0.1     98.5±0.2     99.1±0.2    95.9±0.4    96.4±0.4     98.2±0.2      98.5±0.1     99.2±0.1     95.9±0.3    97.2±0.3    98.3±0.2     98.7±0.0    99.2±0.1
+Chewinggum    96.0±0.4    90.1±0.4     96.9±0.3     98.6±0.1     99.1±0.1    96.0±0.3    93.1±0.7     96.6±0.1      98.6±0.1     99.2±0.1     95.7±0.3    94.4±0.5    96.8±0.1     98.5±0.1    99.2±0.2
+   Fryum      93.5±0.3    93.3±0.6     93.3±0.5     96.4±0.3     95.4±0.3    93.9±0.2    94.1±0.6     94.0±0.3      97.0±0.2     96.4±0.2     94.4±0.1    95.0±0.4    94.2±0.2     97.1±0.1    96.6±0.2
+ Macaroni1    97.9±0.2    89.4±0.9     95.2±0.4     96.4±0.6     97.8±0.1    98.5±0.2    91.7±0.3     96.0±1.3      96.5±0.7     98.3±0.1     98.8±0.1    93.5±0.5    97.0±0.3     97.0±0.2    98.2±0.1
+ Macaroni2    94.1±1.0    86.4±1.1     89.1±1.6     96.8±0.4     96.6±0.5    95.2±0.4    90.1±0.8     90.2±1.9      96.8±0.6     97.2±0.3     96.4±0.2    90.2±0.3    93.9±0.3     97.3±0.3    97.0±0.3
+   PCB1       94.7±0.4    89.9±0.3     96.1±1.5     96.6±0.6     96.6±0.8    96.5±1.5    90.6±0.6     97.6±0.9      97.0±0.9     96.9±0.4     96.8±1.5    93.2±1.5    98.1±1.0     98.1±0.9    98.2±0.3
+   PCB2       95.1±0.2    90.9±1.4     95.4±0.2     93.0±0.4     93.5±0.9    95.7±0.1    93.9±0.9     96.0±0.3      93.9±0.2     94.8±0.8     96.3±0.0    93.7±1.0    96.6±0.2     94.6±0.4    95.3±0.5
+   PCB3       96.0±0.1    93.9±0.3     96.2±0.3     94.3±0.3     95.9±0.5    96.6±0.1    95.1±0.5     97.1±0.1      95.1±0.2     96.1±0.4     96.9±0.0    95.7±0.1    97.4±0.2     95.8±0.1    96.8±0.2
+   PCB4       92.0±0.6    89.6±0.6     95.6±0.6     94.0±0.9     95.5±0.5    92.8±0.3    90.7±0.9     96.2±0.4      95.6±0.3     95.6±0.3     94.1±0.2    92.1±0.5    97.0±0.2     96.1±0.3    96.2±0.4
+ Pipe fryum   98.4±0.2    97.2±0.6     98.8±0.2     98.3±0.2     99.1±0.2    98.7±0.1    98.1±0.4     99.1±0.1      98.5±0.2     99.4±0.2     98.8±0.0    98.5±0.1    99.1±0.0     98.7±0.1    99.3±0.3
+   Mean       95.6±0.4    89.9±0.8     95.4±0.6     96.4±0.4     96.7±0.4    96.2±0.4    92.0±0.7     96.1±0.5      96.8±0.3     97.1±0.3     96.6±0.3    93.2±0.5    96.8±0.3     97.2±0.2    97.4±0.3
+
+
+                          Table 14. Comparison of pixel-level anomaly detection in terms of subset-wise AUROC on VisA.
+     MVTec                                      1-shot                                                             2-shot                                                              4-shot
+Image-level AUPR      SPADE       PaDiM      PatchCore    WinCLIP+      PromptAD       SPADE        PaDiM       PatchCore     WinCLIP+      PromptAD       SPADE         PaDiM      PatchCore    WinCLIP+     PromptAD
+     Bottle           99.6±0.1    99.2±0.2   99.8±0.1      99.4±0.3     99.8±0.1       99.8±0.0    99.6±0.3     99.8±0.1      99.8±0.1      99.9±0.1       99.9±0.0     99.7±0.0     99.8±0.1      99.8±0.1   100.0±0.1
+     Cable            79.6±2.3    64.9±3.8   93.8±2.2      93.2±1.1     95.5±0.7       84.5±3.1    69.6±6.6     95.1±1.3      92.9±0.6      96.9±0.7       88.8±1.9     76.1±5.6     97.1±0.7      94.4±0.3   97.4±0.5
+    Capsule           91.2±0.9    86.9±2.2   89.4±2.0      91.6±2.7     97.8±3.1       91.6±2.1    88.4±0.8     91.0±2.9      93.3±3.6      97.0±3.0       94.4±1.9     87.8±0.8     94.9±1.1      95.1±3.3   98.6±2.2
+     Carpet           99.4±0.0    99.0±0.2   98.7±0.2      99.9±0.1     100.0±0.0      99.5±0.1    99.4±0.1     99.0±0.1      99.9±0.1      100.0±0.0      99.6±0.1     99.4±0.1     98.8±0.2     100.0±0.0   100.0±0.0
+      Grid            66.9±2.1    75.0±3.3   81.1±4.9      99.9±0.1     98.8±0.3       68.3±2.1    82.5±2.3     84.1±4.0      99.8±0.1      99.9±0.3       68.8±4.2     83.0±1.8     86.4±4.0      99.9±0.0   99.7±0.1
+    Hazelnut          97.9±0.6    93.3±1.7   92.9±2.2      98.6±0.7     99.7±0.3       98.0±1.1    94.1±0.5     96.0±2.0      99.1±0.4      99.8±0.2       99.1±0.7     94.8±0.6     97.0±1.2      99.1±0.2   99.9±0.2
+    Leather          100.0±0.0    99.2±0.2   99.1±0.2     100.0±0.0     100.0±0.0     100.0±0.0    99.2±0.3     99.3±0.2      100.0±0.0     100.0±0.0     100.0±0.0     99.6±0.1     99.6±0.1     100.0±0.0   100.0±0.0
+    Metal nut         91.7±0.8    82.0±2.7   91.0±1.1      99.7±0.2     99.6±0.1       93.7±2.4    82.2±1.4     92.3±4.0      99.9±0.0      100.0±0.1      94.1±1.8     85.5±1.7     97.0±2.6      99.9±0.1   99.9±0.0
+      Pill            97.0±0.8    88.3±1.3   96.5±0.6      98.3±0.5     98.5±0.3       96.5±0.4    87.9±2.6     96.6±0.7      98.6±0.1      97.8±0.2       97.0±0.2     87.0±1.2     96.9±0.4      98.6±0.2   98.5±0.1
+     Screw            71.3±1.8    78.1±1.0   71.4±2.3      94.2±0.6     78.5±3.0       71.0±1.4    77.3±1.3     72.9±3.4      94.1±1.5      86.7±1.9       73.7±2.4     75.7±2.8     71.8±1.9      94.9±0.8   93.8±2.1
+      Tile           100.0±0.0    97.2±0.7   99.6±0.3     100.0±0.0     100.0±0.0     100.0±0.0    97.6±0.4     99.4±0.4      100.0±0.1     100.0±0.0     100.0±0.0     97.6±0.2     99.6±0.1     100.0±0.0   100.0±0.0
+   Toothbrush         88.3±0.6    93.7±0.5   93.5±1.4      96.7±2.0     98.9±0.4       90.8±1.3    95.2±1.6     94.1±1.4      99.0±0.6      99.3±0.4       91.3±2.6     95.8±0.7     94.8±0.7      98.7±1.1   99.7±0.1
+   Transistor         76.2±1.7    66.2±7.5   77.7±5.5      79.0±4.0     91.2±5.9       81.6±3.4    69.0±6.5     89.3±3.9      80.7±2.3      92.2±2.9       80.3±2.6     77.6±8.4     84.5±9.0      80.7±3.2   92.2±1.2
+     Wood             99.6±0.1    98.8±0.3   99.3±0.1     100.0±0.0     99.6±0.3       99.7±0.1    99.0±0.1     99.5±0.2      100.0±0.0     99.7±0.1       99.7±0.2     99.1±0.0     99.5±0.2      99.9±0.1   99.5±0.1
+     Zipper           96.9±0.5    95.5±0.9   97.2±0.3      96.8±1.8     99.0±0.6       98.2±0.8    95.4±1.0     97.8±1.0      98.3±0.4      99.3±0.5       98.6±0.4     96.2±0.8     99.1±0.7      98.5±0.2   98.5±0.3
+     Mean            90.6±0.8     88.1±1.7   92.2±1.5      96.5±0.9      97.1±1.0     91.7±1.2     89.3±1.7     93.8±1.7      97.0±0.7      97.9±0.7      92.5±1.2      90.5±1.6     94.5±1.5     97.3±0.6     98.5±0.5
+
+
+                             Table 15. Comparison of image-level anomaly detection in terms of subset-wise AUPR on MVTec.
+
+ MVTec                                     1-shot                                                             2-shot                                                                  4-shot
+Pixel-PRO       SPADE       PaDiM       PatchCore    WinCLIP+      PromptAD         SPADE       PaDiM      PatchCore     WinCLIP+         PromptAD       SPADE        PaDiM        PatchCore     WinCLIP+     PromptAD
+  Bottle        91.1±0.4    89.8±0.8    93.5±0.3     91.2±0.4      93.6±0.1       91.8±0.5     91.7±0.2     93.9±0.3        91.8±0.3      93.9±0.2      92.5±0.1      92.2±0.2     94.0±0.2      91.6±0.2     94.5±0.2
+  Cable         63.5±0.7    59.1±3.2    84.7±1.0     72.5±2.3      87.3±1.2       66.7±0.9     66.5±2.8     88.5±0.9        74.7±2.3      87.8±0.7      69.5±0.4      74.2±1.8     91.7±0.6      77.0±1.1     88.9±0.3
+ Capsule        92.7±0.4    80.0±2.0    83.9±0.9     85.6±2.7      80.1±1.7       93.4±0.3     82.3±2.1     86.6±1.0        90.6±0.6      79.2±2.2      94.1±0.6      85.7±1.3     87.8±1.9      90.1±1.5     88.7±2.0
+  Carpet        96.1±0.0    92.9±0.3    93.3±0.3     97.4±0.4      98.3±0.3       96.2±0.0     93.9±0.2     93.7±0.4        97.3±0.3      98.2±0.3      96.3±0.0      94.4±0.2     93.9±0.4      97.0±0.2     98.2±0.1
+   Grid         67.7±1.9    41.2±4.6    21.7±9.5     90.5±2.7      94.3±1.0       72.1±1.5     45.1±3.6     23.7±3.8        92.8±2.5      95.0±0.8      78.0±1.5      55.5±3.4     30.4±4.6      93.6±0.6     93.8±0.7
+ Hazelnut       94.9±0.3    85.7±1.9    88.3±1.3     93.7±0.9      92.9±0.5       95.6±0.2     89.4±0.9     89.8±1.3        94.2±0.3      93.4±0.5      95.6±0.1      90.4±0.7     92.0±0.3      94.2±0.3     95.2±0.5
+ Leather        98.7±0.0    95.6±0.2    95.2±1.0     98.6±0.0      98.7±0.5       98.8±0.0     96.2±0.2     95.9±0.3        98.3±0.4      98.7±0.4      98.8±0.0      96.3±0.1     96.4±0.1      98.0±0.4     98.4±0.5
+ Metal nut      73.4±1.1    38.1±1.6    66.7±2.9     84.7±1.1      83.1±0.6       78.1±1.8     48.2±5.0     79.6±4.2        86.7±0.8      87.7±1.1      81.2±1.4      54.0±8.8     83.8±5.5      89.4±0.1     87.6±0.3
+   Pill         92.8±0.3    78.9±0.6    89.5±1.6     93.5±0.2      90.8±0.4       93.3±0.2     84.3±0.4     91.6±0.5        94.5±0.2      90.5±0.4      93.9±0.2      86.6±0.4     92.5±0.4      94.6±0.3     92.0±0.1
+  Screw         85.0±0.8    51.6±1.7    68.1±1.3     82.3±1.1      78.1±1.7       87.2±1.2     69.5±2.1     69.0±2.1        84.1±0.5      74.7±1.4      89.5±1.3      72.3±0.8     72.4±3.1      86.3±1.8     86.7±2.5
+   Tile         84.2±0.4    66.7±1.5    82.5±1.1     89.4±0.4      90.7±0.3       84.6±0.2     71.9±0.5     82.5±0.5        89.6±0.4      90.9±0.2      84.9±0.1      73.6±0.9     83.0±0.1      89.9±0.3     90.9±0.2
+Toothbrush      83.5±1.3    82.1±1.5    79.0±2.4     85.3±1.0      90.1±0.5       87.4±1.1     83.3±2.6     81.0±0.7        84.7±1.4      91.6±0.5      89.0±1.1      87.1±1.7     85.5±3.0      86.0±3.3     91.3±0.2
+Transistor      55.3±2.0    70.3±7.0    70.9±4.6     65.0±1.8      67.5±3.7       57.6±1.4     76.5±5.5     78.8±1.5        68.6±1.1      68.1±2.1      58.5±0.7      82.2±7.4     79.5±2.8      69.0±1.1     73.0±1.2
+  Wood          92.9±0.1    86.5±0.6    87.1±1.0     91.0±0.6      92.4±0.8       93.1±0.1     88.0±0.2     86.8±1.4        91.8±0.6      91.6±0.6      93.2±0.1      88.4±0.2     87.7±0.4      91.7±0.3     91.4±0.5
+  Zipper        86.8±0.6    81.7±2.0    91.2±1.1     86.0±1.7      81.0±1.4       89.0±0.4     85.6±0.7     92.8±0.4        86.4±1.6      86.4±0.5      90.1±0.2      87.2±0.8     93.4±0.2      86.9±0.7     87.5±0.6
+  Mean          83.9±0.7    73.3±2.0    79.7±2.0     87.1±1.2      87.9±1.0       85.7±0.7     78.2±1.8     82.3±1.3        88.4±0.9      88.5±0.8      87.0±0.5      81.3±1.9     84.3±1.6      89.0±0.8     90.5±0.7
+
+
+                                Table 16. Comparison of pixel-level anomaly detection in terms of subset-wise PRO on MVTec.
+
+
+
+
+      VisA                                      1-shot                                                             2-shot                                                               4-shot
+Image-level AUPR      SPADE         PaDiM     PatchCore    WinCLIP+      PromptAD       SPADE        PaDiM       PatchCore     WinCLIP+      PromptAD       SPADE        PaDiM       PatchCore    WinCLIP+    PromptAD
+     Candle           86.5±4.3    69.2±3.9    86.6±2.3      93.6±1.5      93.7±2.9    90.7±3.2       72.8±1.0    86.8±1.7       95.1±1.1      93.6±1.1     92.6±1.9     72.5±1.1     88.9±1.1     95.3±0.4     92.9±1.1
+    Capsules          79.4±4.9    63.4±5.7    72.3±5.3      89.9±2.5      90.1±1.9    79.9±5.8       63.4±2.0    73.6±4.7       88.9±0.7      88.3±2.6     81.1±4.5     63.0±2.3     78.4±3.1     91.5±1.4     89.8±1.0
+    Cashew            97.9±0.4    78.2±5.7    94.6±2.0      97.2±0.2      97.6±0.7    98.6±0.6       86.1±2.2    96.9±0.3       97.3±0.2      97.4±0.5     98.3±0.6     88.4±2.0     96.5±0.7     97.7±0.4     97.0±1.1
+  Chewinggum          96.4±0.9    79.8±3.6    98.9±0.1      99.0±0.3      99.1±0.7    97.1±0.4       89.5±1.9    99.1±0.2       98.9±0.3      98.4±0.2     97.1±0.6     88.5±3.2     99.3±0.1     99.0±0.1     98.5±0.3
+     Fryum            89.8±1.8    74.5±2.9    87.6±2.4      94.7±1.0      93.8±1.0    94.5±2.3       81.0±5.4    92.1±1.3       95.8±0.2      96.0±0.7     95.8±1.0     81.5±3.0     95.0±0.6     96.0±0.3     93.6±0.5
+   Macaroni1         61.9±11.2    60.4±2.9    67.8±3.4      84.9±1.2      86.3±1.9    64.5±9.5       63.1±4.3    74.9±5.2       84.7±1.5      91.1±1.7     60.2±2.7     64.9±2.1     82.1±3.5     86.5±0.6     89.2±1.3
+   Macaroni2          52.7±4.2    51.7±5.0    54.9±3.2      68.4±1.8      72.5±2.5    55.9±3.1       52.7±1.5    57.2±2.6       70.4±1.8      84.7±1.6     51.9±2.3     54.9±2.5     60.2±3.0     69.6±2.8     82.2±1.0
+     PCB1             84.9±3.7    68.6±2.4    72.1±2.5     76.5±19.0     88.0±11.3    83.8±2.1       60.4±7.7    72.6±16.4     78.3±4.3       80.9±6.3     83.2±7.2     77.4±2.9     81.0±9.2     87.7±1.7     90.1±3.6
+     PCB2             74.9±2.9    63.3±1.2    84.4±0.4      64.9±3.3      75.4±2.7    71.7±6.6       68.9±2.6    86.6±1.1       65.8±4.0      73.0±4.8     74.2±5.0     75.0±1.7     86.2±1.0     71.3±3.4     75.3±2.5
+     PCB3             75.5±2.1   52.3±10.8    84.6±1.5      73.5±1.6      75.2±3.8    78.3±5.2       65.2±3.8    86.1±0.5       80.9±1.6      82.8±2.2     81.0±3.6     64.5±2.4     88.3±1.1     84.8±1.8     83.5±1.6
+     PCB4             92.9±1.6    74.7±2.6    92.8±3.1     78.5±15.5      90.5±1.2    81.9±11.2     67.6±11.9    93.2±3.4      72.5±16.2      94.5±2.9     94.8±2.9     84.0±2.0     94.9±1.2     85.6±8.9     97.5±1.3
+   Pipe fryum         88.3±2.0    79.2±1.5    95.4±0.6      98.6±0.5      98.3±0.1    88.1±1.7       84.5±1.7    96.8±0.7       99.0±0.3      99.1±0.1     88.8±1.0     89.8±1.7     98.3±0.3     99.2±0.2     99.3±0.1
+     Mean            82.0±3.3     68.3±4.0    82.8±2.3     85.1±4.0      88.4±2.6      82.3±4.3     71.6±3.8      84.8±3.2      85.8±2.7      90.0±2.1     83.4±2.7     75.6±2.2     87.5±2.1     88.8±1.8     90.8±1.3
+
+
+                              Table 17. Comparison of image-level anomaly detection in terms of subset-wise AUPR on VisA.
+
+    VisA                                    1-shot                                                             2-shot                                                                 4-shot
+ Pixel-PRO        SPADE       PaDiM      PatchCore    WinCLIP+        PromptAD       SPADE        PaDiM     PatchCore       WinCLIP+      PromptAD       SPADE         PaDiM       PatchCore     WinCLIP+     PromptAD
+   Candle        95.6±0.5    81.5±5.3     92.6±0.4      94.0±0.4       91.8±1.2     95.6±0.4    87.3±1.2      93.4±0.6      94.2±0.2       91.6±0.7      95.7±0.1     88.3±0.7     94.1±0.4      94.4±0.2     90.6±0.5
+  Capsules       83.1±1.1    30.6±1.1     66.6±4.5      73.6±3.5       70.0±1.6     85.4±3.1    38.4±3.7      67.9±2.3      75.9±1.9       70.8±2.5      89.0±1.2     43.3±2.0     69.0±3.2      77.0±1.4     72.4±3.2
+  Cashew         89.8±1.1    73.4±2.1     90.8±0.2      91.1±0.8       92.3±0.5     90.4±0.5    78.4±2.7      91.4±1.0      90.4±0.6       92.7±1.8      90.4±0.6     81.2±2.8     92.1±0.3      91.3±0.9     92.8±2.0
+Chewinggum       73.9±1.2    58.1±0.6     78.2±1.3      91.0±0.5       89.8±1.3     73.8±1.1    63.7±2.4      78.0±0.4      90.9±0.7       87.8±1.3      72.7±0.9     67.2±1.8     79.3±0.8      91.0±0.4     89.4±0.6
+   Fryum         83.7±1.2    71.1±1.6     78.7±2.3      89.1±1.0       83.5±3.1     84.5±0.9    71.2±0.8      81.4±2.8      89.3±0.2       86.2±3.1      86.2±0.9     73.2±1.3     81.0±1.2      89.7±0.5     80.3±0.7
+ Macaroni1       92.0±0.6    62.2±4.4     83.4±1.3      84.6±2.3       87.5±1.9     93.9±0.8    71.8±2.4      86.2±4.6      85.2±1.4       90.6±1.5      95.1±0.4     76.6±2.1     89.6±0.7      86.8±0.8     91.5±1.3
+ Macaroni2       80.0±3.3    54.9±3.6     66.0±3.0      89.3±2.4       80.6±1.5     81.7±1.5    65.6±3.4      67.2±6.5      88.6±1.7       82.7±1.0      86.0±0.8     65.9±1.5     78.3±0.9      90.5±1.3     87.2±0.6
+   PCB1          81.3±5.7    63.9±1.8    79.0±10.7      82.5±6.0      89.2±13.1     87.2±2.3    68.4±4.1      86.1±1.7      83.8±5.0       90.2±7.5      88.0±2.7     70.2±3.3     88.1±2.6      87.9±2.1     90.2±6.0
+   PCB2          83.7±0.6    64.4±3.8     80.9±0.5      73.6±1.5       79.3±2.0     85.5±1.0    72.9±3.4      82.9±1.8      76.2±0.9       79.3±1.9      87.0±0.5     71.9±2.6     83.7±1.0      78.0±1.3     76.3±1.6
+   PCB3          84.3±1.0    69.0±1.2     78.1±2.0      79.5±2.5       84.0±1.4     86.1±0.6    74.0±2.3      82.2±1.1      82.3±1.8       84.7±1.1      87.7±0.6     77.2±0.8     84.4±1.9      84.2±1.0     85.0±1.3
+   PCB4          66.9±2.0    59.1±1.8     77.9±3.1      76.6±4.1       78.8±2.3     69.3±1.1    62.6±3.6      79.5±4.8      81.7±1.2       78.3±2.6      74.7±1.0     67.9±2.6     83.5±2.5      84.2±0.7     83.4±2.4
+ Pipe fryum      94.3±0.5    83.9±0.8     93.6±0.5      96.1±0.6       95.2±0.4     95.0±0.2    86.9±0.9      94.5±0.4      96.2±0.6       94.8±0.5      95.0±0.3     88.7±1.3     95.0±0.5      96.6±0.2     95.3±0.3
+   Mean          84.1±1.6    64.3±2.4    80.5±2.5       85.1±2.1      85.1±2.5      85.7±1.1    70.1±2.6      82.6±2.3      86.2±1.4       85.8±2.1      87.3±0.8     72.6±1.9     84.9±1.4      87.6±0.9     86.2±1.7
+
+
+                                 Table 18. Comparison of pixel-level anomaly detection in terms of subset-wise PRO on VisA.
+ / D \ H U      / D \ H U             / D \ H U            / D \ H U            / D \ H U        / D \ H U  
+
+
+
+
+ / D \ H U      / D \ H U             / D \ H U           / D \ H U           / D \ H U       / D \ H U   
+
+
+
+
+                      Figure 11. Visualization of the QK attention map in the vision encoder.
+ / D \ H U      / D \ H U             / D \ H U            / D \ H U            / D \ H U        / D \ H U  
+
+
+
+
+ / D \ H U      / D \ H U             / D \ H U           / D \ H U           / D \ H U       / D \ H U   
+
+
+
+
+                      Figure 12. Visualization of the VV attention map in the vision encoder.
+

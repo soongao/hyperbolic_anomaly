@@ -1,0 +1,1295 @@
+                                               Real-IAD: A Real-World Multi-View Dataset for Benchmarking Versatile
+                                                                  Industrial Anomaly Detection
+
+                                                            Chengjie Wang1,2 Wenbing Zhu3,4 Bin-Bin Gao2 Zhenye Gan2
+                                                    Jiangning Zhang2 Zhihao Gu1 Shuguang Qian4 Mingang Chen5 Lizhuang Ma1 *
+                                                     1
+                                                         Shanghai Jiao Tong University 2 Youtu Lab, Tencent 3 Fudan University 4 Rongcheer Co., Ltd
+                                                                        5
+
+
+
+
+arXiv:2403.12580v1 [cs.CV] 19 Mar 2024
+                                                                          Shanghai Development Center of Computer Software Technology
+                                                                          Website:     https://realiad4ad.github.io/Real-IAD
+
+
+
+                                                                      Abstract                             of technological advancement and bridging the gap between
+                                                                                                           technical research and practical application. For instance,
+                                             Industrial anomaly detection (IAD) has garnered signif-       ImageNet [13] has made an indelible contribution to the de-
+                                         icant attention and experienced rapid development. How-           velopment of deep learning model structures and learning
+                                         ever, the recent development of IAD approach has encoun-          methodologies. MVTec AD [2] abstracts defect detection in
+                                         tered certain difficulties due to dataset limitations. On         manufacturing into a research topic, thereby bringing visual
+                                         the one hand, most of the state-of-the-art methods have           learning algorithms closer to industrial production applica-
+                                         achieved saturation (over 99% in AUROC) on mainstream             tion scenarios. Nevertheless, the data volume of current AD
+                                         datasets such as MVTec, and the differences of methods            datasets is still small and needs further development.
+                                         cannot be well distinguished, leading to a significant gap
+                                                                                                               Industrial production is the cornerstone of human so-
+                                         between public datasets and actual application scenarios.
+                                                                                                           cietal development, with product quality inspection play-
+                                         On the other hand, the research on various new practi-
+                                                                                                           ing a key role [7]. Defects in the production process of
+                                         cal anomaly detection settings is limited by the scale of
+                                                                                                           parts can affect product quality and subsequently reduce
+                                         the dataset, posing a risk of overfitting in evaluation re-
+                                                                                                           product lifespan. In the production of pharmaceuticals,
+                                         sults. Therefore, we propose a large-scale, Real-world, and
+                                                                                                           food, batteries, and other products, product defects can
+                                         multi-view Industrial Anomaly Detection dataset, named
+                                                                                                           pose a threat to human safety. Given the importance of
+                                         Real-IAD, which contains 150K high-resolution images of
+                                                                                                           defect detection, manufacturing companies have invested
+                                         30 different objects, an order of magnitude larger than ex-
+                                                                                                           substantial resources in this area [2–4], and academia has
+                                         isting datasets. It has a larger range of defect area and
+                                                                                                           also gradually turned its attention to this issue in recent
+                                         ratio proportions, making it more challenging than previ-
+                                                                                                           years [1, 12, 15, 25, 26, 34]. Some automation technologies
+                                         ous datasets. To make the dataset closer to real application
+                                                                                                           have begun to play a role in practical applications. Early ap-
+                                         scenarios, we adopted a multi-view shooting method and
+                                                                                                           plications of visual learning technology in industrial defect
+                                         proposed sample-level evaluation metrics. In addition, be-
+                                                                                                           detection mainly involved supervised learning for detec-
+                                         yond the general unsupervised anomaly detection setting,
+                                                                                                           tion [6, 14, 28] and segmentation [8, 16, 32] tasks. Although
+                                         we propose a new setting for Fully Unsupervised Indus-
+                                                                                                           these methods have practical value, they still face technical
+                                         trial Anomaly Detection (FUIAD) based on the observation
+                                                                                                           challenges such as the need for precise defect location an-
+                                         that the yield rate in industrial production is usually greater
+                                                                                                           notation. Moreover, the detection performance significantly
+                                         than 60%, which has more practical application value. Fi-
+                                                                                                           decreases for defects that are scarce or not included in the
+                                         nally, we report the results of popular IAD methods on the
+                                                                                                           training set. With the advent of datasets like MVTec AD [2]
+                                         Real-IAD dataset, providing a highly challenging bench-
+                                                                                                           and VisA [40], a large number of unsupervised anomaly
+                                         mark to promote the development of the IAD field.
+                                                                                                           detection methods have emerged [12, 23, 26, 29, 34, 38].
+                                                                                                           These techniques only need to ensure that the images in the
+                                                                                                           training set are anomaly-free, and resulting models have the
+                                         1. Introduction
+                                                                                                           ability to predict defect locations and pixel areas, signifi-
+                                         High-quality datasets play a pivotal role in the develop-         cantly reducing manual annotation costs and endowing the
+                                         ment of computer vision technology, guiding the direction         algorithm with the ability to recognize unknown defects.
+                                           * Corresponding authors.                                           The emergence of datasets like MVTec AD [2], and
+VisA [40] has stimulated academic interest in industrial          tic, wood, ceramics, and mixed materials etc., considering
+anomaly detection research and has given birth to many in-        the diversity in industrial production. We have also deliber-
+novative methods. However, with technological progress,           ately increased the resolution of the dataset to capture more
+these datasets have gradually revealed their limitations. For     subtle defect features, providing strong support for high-
+example, the defect range in MVTec AD is small, and               precision defect detection. In addition, we have collected
+the actual application scenarios are simple. Recent meth-         images of each product from multiple angles to address the
+ods have exceeded 99% in I-AUROC (image-level) and P-             problem that a single view cannot cover all defects. To ver-
+AUROC (pixel-level) metrics, making it difficult to distin-       ify the effectiveness of the new dataset and promote techno-
+guish the merits of new methods. The scale of the data is         logical development, we conducted a series of experiments
+also limited, with some categories in MVTec AD having             on the dataset. Specifically, we conduct benchmark tests
+only about 60 or even fewer defect images, and the ran-           on existing unsupervised anomaly detection algorithms to
+dom error caused by the small number of test images can-          assess their performance on the new dataset. The exper-
+not be ignored. Some new IAD research uses some defec-            imental results show that although these algorithms have
+tive images in the training set, resulting in a smaller test      achieved good performance on the original datasets, there
+set and exacerbating the problem. In terms of object di-          is still room for improvement on the new dataset, indicating
+versity, MVTec AD includes 15 types of objects, and VisA          that the new dataset has a certain level of challenge, which
+includes 12 types of objects. The limited number of object        can help promote algorithm improvement and innovation.
+types affects the evaluation of the capabilities of a unified         In summary, our main contributions are as follows:
+model, leading to overly optimistic model metrics. In ad-         • We propose a new Real-IAD dataset, which is more than
+dition, there is a gap between the current dataset setup and        ten times larger than existing mainstream datasets. It in-
+the ideal application scenario. Although IAD is unsuper-            cludes 30 classes of objects with each containing 5 shoot-
+vised learning, the training set still requires manual annota-      ing angles, totaling 150K high-resolution images. More-
+tion. This process may introduce noise samples, such as the         over, Real-IAD presents more challenging defects with a
+noise samples in the BTAD training set proposed in Soft-            larger range of defect area and ratio proportions, better
+Patch [21]. Furthermore, mainstream 2D IAD datasets con-            differing the performance between different methods and
+sist of single-view images, but in practical applications, part     meeting various research settings of IAD.
+structures are complex, and a single view cannot cover all        • We construct a Fully Unsupervised IAD setting on the
+defects. Although some datasets, like MVTec AD-3D [4],              Real-IAD dataset that is closer to actual application sce-
+attempt to solve the multi-view problem from a 3D perspec-          narios, where only naturally existing constraint is used
+tive, the high cost of 3D sensors limits them in practical          that the yield rate of most production lines is greater than
+applications.                                                       60%, without introducing additional manual annotations.
+    To make the dataset closer to actual application scenarios    • We report the performance of popular IAD methods on
+and address the limitations of existing datasets, we propose        the Real-IAD dataset in several settings and provide a
+a new Real-world Industrial Anomaly Detection dataset               highly challenging benchmark to promote the develop-
+called Real-IAD. This dataset far exceeds existing datasets         ment of the anomaly detection field.
+in terms of the number of object categories and the number
+of images. To our knowledge, this dataset is the first to con-    2. Related Work
+sider the multi-view problem in 2D IAD tasks. In an ideal
+                                                                  2.1. Anomaly Detection Datasets
+scenario for practical application, image acquisition equip-
+ment is deployed on the production line, and the algorithm        Early anomaly detection works are generally conducted on
+is trained automatically without human intervention, pos-         KolektorSDD [31] which only contains one category and
+sessing the ability to determine whether a product is defec-      greatly limits the evaluation and development of algorithms.
+tive. Based on the characteristic that the yield rate of most     Subsequently, datasets such as MTD [19], MPDD [20] and
+production lines is greater than 60%, we add 0∼40% of             BTAD [27] are proposed, but these datasets are still rela-
+quality inspection anomaly images to the anomaly-free train       tively small, in terms of the number of categories and total
+set, proposing the completely unsupervised anomaly detec-         number of images. Since the introduction of the MVTec
+tion problem for the first time. Through this new dataset,        AD dataset [2], the conventional sensory IAD tasks have
+we hope to promote technological development in the field         started to get on track and gradually attracted a large num-
+of industrial anomaly detection, encourage the emergence          ber of researchers and practitioners. This dataset contains
+of more efficient and practical detection methods, and pro-       15 industrial products in 2 types with a total of 5,354 im-
+vide stronger technical support for industrial production. In     ages, greatly promoting algorithm research. Later VisA [40]
+this new real-world dataset, we have collected 30 indus-          covers 12 objects in 3 types with a total of 10,821 images,
+trial products covering a variety of materials, such as plas-     elevating the number of IAD dataset to the 10K level for
+the first time while having a larger number of categories,        3. Real-IAD Dataset Description
+i.e., 15. Recently, Zhou et al. [39] propose a synthetic
+PAD to promote research on pose-agnostic anomaly de-              3.1. Data Collection and Construction Manner
+tection, but there is a natural gap between synthetic data        This section introduces the construction pipeline of Real-
+and real samples, leading to inconsistencies in the metrics.      IAD in Fig. 1, and the procedure includes three parts:
+In addition, some datasets have extended 3D information           1) Material Preparation. We have purchased and collected
+to better detect defects, e.g., MVTec 3D AD [4], Eyecan-          30 objects covering a variety of materials, including metal,
+dies [5], and Real3D [24]. Nevertheless, the current visual       plastic, wood, ceramics, and mixed materials. Some ob-
+IAD datasets are still small in scale and category, gener-        jects are shown in the upper part of Fig. 1-(a). We manually
+ally applied to limited industrial scenarios, and there is no     created various types of defects, including missing parts,
+IAD dataset equivalent to the status of ImageNet-1K [13]          dirt, deformation, pits, damage, holes, cracks, scratches, as
+in the classification field. To address this issue, we pro-       shown in the lower part of Fig. 1-(a). Subsequently, these
+pose a novel large-scale (approximately 150K), more cat-          normal and anomaly objects are sent to the prototype ma-
+egories (30 categories), and multi-view (5 shooting angles)       chine for image collection.
+Real-IAD dataset for the task, which contain high-definition      2) Prototype Construction. The construction of the acqui-
+images, elaborate labelings, and more challenging detects,        sition equipment is shown in Fig. 1-(b). There are a total
+committed to providing a more challenging benchmark to            of five cameras capturing the object from different angles,
+promote the development of IAD methods and fair compar-           with one camera taking top shots and the other four taking
+ison of different methods (c.f ., Sec. 4 for details).            shots from symmetric angles at approximately 45 degrees.
+                                                                  Additionally, to better image the object and clearly capture
+2.2. Standard Anomaly Detection                                   minor defects, a ring light source is installed above the ob-
+                                                                  ject. In actual applications, automated equipment is used to
+The standard IAD task aims to identify whether a given im-
+                                                                  flip the parts for bottom quality inspection. For parts with
+age of a target class is anomalous or not and localize the
+                                                                  more structural obstructions, the camera is rotated to cap-
+anomaly region if the prediction is anomalous. The lack of
+                                                                  ture images from more angles. Considering that part flip-
+anomalous data makes it more challenging and it is usually
+                                                                  ping and additional shooting angles may affect actual ap-
+formulated as an unsupervised learning problem with only
+                                                                  plications but not algorithm research, we abstract the multi-
+normal data available in the training phase. Recently, vast
+                                                                  view visual quality inspection problem in real scenarios into
+efforts are dedicated to developing unsupervised anomaly
+                                                                  five shooting angles. The camera adopted is HIKROBOT
+detectors and form several mainstream approaches, namely
+                                                                  MV-CE200-10GC with 3,648×5,472 resolution.
+data augmentation-based methods [22, 36], reconstruction-
+                                                                  3) Data Collection, Annotation, and Cleaning. As shown
+based methods [17, 23], and embedding-based methods [12,
+                                                                  inFig. 1-(c), to ensure the accuracy of dataset collection, we
+26, 29, 30]. Specially, the embedding-based methods can be
+                                                                  first manually confirm all normal images and anomaly im-
+further divided into four categories, i.e., memory bank [29],
+                                                                  ages and use LabelMe to manually label pixel-level masks
+normalizing flow [30], knowledge distillation [12, 37], and
+                                                                  for anomaly data. Then, the data is divided into three
+classification [26]. These methods produce superior results.
+                                                                  groups, each of which is supervised trained using a cas-
+                                                                  cade RCNN based on HRNet-32w backbone for confident
+2.3. Other Settings in Anomaly Detection                          learning. We look for inconsistencies between the model’s
+More challenging settings have been proposed one after an-        prediction results and the manual annotation results. These
+other. The zero-/few-shot IAD [9, 10, 18] focuses on em-          data will undergo manual inspection and annotation again
+ploying a few normal samples for IAD, reducing the de-            until the model’s predicted AP results remain essentially
+mand for data. SoftPatch [21] introduces noisy data (less         unchanged, and the number of annotated images that need
+than 10%) into the anomaly-free training data in the stan-        to be modified is less than a certain threshold. Finally, we
+dard setting to model the real scenario, and Zaheer et al.        consider the data to be clean and construct different dataset
+propose unsupervised video detection [35]. Contrarily, the        settings.
+semi-supervised IAD [33] introduces anomalous data dur-
+                                                                  3.2. Comparison with Popular 2D Datasets
+ing training for better IAD. To avoid re-training for differ-
+ent categories, the unified IAD [34] accomplished IAD for         This section provides a detailed statistical analysis of the
+multiple classes by a unified framework. In this paper, we        proposed Real-IAD dataset, and compares it with main-
+propose a new setting called Fully Unsupervised Industrial        stream datasets, i.e., MVTec AD [2] and VisA [40].
+Anomaly Detection (FUIAD) based on the observation that           Comparison with Mainstream Datasets. As shown in
+the yield rate in industrial production is usually greater than   Tab. 1, compared to mainstream datasets, our method has at
+60%, which has a more practical application value.                least a 2x increase in the number of categories, and a mag-
+                                                                                                                  Labeling
+Ano
+                                                                                              Anomaly Images
+
+
+                    (a) Data Preparation              (b) Protype Construction                             (c) Data Collection, Annotation, and Cleaning                    (d) Data Visua
+
+
+
+                  (a) Material Preparation             (b) Prototype Construction                               (c) Data Collection, Annotation, and Cleaning
+
+
+                                                                                CAD Design
+                                                      No.2          No.3                                              Manual
+
+
+
+
+Normal Objects
+                                                             No.1
+                                                                                                                    Inspection
+
+                                                                                                  Normal Images
+                                                                                                                                               SL-CNN-1
+                                                      No.5          No.4
+
+
+
+                                                                                                                                                                Confident
+                                                                                                                                               SL-CNN-2
+                                                                                                                                                                 Learning
+                            Defect Manufacturing
+
+
+
+
+Anomaly Objects
+                                                                       Entity                                                                  SL-CNN-3
+                                                                                                                                                               Judge
+
+
+                                                                                                                       Mask                  Dissatisfactory      End
+                                                                                                                     Labeling                                  Condition
+
+                                                                                                 Anomaly Images                                           Satisfactory
+
+
+
+
+Figure 1. Data collection pipeline for our proposed Real-IAD dataset, which consists of four steps in tandem: (a) Material preparation
+and defect manufacturing. (b) Prototype design and construction that contains 5 shots for capturing multi-view images simultaneously, i.e.,
+one top-down camera with extra four cameras arranged uniformly at 45 degrees. (c) Collection procedure that includes cyclical processes
+of data collection, annotation, and cleaning. At the bottom, partial visualization of the final Real-IAD dataset reveals that the proposed
+Real-IAD exhibits large scale (30 classes), a wide range of defect proportions (0.01% to 6.75%), and a broad defect ratio (1:1 to 1:10),
+indicating that Real-IAD is highly challenging. Abnormal areas are prominently marked in red.
+
+                  Table 1. Comparison with current popular 2D real-world IAD datasets on different attributes. ✔: Satisfied. ✘: Unsatisfied.
+
+
+                                                      Image Number                             Image           Defect Types       Segmentation               Multiple
+                  Dataset       Class
+                                             Normal     Anomaly                  All         Resolution        Per Category         Labeling              Shooting Angles
+      BTAD                         3           952             392           1344            600∼1,600             3.00                  ✔                        ✘
+      SSGD                         1            0             2504           2504            1,500×1,000           7.00                  ✘                        ✘
+     MVTec AD                     15          4,096           1,258          5,354           700∼1,024             4.87                  ✔                        ✘
+       VisA                       12         9,621           1,200          10,821           960∼1,562             7.50                  ✔                        ✘
+     Read-IAD                     30         99,721          51,329         151,050          2,000∼5,000           4.37                  ✔                        ✔
+
+
+
+nitude increase in quantity, i.e., from 10K to 150K. Further-                                       Furthermore, each object is provided with five images taken
+more, Real-IAD provides images with a resolution of up                                              from different angles with segmentation labeling to support
+to 2,000∼5,000 to support research on finer-grained IAD                                             a multi-view setting, c.f ., Fig. 3.
+algorithms, which involves cropping from original images.                                           Data Statistics. Fig. 2 shows statistic of our Real-IAD
+                                                       Real-IAD                                                                                          400
+                      Anomaly        Normal
+                      Anomaly        Normal                                                     2000
+                                                                                                                                                         200
+                                                                                                1000
+
+                                                                                                   0                                                       0     1
+                                                                                                                                                                12
+                                                                                                       0.000
+                                                                                                       0.127
+                                                                                                       0.255
+                                                                                                       0.382                                                    23
+                                                                                                                                                                34
+                                                                                                                                                                45
+                                                                                                                                                                56
+                                                                                                                                                                67
+                                                                                                                                                                78
+                                                                                                                                                                89
+                                                                                                                                                               100
+                                                                                                                                                               111
+                                                                                                                                                               122
+                                                                                                       0.509
+                                                                                                       0.637
+                                                                                                       0.764
+                                                                                                       0.891
+                                                                                                       1.019
+                                                                                                       1.146                                                   133
+                                                                                                                                                               144
+                                                                                                                                                               155
+                                                                                                                                                               166
+                                                                                                                                                               177
+                                                                                                                                                               188
+                                                                                                                                                               199
+                                                                                                                                                               210
+                                                                                                                                                               221
+                                                                                                                                                               232
+                                                                                                       1.273
+                                                                                                       1.400
+                                                                                                       1.528
+                                                                                                       1.655
+                                                                                                       1.782
+                                                                                                       1.910                                                   243
+                                                                                                                                                               254
+                                                                                                                                                               265
+                                                                                                                                                               276
+                                                                                                                                                               287
+                                                                                                                                                               298
+                                                                                                                                                               309
+                                                                                                       2.037
+                                                                                                       2.164
+                                                                                                       2.292
+                                                                                                       2.419
+                                                                                                       2.546
+                                                                                                       2.673
+                                                                                                       2.801
+                                                                                                       2.928
+                                                                                                       3.055
+
+                                                     图表标题
+                                                                                                                                                                     图表标题
+                                                     图表标题                                              图表标题
+            160000                                                                                                                      1200
+                                                                                        8000
+            160000                                                             99721
+            140000
+                                                                               99721    7000                                            1000
+            140000
+            120000
+            120000
+             100000
+                                                                                        6000
+                                                                                                                                         800
+            100000
+             80000                                                                      5000
+             80000
+             60000                                                                      4000                                             600
+             60000
+             40000
+             40000                                                                      3000
+             20000          952                                                                                                          400
+                                                0
+              20000         952                        4096         9621                2000
+                           392                2504     4096
+                  0                                                 9621                                                                 200
+                           392
+                         BTAD                         1258
+                                              2504
+                                            SSGD                   1200                 1000
+                         BTAD                         1258
+                                                   MVTec AD                  51329
+                                            SSGD                   1200
+                                                                  VisA
+                                                   MVTec AD                  51329
+                                                                           Real-IAD        0                                               0
+                                                                  VisA                         0.000                                             1
+                                                                                                                                                12
+                                                                                                                                                23
+                                                                                                                                                34
+                                                                                                                                                45
+                                                                           Real-IAD
+                                                                                               0.127
+                                                                                               0.255                                            56
+                                                                                                                                                67
+                                                                                                                                                78
+                                                                                                                                                89
+                                                                                                                                                     图表标题
+                                                                                                                                               100
+                                                                         图表标题
+                                                                                               0.382
+                                                                                               0.509
+                                                                                               0.637
+                                                                                               0.764
+                                                                                               0.891
+                                                                                               1.019                                           111
+                                                                                                                                               122
+                                                                                                                                               133
+                                                                                                                                               144
+                                                                                                                                               155
+                                                                                                                                               166
+                                                                                                                                               177
+                                                                                                                                               188
+                                                                                                                                               199
+                                                                                                                                               210
+                                                                                               1.146
+                                                                                               1.273
+                                                                                               1.400                                           221
+                                                                                                                                               232
+                                                                                                                                               243
+                                                                                                                                               254
+                                                                                                                                               265
+                                                 Anomaly    Normal
+                                                                                               1.528                                           276
+                                       (a)                                              (b)                                             (c)
+                                                                                               1.655
+                                                                                               1.782
+                                                                                               1.910
+                                                                                               2.037
+                                                                                               2.164                                           287
+                                                                                                                                               298
+                                                                                                                                               309
+                                                                                               2.292
+            4500                                                                                              4000
+                                                                                               2.419
+                                                                                               2.546
+                                                                                               2.673
+                                                                                               2.801
+                                                                                               2.928
+                                                                                               3.055
+                                                 Anomaly    Normal
+            4000                                                                                              3500
+            3500                                                                                              3000
+            3000
+                                                                                                              2500
+            2500
+                                                                                                              2000
+            2000
+                                                                                                              1500
+            1500
+            1000                                                                                              1000
+
+             500                                                                                               500
+
+               0                                                                                                 0
+                 swit
+                u_ ch
+                  bloc
+                      Confident Learning: Estimating Uncertainty in Dataset Labels
+                       k
+                         ro w u
+                           ll e oo sb
+                               d_ ds
+                                                   us er y
+                                                 po regu od
+                                                w ooth do ll
+                                                  oo
+                                                       b_ ase
+                                                           ad r
+                                                        fir to
+                                                     rc la
+                                                   tto b e
+                                                               ap
+                                                            e_ r
+                                                        el to
+                                                     t n_
+                                                      d br
+                                                bu en_ ush
+                                                       n _ ad
+                                                            m ry
+                                                      pl o un
+                                                         as
+                                                           ai
+                                                            ba s
+                                                                ho
+                                                                tte
+                                                            ti c ts
+                                                                 _n
+                                                                   to
+                                                                       r
+                                                                                                                        onpl
+                                                                                                                            au
+                                                                                                                           b i oj
+                                                                                                                  bu o tt ack
+                                                                                                                   ph
+                                                                                                                       tto le_   d
+                                                                                                                            n _ ca
+                                                                                                                                 ba p
+                                                                                                                               en er y
+                                                                                                                                  er p
+                                                                                                                            fir ase tt
+                                                                                                                                m in t
+                                                                                                                            e_ pc
+                                                                                                                                   d_
+                                                                                                                                e_ r
+                                                                                                                                   ou
+                                                                                                                                ba b
+                                                                                                                             as tery
+                                                                                                                                    ho
+                                                                                                                                    tm caod
+                                                                                                                                        nt  s
+                                 st
+                                                                    ut                                                  pl ti c_
+                                    rip ti ck
+                                                ph en cb
+                                                    on _
+                                                       e_ c a
+                                                      bo tte  d
+                                                            ba p  p                                             ro          a
+                                                                                                                    po sti c ut
+                                                                                                                         r c _p
+                                                                                                                            el lu
+                                                                                                                  ll e reg o ll
+                                                                                                                       d_ u l  ai g
+                                                                                                                           st ato  n_  n
+                                                                                                                                       d
+                                                    pl _b  ttl ry
+                                                         to in
+                                                            y
+                                                       as ric  e_
+                                                                m ca p t                                                      r
+                                                                                                                      si m ip _ r
+                                                                                                                            _c bas
+                                                                                                                                ar e
+                                                                                                                                   d_
+                                                                                                                                  sw t  se
+                                                                                                                                      i tc
+                                       _b
+                                                           ti c k
+                                                        a pp
+                                                 te udi er
+                                                     rm oja    _p
+                                                              zi   lug                                               te  rm t a
+                                                                                                                              in p e
+                                                                                                                                 a
+                                                                                                                          to lb lo
+                                                                                                                             ot ck
+                                                                                                                                 hb  ru  shh
+                                                          in ck
+                                                            al
+                                         as
+                                                      tr tap
+                                                         a
+                                                  si m n sis e
+                                                       _c to r
+                                                            ar 1bloc  k                                                   tr to toy
+                                                                                                                                 y_
+                                                                                                                             an rickb
+                                                                                                                                  sis
+                                                                                                                                u_ r1
+                                                                                                                                    blto
+                                                                                                                                       oc
+                                            e
+                                                               d_
+                                                                vc se
+                                                                   pi t
+                                                                      ll                                          w  oous  b_ us
+                                                                                                                               ad b
+                                                                                                                          de vcp   ap   to kr
+                                                                                                                           Pit      Deformation       Abrasion       Scratch      Damage
+                                                                                                                               n_ ill
+                                                                                                                            w ead
+                                                                                                                               oo sb
+                                                                                                                                   ds
+                                                                                                                                  zip kti c
+                                                                                                                                       pe  r
+
+                                                            (d)      normal   anomaly                                (e)             AK BX CH
+                                                                                                                           Missing parts     PresenceHS
+                                                                                                                                                      of PS
+                                                                                                                                                        foreign QS
+                                                                                                                                                                objectsYW    ZW
+                                                                                                                                                                             Contamination
+
+
+            Figure 2. Statistic information of our proposed Real-IAD datast. (a) Statistic comparison of anomaly/normal data volume among
+            popular datasets. (b) Statistics of the percentage of the image area occupied by the anomaly region. (c) Statistics of the aspect ratio
+            of the minimum bounding rectangle of the defect. (d) Distribution of anomaly/normal image quantities across different categories. (e)
+            Distribution of data volume across different defect categories.
+
+                                                                                                                 existing datasets, the Real-IAD dataset covers a wider range
+                                                                                                                 of categories and provides richer scenarios, which helps to
+                                                                                                                 train more robust anomaly detection models and conduct
+                                                                                                                 fair evaluations. 2) Large-scale: Real-IAD is the first to
+                                                                                                                 provide a dataset of over 150K images, a magnitude in-
+                                                                                                                 crease compared to popular IAD datasets, which also pro-
+                                                                                                                 vides multi-view images with pixel-level annotations. 3)
+                                                                                                                 Challenge: Compared with existing datasets, the Real-IAD
+                                                                                                                 has a higher level of difficulty, which can drive the develop-
+            Figure 3. Visualization of multi-view collections, where the first
+                                                                                                                 ment and progress of current anomaly detection algorithms.
+            column represents the results captured by the top-down camera,
+            and the other columns represent the results captured by four sur-
+                                                                                                                 3.3. Real-IAD Visualization
+            rounding cameras at 45 degrees. Abnormal images are highlighted
+            for visualization, and normal images are displayed with normal                                       The bottom of Fig. 1 displays 30 sample data types from
+            brightness. It can be seen that multi-view shooting can solve the                                    Real-IAD, demonstrating that the dataset includes data from
+            problem of invisibility of abnormal areas from a single viewpoint.                                   a variety of material types, such as metal, plastic, wood,
+            dataset. Compared to the contrastive datasets, our Real-                                             ceramics, and mixed material. Moreover, the types of de-
+            IAD has an order of magnitude improvement on both nor-                                               fects include pit, deformation, abrasion, scratches, damage,
+            mal and abnormal data (Fig. 2-a). At the same time, the                                              missing parts, foreign objects, and contamination. The de-
+            proportion of defect area (Fig. 2-b) and the range of defect                                         fect area occupies a proportion ranging from 0.1 to 0.5, with
+            ratio (Fig. 2-c) are larger, indicating a higher difficulty level                                    a ratio ranging from 0.1 to 10.0. The richer data indicates
+            of the dataset, which is also proven by the experiments in                                           that Real-IAD is highly challenging, and it is expected to
+            Tab. 2. The bottom of Fig. 2 displays the number of nor-                                             promote further development in IAD.
+            mal and abnormal data in different categories (Fig. 2-d), as
+            well as the proportion of different types of defects (Fig. 2-                                        4. Benchmark
+            e). Overall, the ratio of normal to abnormal data is not very
+                                                                                                                 4.1. Evalution settings
+            disparate, e.g., VisA reaches 8:1, and each type of category
+            has multiple types of defects.                                                                       We establish two evaluation protocols, including Unsuper-
+            Advantage Analyses. Our Real-IAD dataset has advan-                                                  vised IAD, and fully Unsupervised IAD for all 30 categories
+            tages in the following aspects: 1) Diversity: Compared with                                          in Real-IAD dataset.
+
+
+Data Visualization
+Unsupervised IAD (UIAD): The algorithm learns patterns           5. Comparisons with IAD Benchmarks
+and structures only from normal samples. Therefore, most
+existing anomaly datasets are usually divided into training      5.1. Results on Unsupervised IAD
+and testing sets, where the training set only contains normal
+                                                                 We comprehensively compare the performance of our Real-
+samples. In contrast, the testing set consists of both normal
+                                                                 IAD with some popular IAD benchmarks (e.g., MVTec
+and anomalous samples. Following the previous arts, we
+                                                                 AD [2] and VisA [40]). MVTec AD [2] is a widely used
+fisrt evaluate our Real-IAD with the UIAD setting.
+                                                                 dataset in the field of industrial anomaly detection. It con-
+Fully Unsupervised IAD (FUIAD): The setting is in-               sists of high-resolution images of 10 objects and 5 textures,
+evitable in real-world IAD but is seldom discussed. And it       captured under different lighting conditions and with differ-
+is difficult to construct the FUIAD setting due to the limited   ent types of anomalies. The dataset provides ground truth
+availability of anomalous samples in the existing datasets,      annotations for the location and type of anomalies present
+such as MVTec AD [2] and VisA [40]. This paper is the first      in the images, enabling quantitative evaluation of detection
+to consider FUIAD (i.e., UIAD with noise) from a dataset         performance. VisA [40] is 2× larger than MVTec AD, with
+construction perspective. In the Real-IAD, large and di-         both image and pixel-level annotations. It spans 12 ob-
+verse samples of anomalies give us the flexibility to build      jects across 3 domains, with challenging scenarios includ-
+an FUIAD setup.                                                  ing complex structures in objects, multiple instances, and
+                                                                 object pose/location variations. The proposed Real-IAD is
+   To create an FUIAD setting, we first need to fix the test-    a large-scale (approximately 150K) with more categories
+ing set including normal and anomaly samples. In our ex-         (30 objects), and multi-view (5 shooting angles) dataset for
+periment, the number of normal and anomaly samples is            anomaly detection, where each anomaly image is labeled by
+uniformly set to 100 samples (500 images). The remain-           a pixel-level mask and a specific defect type. Considering
+ing normal and anomaly samples will be a candidate set for       that MVTec and VisA are single-view, we also select one
+constructing a noisy training set. We keep the total number      viewpoint (i.e., top view) from Real-IAD to form a single-
+of samples in the training set constant but the correspond-      view Real-IAD, a subset of multi-view Real-IAD.
+ing numbers of normal and abnormal ones are adaptively               For the UIAD setting, we mainly choose embedded-
+adjusted with a given noise ratio. To do this, we need first     based IAD methods, such as PatchCore[29], PaDim [11],
+infer the number of training samples according to the scale      and CFlow [30], data-augmentation-based methods, Sim-
+of the candidate set and the range of noisy ratio (e.g., [0.1,   pleNet [26] and DeSTSeg [38], and reconstruction-based
+0.4]). Then, we randomly sample normal and anomaly sam-          RD [12] and UniAD [34] for performance comparisons.
+ples from the candidate set to construct a training set with     PatchCore [29] first extracts neighborhood-aware patch-
+a specific noisy ratio. In this way, we obtain several new       level features and then stores them in a memory bank. At
+fully unsupervised benchmarks with different noise ratios        test time, images are classified as anomalies if at least one
+dubbed α ∈ [0, 1].                                               patch is anomalous, and pixel-level anomaly segmentation
+                                                                 is generated by scoring each patch feature. PaDiM [11]
+                                                                 extract pre-trained features to model normal distribution,
+4.2. Evaluation Metric                                           then utilize a distance metric to measure the anomalies.
+                                                                 CFlow [30] proposed to use a conditional normalizing flow
+The AUROC is the most widely used metric for image-level         framework to estimate the exact data likelihoods which
+and pixel-level anomaly detection. In addition, a normal-        are infeasible in other generative models for IAD. Sim-
+ized Per-Region Overlap (PRO) between segmentation and           pleNet [26] and DeSTSeg [38] convert Unsupervised IAD
+ground truth is calculated and the Area Under PRO curve          into supervised IAD training with generated anomaly im-
+(AUPRO) is also adopted as a pixel-level metric [2].             ages/features and real normal images/features. Feature
+                                                                 reconstruction-based RD [12] and UniAD [34] prevent the
+   Most IAD methods [12, 22, 26, 29, 30, 36, 38] evalu-          model from learning the shortcut with reverse distillation
+ate anomaly detection only at image and pixel levels due to      and neighborhood-masked attention, respectively. We re-
+limitations of existing IAD datasets. The proposed Real-         produce PatchCore [29], PaDim [11], CFlow [30] and
+IAD, to the best of our knowledge, is the first multi-view       RD [12] with open-sourced Anomalib, and other methods
+anomaly detection dataset, where each sample consists of         including SimpleNet [26], DeSTSeg [38] and UniAD [34]
+multiple different views. Therefore, in addition to evaluat-     with official codes. In our experiments, we resize all im-
+ing anomaly detection performance at the image and pixel         ages to 256×256, only center crop 224×224 from the re-
+levels, we integrate the results from multiple views to assess   sized 256×256 for PatchCore [29] and PaDim [11]. Other
+sample-level performance. This is more consistent with the       hyperparameters, such as batch size and learning rate, are
+indicator evaluation in industrial production lines.             kept the same as the official implementation.
+Table 2. UIAD performance comparisons on Real-IAD and some existing IAD datasets, MVTec AD [2] and VisA [40]. The results are
+averaged over all categories on each dataset. We report the averaged value and standard deviation (denoted as “mean±std”) based on the
+results of different methods for each metric. The lower the value means the corresponding anomaly detection task is more challenging.
+
+                                               Embedding-based                   Data-Aug-based                        Reconstruction-based
+ Datasets                 Metric↑                                                                                                                   Mean±Std
+                                    PatchCore[29] PaDim[11] CFlow[30]      SimpleNet[26] DeSTSeg[38]                   RD[12] UniAD[34]
+                          I-AUROC        99.0         95.5     97.1            99.3           98.4                      98.5        97.5             97.9 ±1.2
+ MVTec AD [2]
+                          P-AUPRO        94.7         91.3     92.3            89.9           94.7                      93.1        90.7             92.4 ±1.8
+                          I-AUROC        95.1         85.1     91.8            95.4           90.3                      95.9        88.8             91.8 ±3.7
+ VisA [40]
+                          P-AUPRO        91.2         79.7     84.8            88.7           90.6                      92.9        85.5             87.6 ±4.2
+                          I-AUROC        90.4         86.6     85.0            91.7           89.2                      87.6        82.7             87.6 ±2.9
+ Real-IAD (single-view)
+                          P-AUPRO        92.5         90.0     88.6            88.9           90.3                      94.4        86.0             90.0 ±2.6
+                          S-AUROC        93.7         91.2     89.8            94.9           94.0                      83.7        88.1             90.3 ±4.0
+ Real-IAD (multi-view)    I-AUROC        89.4         80.3     82.5            88.5           86.9                      87.1        82.9             85.0 ±3.6
+                          P-AUPRO        91.5         81.8     90.5            84.6           81.5                      93.8        86.1             86.3 ±4.4
+
+    The results of all methods on MVTec, VisA, and our                Table 3. Comparison with popular IAD datasets on FUIAD set-
+single-/multi-view Real-IAD are presented in Table 2. 1)              ting. NR (α) and # TS are the noisy ratio and anomalous testing
+We can observe that there is a significant performance de-            samples, respectively. The fail settings are marked in blue.
+crease from MVTec (97.9% in I-AUROC) to our single-                                           # valid category                 # training images or samples
+                                                                        NR        # TS
+view and multi-view Real-IAD (85% in I-AUROC). This                                      MVTec AD   ViSA    Real-IAD    MVTec AD   ViSA   Real-IAD(I)   Real-IAD(S)
+                                                                                  25       15        12        30         268       667      2605           521
+indicates that the proposed Real-IAD is more challeng-                  α = 0.1
+                                                                                  50       13        12        30         223       500      2466           493
+                                                                                  75        9        12        30         200       250      2327           465
+ing than the existing datasets for anomaly detection. The                         100       4         0        30         181        0       2188           437
+                                                                                  150       0         0        30          0         0       1910           382
+performance drop is more pronounced when using a uni-                             25       15        12        30         252       375      2931           586
+                                                                                  50       13        12        30         193       250      2774           554
+fied model, which is reasonable considering the more com-               α = 0.2
+                                                                                  75        9        12        30         148       125      2618           523
+plex data distribution (i.e., more views and more classes)                        100
+                                                                                  150
+                                                                                            4
+                                                                                            0
+                                                                                                      0
+                                                                                                      0
+                                                                                                               30
+                                                                                                               30
+                                                                                                                          120
+                                                                                                                           0
+                                                                                                                                     0
+                                                                                                                                     0
+                                                                                                                                             2462
+                                                                                                                                             2149
+                                                                                                                                                            492
+                                                                                                                                                            429
+in Real-IAD; 2) It is hard to evaluate different methods on                       25
+                                                                                  50
+                                                                                           15
+                                                                                           13
+                                                                                                     12
+                                                                                                     12
+                                                                                                               30
+                                                                                                               30
+                                                                                                                          152
+                                                                                                                          108
+                                                                                                                                    187
+                                                                                                                                    125
+                                                                                                                                             3908
+                                                                                                                                             3699
+                                                                                                                                                            781
+                                                                                                                                                            739
+                                                                        α = 0.4
+the existing datasets as the results are very similar. Espe-                      75        9        12        30          78        62      3491           698
+                                                                                  100       4         0        30          60        0       3283           656
+cially on MVTec, most methods achieve about 98%-99%                               150       0         0        30          0         0       2866           573
+
+in I-AUROC. In contrast, on the Real-IAD dataset, most
+methods only obtain about 90% I-AUROC, which is better                    Popular anomaly detection datasets like MVTec AD [2]
+for evaluating the effectiveness of anomaly detection algo-           and VisA [40] are primarily designed for unsupervised set-
+rithms; 3) The pixel-level P-PRO on Real-IAD is compara-              tings. To evaluate the capabilities of fully unsupervised al-
+ble to the existing VisA but noticeably lower than MVTec              gorithms, researchers have to randomly sample a portion of
+AD. This indicates that the proposed Real-IAD dataset also            anomaly samples from the testing set and add them as noise
+presents challenges at the pixel-level anomaly localization.          samples to the training set, creating a fully unsupervised
+                                                                      IAD experiment. In this way, it leads to a significant reduc-
+5.2. IAD Benchmarks Meet FUIAD                                        tion in the number of testing samples, which may be insuf-
+Traditional Unsupervised IAD methods indeed assume that               ficient to effectively evaluate the performance of anomaly
+the training dataset only contains normal samples. How-               detection algorithms. For quantitative analysis, we assume
+ever, in practical applications, it isn’t easy to guarantee that      a certain number of testing samples (e.g., 25, 50, 75, 100
+all training samples are normal. Considering that the yield           and 150) for each category and calculate the number of valid
+rate of good products on a production line is typically higher        testing categories and the number of training images or sam-
+than 60%, it means that no more than 40% products are ab-             ples based on a given noise ratio (e.g., 0.1, 0.2 and 0.4). The
+normal. Therefore, existing unsupervised methods may not              corresponding statistic results are reported in Table 3.
+be suitable for practical applications because they require              We can see that increasing the noisy ratio or inject-
+manual annotation before training that is laborious.                  ing anomalous noisy samples into the normal training set
+    Hence, a more practical solution is to perform fully un-          (MVTec and VisA) would lead to a decrease in the number
+supervised anomaly detection, which allows a certain pro-             of valid testing categories and the number of normal train-
+portion of abnormal samples in the training process. This             ing samples, making it impossible to evaluate the perfor-
+paradigm can better adapt to real-world scenarios and re-             mance of FUIAD algorithms in some challenging settings
+duce reliance on manual annotation. By building a fully Un-           (high noisy ratios). In contrast, the proposed Real-IAD en-
+supervised IAD setting, it is possible to better simulate ab-         sures a consistent number of valid testing categories and a
+normal situations in real-world scenarios, thereby improv-            stable scale of corresponding normal samples in the training
+ing the robustness and practicality of IAD algorithms.                set when the noisy ratio ranges from 0.1 to 0.4 and the num-
+Table 4. FUIAD performance (S-AUROC/I-AUROC/P-PRO) comparisons on Real-IAD. The results are averaged over 30 categories. The
+best results are marked in red and the second-best ones are marked in blue.
+
+                                           Embedding-based                                               Data-Aug-based                       Reconstruction-based
+ Settings
+              PaDim[11]             CFlow[15]        PatchCore[29]        SoftPatch[21]        SimpleNet[26]      DeSTSeg[38]             RD[12]            UniAD[34]
+ α = 0.0    92.7 / 84.6 / 84.4   88.8 / 83.9 / 90.6 94.4 / 91.3 / 92.6   93.9 / 91.4 / 92.1   94.9 / 89.8 / 83.9 94.6 / 89.6 / 88.7   85.5 / 89.3 / 95.0 89.6 / 85.4 / 87.6
+ α = 0.1    85.5 / 81.9 / 86.4   81.8 / 80.3 / 90.7 92.2 / 90.4 / 93.2   92.8 / 90.9 / 92.9   87.8 / 83.3 / 79.9 88.1 / 85.6 / 86.9   83.5 / 88.1 / 95.1 87.2 / 84.2 / 87.7
+ α = 0.2    82.2 / 80.1 / 86.5   81.3 / 79.6 / 90.7 91.1 / 89.5 / 93.0   92.2 / 90.5 / 92.9   82.7 / 79.6 / 75.9 81.4 / 80.3 / 83.2   80.7 / 87.3 / 94.9 85.2 / 82.8 / 87.3
+ α = 0.4    76.5 / 77.0 / 86.1   78.6 / 78.0 / 90.2 88.9 / 88.1 / 92.4   90.6 / 89.3 / 92.5   77.7 / 74.7 / 70.5 74.5 / 74.4 / 75.5   76.8 / 84.5 / 94.7 81.5 / 80.1 / 86.6
+
+ber of anomalous testing samples varies from 50 to 150. We                                SoftPatch [21] that first filters some noisy features and then
+believe that Real-IAD provides a more reliable and compre-                                constructs Memory-Bank achieves almost optimal perfor-
+hensive assessment for FUIAD algorithms.                                                  mance in all methods. However, the performance improve-
+                                                                                          ment is relatively limited compared to unsupervised Patch-
+6. Comparisons with Fully Unsupervised IAD                                                Core [29]. This means that fully unsupervised anomaly de-
+                                                                                          tection still requires more in-depth research efforts. E.g.,
+For fully unsupervised anomaly detection, we set noisy ratio                              using model ensemble methods to improve robustness to
+α ∈ {0.1, 0.2, 0.4}. In addition, to make a fair comparison                               noise, combining the semantic understanding capabilities of
+between FUIAD and UIAD settings on the same testing set,                                  large vision language models to provide prior distribution of
+we also set the noisy ratio to 0, which transforms FUIAD                                  noisy data, etc.
+into UIAD. The results of FUIAD (α = 0) should be the
+upper bound of all FUIAD settings (α > 0). Considering                                    7. Conclusion
+that it is not easy to establish an effective fully unsupervised
+setting on existing datasets, we only evaluate fully unsuper-                             Based on the analysis of existing anomaly detection datasets
+vised anomaly detection methods on our Real-IAD. Simi-                                    and practical industry applications, we have several obser-
+lar to the evaluation of unsupervised anomaly detection, we                               vations. First of all, unsupervised industrial anomaly de-
+also select the same methods, PatchCore[29], PaDim [11],                                  tection algorithms have almost reached saturation in perfor-
+CFlow [30], SimpleNet [26], DeSTSeg [38], RD [12] and                                     mance, but it is still hard to deploy them in actual industrial
+UniAD [34]. To alleviate the effect of noise samples, Soft-                               inspection applications. Secondly, there is a gap between
+Patch [21] proposes a denoising mechanism based on Patch-                                 algorithms and applications, where most algorithms rely on
+Core for memory bank construction. Therefore, we also                                     clean normal training samples, but the data obtained in ac-
+evaluate the SoftPatch method under the FUIAD setting on                                  tual industrial production lines contains a certain amount of
+our Real-IAD. The main results are reported in Tabel 4.                                   noise. Finally, fully unsupervised industrial anomaly detec-
+    Under the setting of unsupervised anomaly detection (the                              tion is a more suitable setting for practical applications, but
+noisy ratio is set to zero), most state-of-the-art anomaly de-                            existing datasets are not sufficient to support research due
+tection methods (such as PatchCore [29], SoftPatch [21],                                  to limited samples. In order to address the above problems,
+SimpleNet [26], DeSTSeg [38]) show almost similar perfor-                                 we propose a large-scale, real-world, multi-view anomaly
+mance for sample- and image-level anomaly classification.                                 detection dataset (Real-IAD), which contains 150k high-
+For pixel-level anomaly segmentation, PatchCore [29],                                     resolution images, covering 30 objects of metal, plastic,
+SoftPatch [21] and RD [12] that use multi-level features are                              wood, ceramics, and mixed materials, each object contains
+more advantageous, thanks to the low-level features retain-                               5 different views with 8 common defects. The Real-IAD
+ing rich spatial location information.                                                    provides high-quality annotations at different levels such as
+    In the setting of fully unsupervised anomaly detection,                               pixel, image, and sample. We established two settings, un-
+almost all methods suffer severe performance degradation                                  supervised and fully unsupervised, to conduct extensive and
+on all metrics, especially PaDim [11], SimpleNet [26],                                    comprehensive evaluations using state-of-the-art anomaly
+DeSTSeg [38] and RD [12]. Unsupervised PatchCore [29]                                     detection methods. We hope that the Real-IAD can advance
+shows robustness, thanks to the patch-level Memory-Bank                                   research in the field of anomaly detection.
+mechanism. In the Memory-Bank, normal and abnormal                                        Limitation and Future Works. This paper only reports the
+features are stored simultaneously, and stable detection can                              results of some typical methods on Real-IAD. In the future,
+be achieved as long as the distribution of abnormal fea-                                  we will replicate more methods on Real-IAD and provide
+tures during the inference phase is different from the stored                             results under more settings, e.g., zero-shot, few-shot, and
+anomalies. In addition, the proportion of abnormal pixels                                 semi-supervised settings, etc. In addition, considering the
+is actually very low even with a high noise ratio at sample-                              large-scale and multi-view characteristics of Real-IAD, it is
+level (such as 0.4), and thus the quality of normal patch fea-                            also worthwhile to further study algorithms that are well-
+tures in Memory-Bank can be ensured to some extent. The                                   suited to these features.
+References                                                           [12] Hanqiu Deng and Xingyu Li. Anomaly detection via reverse
+                                                                          distillation from one-class embedding. In Proceedings of
+ [1] Samet Akcay, Amir Atapour-Abarghouei, and Toby P                     the IEEE/CVF Conference on Computer Vision and Pattern
+     Breckon. Ganomaly: Semi-supervised anomaly detection                 Recognition, pages 9737–9746, 2022. 1, 3, 6, 7, 8, 4, 5
+     via adversarial training. In Computer Vision–ACCV 2018:
+                                                                     [13] Jia Deng, Wei Dong, Richard Socher, Li-Jia Li, Kai Li,
+     14th Asian Conference on Computer Vision, Perth, Australia,
+                                                                          and Li Fei-Fei. Imagenet: A large-scale hierarchical image
+     December 2–6, 2018, Revised Selected Papers, Part III 14,
+                                                                          database. In 2009 IEEE conference on computer vision and
+     pages 622–637. Springer, 2019. 1
+                                                                          pattern recognition, pages 248–255. Ieee, 2009. 1, 3
+ [2] Paul Bergmann, Michael Fauser, David Sattlegger, and
+                                                                     [14] Ross Girshick. Fast r-cnn. In Proceedings of the IEEE inter-
+     Carsten Steger. Mvtec ad–a comprehensive real-world
+                                                                          national conference on computer vision, pages 1440–1448,
+     dataset for unsupervised anomaly detection. In Proceedings
+                                                                          2015. 1
+     of the IEEE/CVF conference on computer vision and pattern
+     recognition, pages 9592–9600, 2019. 1, 2, 3, 6, 7               [15] Denis Gudovskiy, Shun Ishizaka, and Kazuki Kozuka.
+                                                                          Cflow-ad: Real-time unsupervised anomaly detection with
+ [3] Paul Bergmann, Kilian Batzner, Michael Fauser, David Sat-
+                                                                          localization via conditional normalizing flows. In Proceed-
+     tlegger, and Carsten Steger. Beyond dents and scratches:
+                                                                          ings of the IEEE/CVF Winter Conference on Applications of
+     Logical constraints in unsupervised anomaly detection and
+                                                                          Computer Vision, pages 98–107, 2022. 1, 8, 3, 4, 5, 6, 7
+     localization. International Journal of Computer Vision, 130
+     (4):947–969, 2022.                                              [16] Kaiming He, Georgia Gkioxari, Piotr Dollár, and Ross Gir-
+                                                                          shick. Mask r-cnn. In Proceedings of the IEEE international
+ [4] Paul Bergmann, Xin Jin, David Sattlegger, and Carsten Ste-
+                                                                          conference on computer vision, pages 2961–2969, 2017. 1
+     ger. The mvtec 3d-ad dataset for unsupervised 3d anomaly
+     detection and localization. In Proceedings of the 17th Inter-   [17] Jinlei Hou, Yingying Zhang, Qiaoyong Zhong, Di Xie, Shil-
+     national Joint Conference on Computer Vision, Imaging and            iang Pu, and Hong Zhou. Divide-and-assemble: Learning
+     Computer Graphics Theory and Applications, VISIGRAPP                 block-wise memory for unsupervised anomaly detection. In
+     2022, Volume 5: VISAPP, Online Streaming, February 6-8,              Proceedings of the IEEE/CVF International Conference on
+     2022, pages 202–213. SCITEPRESS, 2022. 1, 2, 3                       Computer Vision, pages 8791–8800, 2021. 3
+ [5] Luca Bonfiglioli, Marco Toschi, Davide Silvestri, Nicola        [18] Chaoqin Huang, Haoyan Guan, Aofan Jiang, Ya Zhang,
+     Fioraio, and Daniele De Gregorio. The eyecandies dataset             Michael Spratling, and Yan-Feng Wang. Registration based
+     for unsupervised multimodal anomaly detection and local-             few-shot anomaly detection. In ECCV, pages 303–319.
+     ization. In Proceedings of the Asian Conference on Com-              Springer, 2022. 3
+     puter Vision, pages 3586–3602, 2022. 3                          [19] Yibin Huang, Congying Qiu, and Kui Yuan. Surface defect
+ [6] Zhaowei Cai and Nuno Vasconcelos. Cascade r-cnn: Delv-               saliency of magnetic tile. The Visual Computer, 36:85–96,
+     ing into high quality object detection. In Proceedings of the        2020. 2
+     IEEE conference on computer vision and pattern recogni-         [20] Stepan Jezek, Martin Jonak, Radim Burget, Pavel Dvorak,
+     tion, pages 6154–6162, 2018. 1                                       and Milos Skotak. Deep learning-based defect detection of
+ [7] Yunkang Cao, Xiaohao Xu, Jiangning Zhang, Yuqi Cheng,                metal parts: evaluating current methods in complex condi-
+     Xiaonan Huang, Guansong Pang, and Weiming Shen. A sur-               tions. In 2021 13th International congress on ultra mod-
+     vey on visual anomaly detection: Challenge, approach, and            ern telecommunications and control systems and workshops
+     prospect. arXiv preprint arXiv:2401.16402, 2024. 1                   (ICUMT), pages 66–71. IEEE, 2021. 2
+ [8] Liang-Chieh Chen, Yukun Zhu, George Papandreou, Florian         [21] Xi Jiang, Jianlin Liu, Jinbao Wang, Qiang Nie, Kai Wu,
+     Schroff, and Hartwig Adam. Encoder-decoder with atrous               Yong Liu, Chengjie Wang, and Feng Zheng. Softpatch: Un-
+     separable convolution for semantic image segmentation. In            supervised anomaly detection with noisy data. Advances in
+     Proceedings of the European conference on computer vision            Neural Information Processing Systems, 35:15433–15445,
+     (ECCV), pages 801–818, 2018. 1                                       2022. 2, 3, 8, 4, 5, 6, 7
+ [9] Xuhai Chen, Yue Han, and Jiangning Zhang. A zero-/few-          [22] Chun-Liang Li, Kihyuk Sohn, Jinsung Yoon, and Tomas
+     shot anomaly classification and segmentation method for              Pfister. Cutpaste: Self-supervised learning for anomaly de-
+     cvpr 2023 vand workshop challenge tracks 1&2: 1st place              tection and localization. In Proceedings of the IEEE/CVF
+     on zero-shot ad and 4th place on few-shot ad. arXiv preprint         conference on computer vision and pattern recognition,
+     arXiv:2305.17382, 2023. 3                                            pages 9664–9674, 2021. 3, 6
+[10] Xuhai Chen, Jiangning Zhang, Guanzhong Tian, Haoyang            [23] Yufei Liang, Jiangning Zhang, Shiwei Zhao, Runze Wu,
+     He, Wuhao Zhang, Yabiao Wang, Chengjie Wang, Yunsheng                Yong Liu, and Shuwen Pan. Omni-frequency channel-
+     Wu, and Yong Liu. Clip-ad: A language-guided staged dual-            selection representations for unsupervised anomaly detec-
+     path model for zero-shot anomaly detection. arXiv preprint           tion. IEEE Transactions on Image Processing, 2023. 1, 3
+     arXiv:2311.00453, 2023. 3                                       [24] Jiaqi Liu, Guoyang Xie, Ruitao Chen, Xinpeng Li, Jinbao
+[11] Thomas Defard, Aleksandr Setkov, Angelique Loesch, and               Wang, Yong Liu, Chengjie Wang, and Feng Zheng. Real3d-
+     Romaric Audigier. Padim: a patch distribution modeling               ad: A dataset of point cloud anomaly detection. arXiv
+     framework for anomaly detection and localization. In Inter-          preprint arXiv:2309.13226, 2023. 3
+     national Conference on Pattern Recognition, pages 475–489.      [25] Jiaqi Liu, Guoyang Xie, Jingbao Wang, Shangnian Li,
+     Springer, 2021. 6, 7, 8, 3, 4, 5                                     Chengjie Wang, Feng Zheng, and Yaochu Jin. Deep in-
+     dustrial image anomaly detection: A survey. arXiv preprint      [38] Xuan Zhang, Shiyu Li, Xi Li, Ping Huang, Jiulong Shan,
+     arXiv:2301.11514, 2, 2023. 1                                         and Ting Chen. Destseg: Segmentation guided denoising
+[26] Zhikang Liu, Yiming Zhou, Yuansheng Xu, and Zilei Wang.              student-teacher for anomaly detection. In Proceedings of
+     Simplenet: A simple network for image anomaly detection              the IEEE/CVF Conference on Computer Vision and Pattern
+     and localization. In Proceedings of the IEEE/CVF Confer-             Recognition, pages 3914–3923, 2023. 1, 6, 7, 8, 3, 4, 5
+     ence on Computer Vision and Pattern Recognition, pages          [39] Qiang Zhou, Weize Li, Lihan Jiang, Guoliang Wang, Guyue
+     20402–20411, 2023. 1, 3, 6, 7, 8, 4, 5                               Zhou, Shanghang Zhang, and Hao Zhao. Pad: A dataset
+[27] Pankaj Mishra, Riccardo Verk, Daniele Fornasier, Claudio             and benchmark for pose-agnostic anomaly detection. arXiv
+     Piciarelli, and Gian Luca Foresti. Vt-adl: A vision trans-           preprint arXiv:2310.07716, 2023. 3
+     former network for image anomaly detection and localiza-        [40] Yang Zou, Jongheon Jeong, Latha Pemula, Dongqing Zhang,
+     tion. In 2021 IEEE 30th International Symposium on Indus-            and Onkar Dabeer. Spot-the-difference self-supervised pre-
+     trial Electronics (ISIE), pages 01–06. IEEE, 2021. 2                 training for anomaly detection and segmentation. In Eu-
+[28] Shaoqing Ren, Kaiming He, Ross Girshick, and Jian Sun.               ropean Conference on Computer Vision, pages 392–408.
+     Faster r-cnn: Towards real-time object detection with region         Springer, 2022. 1, 2, 3, 6, 7
+     proposal networks. Advances in neural information process-
+     ing systems, 28, 2015. 1
+[29] Karsten Roth, Latha Pemula, Joaquin Zepeda, Bernhard
+     Schölkopf, Thomas Brox, and Peter Gehler. Towards to-
+     tal recall in industrial anomaly detection. In Proceedings of
+     the IEEE/CVF Conference on Computer Vision and Pattern
+     Recognition, pages 14318–14328, 2022. 1, 3, 6, 7, 8, 4, 5
+[30] Marco Rudolph, Tom Wehrbein, Bodo Rosenhahn, and Bas-
+     tian Wandt. Fully convolutional cross-scale-flows for image-
+     based defect detection. In Proceedings of the IEEE/CVF
+     Winter Conference on Applications of Computer Vision,
+     pages 1088–1097, 2022. 3, 6, 7, 8
+[31] Domen Tabernik, Samo Šela, Jure Skvarč, and Danijel
+     Skočaj. Segmentation-based deep-learning approach for
+     surface-defect detection. Journal of Intelligent Manufactur-
+     ing, 31(3):759–776, 2020. 2
+[32] Tete Xiao, Yingcheng Liu, Bolei Zhou, Yuning Jiang, and
+     Jian Sun. Unified perceptual parsing for scene understand-
+     ing. In Proceedings of the European conference on computer
+     vision (ECCV), pages 418–434, 2018. 1
+[33] Minghui Yang, Peng Wu, and Hui Feng. Memseg: A semi-
+     supervised method for image surface defect detection using
+     differences and commonalities. Engineering Applications of
+     Artificial Intelligence, 119:105835, 2023. 3
+[34] Zhiyuan You, Lei Cui, Yujun Shen, Kai Yang, Xin Lu,
+     Yu Zheng, and Xinyi Le. A unified model for multi-class
+     anomaly detection. Advances in Neural Information Pro-
+     cessing Systems, 35:4571–4584, 2022. 1, 3, 6, 7, 8, 4, 5
+[35] M Zaigham Zaheer, Arif Mahmood, M Haris Khan, Mattia
+     Segu, Fisher Yu, and Seung-Ik Lee. Generative cooperative
+     learning for unsupervised video anomaly detection. In Pro-
+     ceedings of the IEEE/CVF conference on computer vision
+     and pattern recognition, pages 14744–14754, 2022. 3
+[36] Vitjan Zavrtanik, Matej Kristan, and Danijel Skočaj. Draem-
+     a discriminatively trained reconstruction embedding for sur-
+     face anomaly detection. In Proceedings of the IEEE/CVF
+     International Conference on Computer Vision, pages 8330–
+     8339, 2021. 3, 6
+[37] Jiangning Zhang, Xuhai Chen, Yabiao Wang, Chengjie
+     Wang, Yong Liu, Xiangtai Li, Ming-Hsuan Yang, and
+     Dacheng Tao. Exploring plain vit reconstruction for multi-
+     class unsupervised anomaly detection.          arXiv preprint
+     arXiv:2312.07495, 2023. 3
+In this supplementary material, we first give all 30 object visualizations including 12 complex products (mixed material and
+surfaces with complex geometries) and 18 simple products (single material, e.g., metal, plastic, wood, ceramics and etc., and
+simple and smooth surfaces) in Real-IAD in Fig 5. Then, some representative anomaly images covering all 8 defects, i.e.,
+pit, deformation, abrasion, scratch, damage, missing, foreign objects, and contamination, are shown in Fig 4. In our main
+paper, we only report averaged results for all methods, here complete experimental results of all categories with both UIAD
+and FUIAD settings are reported in Tabs. 5, 6, 7, 8, 9 and 10.
+
+
+
+
+  Pit
+
+
+
+
+  Deformation
+
+
+
+
+  Abrasion
+
+
+
+
+  Scratch
+
+
+
+
+  Damage
+
+
+
+
+  Missing
+
+
+
+ Foreign
+ Objects
+
+
+
+
+  Contamination
+
+
+
+
+Figure 4. Anomalies Visualization of Real-IAD. Each row represents an anomaly class from different products and diverse locations.
+From top to bottom, they are pit, deformation, abrasion, scratch, damage, missing, foreign objects, and contamination, respectively.
+                                  Audiojack                                                        PCB
+
+
+
+
+                                 Phone Battery                                                 SIM Card Set
+
+
+
+
+                                    Switch                                                    Terminal Block
+
+
+
+
+                                  Toothbrush                                                          Toy
+
+
+
+
+                                  Transistor1                                                      USB
+
+
+
+
+                                 USB Adaptor                                                       Zipper
+
+                                                                  (a)
+
+
+
+
+                                                              Plastic Nut                    Regulator          Rolled
+        Bottle Cap     End Cap        Fire Hood    Mounts                    Plastic Plug                                   Toy Brick
+                                                                                                               Strip Base
+
+
+
+
+                       Vcpill                     Woodstick      Tape       Porcelain Doll     Mint              Eraser      Button
+          U Block                  Wooden Beads
+                                                                                                                             Battery
+                                                                  (b)
+
+
+Figure 5. Real-IAD Visualisation. (a) The upper six rows show 12 complex objects and all 5 views of each object. (b) The bottom 4 rows
+show the remaining 18 simple objects and each object shows two views. All anomaly regions are marked in red. Best viewed in zoom and
+color.
+Table 5. UIAD performance (I-AUROC / P-AUROC) comparisons with state-of-the-art anomaly detection methods on single-view Real-
+IAD.
+
+                                                          Embedding-based                              Data-Aug-based           Reconstruction-based
+                 Category
+                                    PaDim[11]     CFlow[15] PatchCore[29]      SoftPatch[21]   SimpleNet[26] DeSTSeg[38]        RD[12]     UniAD[34]
+                Audiojack           81.6 / 89.6   77.0 / 85.4    84.0 / 88.7    83.8 / 92.2      88.1 / 90.7     88.0 / 94.2   83.5 / 91.2 82.2 / 85.7
+                PCB                 88.6 / 79.0   83.0 / 85.2    93.9 / 94.7    91.3 / 95.0      91.9 / 91.5     88.5 / 92.8   89.6 / 93.8 82.5 / 78.2
+                Phone Battery       87.6 / 85.4   85.3 / 89.7    91.9 / 91.2    90.4 / 79.3      92.7 / 75.9     92.6 / 94.5   90.4 / 94.7 84.5 / 85.1
+                SIM Card Set        94.8 / 95.2   97.1 / 94.7    98.5 / 97.2    96.2 / 88.7      98.6 / 86.4     95.0 / 94.3   91.9 / 97.3 94.6 / 91.5
+                Switch              89.1 / 92.8   86.4 / 85.6    91.4 / 93.7    95.7 / 96.4      97.3 / 95.5     95.6 / 97.4   91.8 / 93.7 85.0 / 90.8
+                Terminal Block      93.3 / 98.4   89.7 / 93.5    97.9 / 98.5    97.8 / 98.8      98.8 / 97.9     95.9 / 96.9   97.4 / 98.8 90.7 / 96.8
+                Toothbrush          87.9 / 92.2   87.9 / 90.1    90.0 / 95.2    88.5 / 86.9      90.6 / 82.1     92.3 / 88.1   85.6 / 95.3 89.4 / 88.3
+                Toy                 94.1 / 83.0   90.5 / 77.9    89.2 / 90.1    91.4 / 92.4      91.1 / 87.3     85.2 / 83.8   86.6 / 93.9 74.5 / 79.8
+                Transistor1         90.2 / 91.4   86.9 / 90.2    95.9 / 97.0    95.0 / 97.2      97.6 / 96.2     96.6 / 92.5   93.5 / 96.5 90.9 / 89.7
+                USB                 84.5 / 92.0   91.2 / 92.0    95.0 / 97.1    96.2 / 98.1      97.2 / 97.2     90.7 / 95.9   88.5 / 98.0 88.1 / 90.7
+                USB Adaptor         86.7 / 87.2   75.8 / 87.3    82.7 / 89.8    86.6 / 88.9      86.5 / 85.7     84.0 / 83.9   78.8 / 91.3 76.4 / 71.3
+                Zipper              94.4 / 90.2   95.6 / 93.4    98.8 / 96.1    98.1 / 95.4      99.6 / 94.5     99.9 / 95.8   99.6 / 98.1 95.4 / 94.0
+                Bottle Cap          89.2 / 94.7   88.9 / 91.7    92.2 / 94.9    95.2 / 96.2      95.0 / 95.4     87.3 / 93.2   90.5 / 92.6 87.4 / 89.5
+
+
+
+ Top-view UAD
+                End Cap             73.5 / 86.2   65.9 / 80.3    76.8 / 89.6    76.2 / 91.5      81.2 / 85.4     78.4 / 92.7   69.7 / 91.2 73.5 / 82.5
+                Fire Hood           92.2 / 94.9   92.0 / 95.5    93.4 / 94.0    93.4 / 93.8      94.9 / 92.8     85.5 / 93.3   92.5 / 96.9 93.1 / 93.5
+                Mounts              89.0 / 96.9   87.8 / 94.6    92.8 / 97.8    91.2 / 98.0      95.1 / 97.1     95.3 / 97.5   91.1 / 98.1 84.8 / 97.1
+                Plastic Nut         76.1 / 81.3   77.9 / 81.8    84.7 / 82.9    81.8 / 95.5      85.8 / 88.4     85.1 / 90.0   82.6 / 93.2 71.3 / 82.8
+                Plastic Plug        93.0 / 96.7   92.0 / 96.0    95.3 / 96.9    94.5 / 97.6      94.4 / 92.3     91.9 / 97.0   90.9 / 97.2 81.3 / 92.7
+                Regulator           83.1 / 98.5   71.1 / 82.0    96.7 / 99.6    89.5 / 99.2      97.9 / 98.3     98.1 / 97.9   87.8 / 98.9 53.8 / 74.2
+                Rolled Strip Base   99.1 / 95.4   98.3 / 98.1    99.3 / 98.5    98.9 / 98.9      99.8 / 97.1     99.2 / 88.6   94.9 / 96.1 97.7 / 97.6
+                Toy Brick           78.2 / 83.5   83.4 / 82.7    84.0 / 84.8    82.6 / 85.9      84.3 / 80.6     80.0 / 81.6   82.1 / 90.1 84.6 / 86.7
+                U Block             89.3 / 97.2   85.0 / 95.9    93.4 / 98.7    91.6 / 97.9      93.4 / 95.1     90.0 / 96.7   88.5 / 98.1 80.4 / 88.4
+                Vcpill              84.2 / 91.3   91.7 / 90.0    92.8 / 91.6    89.1 / 83.2      92.0 / 76.9     91.1 / 74.8   90.6 / 94.9 81.9 / 89.3
+                Wooden Beads        86.3 / 86.1   84.0 / 84.4    84.4 / 84.4    85.4 / 85.3      85.2 / 78.7     86.4 / 83.6   78.8 / 85.6 81.3 / 76.7
+                Woodstick           89.9 / 83.2   86.0 / 93.8    82.8 / 77.2    80.6 / 75.8      86.2 / 87.4     84.9 / 93.4   89.4 / 94.9 89.0 / 91.1
+                Tape                96.4 / 98.2   95.8 / 97.7    98.7 / 99.0    98.9 / 99.2      98.7 / 97.9     98.9 / 98.4   98.2 / 98.8 97.7 / 97.6
+                Porcelain Doll      79.3 / 88.9   84.3 / 93.4    88.6 / 96.0    85.8 / 94.7      87.0 / 88.2     83.3 / 75.7   87.5 / 95.4 66.9 / 84.7
+                Mint                57.6 / 66.6   57.8 / 62.0    69.5 / 72.4    63.7 / 70.1      69.4 / 61.6     64.1 / 66.1   63.6 / 78.3 56.7 / 44.0
+                Eraser              90.6 / 94.3   90.2 / 91.1    92.9 / 95.5    91.8 / 94.5      93.2 / 93.3     89.6 / 90.0   87.5 / 95.4 90.4 / 91.0
+                Button Battery      78.3 / 88.2   72.5 / 80.9    85.5 / 91.2    86.6 / 86.7      87.7 / 81.1     81.1 / 90.0   83.6 / 94.1 74.1 / 78.2
+                Average All         86.6 / 90.0   85.0 / 88.6    90.4 / 92.5    89.6 / 91.8      91.7 / 88.9     89.2 / 90.4   87.6 / 94.4 82.7 / 86.0
+Table 6. UIAD performance (S-AUROC / I-AUROC / P-AUPRO) comparisons with state-of-the-art anomaly detection methods on multi-
+view Real-IAD.
+
+                                                                      Embedding-based                                               Data-Aug-based                        Reconstruction-based
+                   Category
+                                        PaDim[11]             CFlow[15]        PatchCore[29]         SoftPatch[21]        SimpleNet[26]       DeSTSeg[38]             RD[12]            UniAD[34]
+                  Audiojack           92.2 / 66.6 / 79.5   82.0 / 74.3 / 83.4 89.3 / 86.3 / 87.6    91.0 / 88.5 / 92.5   91.2 / 87.4 / 89.3 95.3 / 81.8 / 58.8    81.9 / 82.4 / 87.7 91.2 / 82.8 / 84.0
+                  PCB                 88.4 / 75.0 / 65.5   83.1 / 77.3 / 87.3 93.0 / 92.4 / 93.5    90.3 / 90.8 / 93.9   90.7 / 87.1 / 88.0 83.6 / 79.6 / 86.4    79.3 / 89.5 / 94.2 83.2 / 80.5 / 80.4
+                  Phone Battery       91.7 / 81.9 / 83.3   91.2 / 84.4 / 92.0 95.1 / 91.6 / 91.6    91.5 / 90.2 / 83.3   94.7 / 88.9 / 72.8 98.2 / 86.2 / 77.9    89.4 / 90.8 / 95.8 93.6 / 83.4 / 87.3
+                  SIM Card Set        94.2 / 91.8 / 84.1   95.6 / 94.4 / 92.2 99.3 / 97.1 / 87.7    98.4 / 95.8 / 75.9   99.2 / 96.1 / 72.8 98.3 / 91.8 / 91.8    89.9 / 93.6 / 92.7 94.0 / 91.1 / 83.4
+                  Switch              82.1 / 80.8 / 88.8   92.9 / 83.9 / 87.5 94.6 / 89.4 / 93.6    97.8 / 94.7 / 96.2   98.8 / 94.8 / 93.8 96.6 / 92.5 / 94.3    87.3 / 87.2 / 93.7 95.3 / 85.7 / 90.7
+                  Terminal Block      96.9 / 86.7 / 95.1   92.2 / 85.1 / 96.4 97.5 / 94.1 / 97.1    98.2 / 96.2 / 97.8   97.7 / 93.4 / 95.0 96.1 / 91.4 / 90.2    89.8 / 94.5 / 98.6 93.8 / 85.9 / 93.1
+                  Toothbrush          91.7 / 74.4 / 75.2   91.9 / 79.9 / 85.8 94.7 / 88.0 / 91.9    92.9 / 89.3 / 87.4   95.3 / 86.1 / 76.6 97.9 / 87.5 / 87.0    86.7 / 83.4 / 90.9 95.0 / 82.7 / 86.6
+                  Toy                 91.4 / 82.5 / 72.4   78.8 / 67.8 / 81.2 92.8 / 87.3 / 91.2    91.3 / 86.7 / 91.9   92.9 / 82.2 / 77.5 96.5 / 82.1 / 78.5    75.0 / 81.5 / 92.4 77.2 / 67.3 / 74.4
+                  Transistor1         90.3 / 86.5 / 88.3   96.6 / 92.8 / 94.8 99.8 / 97.8 / 97.5    99.3 / 97.2 / 97.6   99.7 / 97.3 / 95.5 99.0 / 95.6 / 96.4    94.7 / 95.8 / 97.6 99.3 / 94.1 / 92.9
+                  USB                 77.0 / 69.7 / 76.9   86.1 / 78.1 / 83.7 93.9 / 90.7 / 95.1    93.8 / 91.2 / 96.8   93.9 / 90.0 / 93.5 93.3 / 90.3 / 89.1    89.4 / 92.1 / 96.1 83.1 / 80.9 / 85.2
+                  USB Adaptor         93.2 / 81.9 / 89.9   86.8 / 75.2 / 88.8 90.6 / 83.8 / 91.4    91.9 / 86.0 / 91.8   93.0 / 82.7 / 79.4 93.6 / 73.1 / 55.3    65.3 / 71.9 / 89.5 85.1 / 77.3 / 79.9
+                  Zipper              99.3 / 90.4 / 78.5   97.6 / 93.8 / 94.2 100.0 / 98.1 / 90.8   99.6 / 97.9 / 90.9   99.7 / 98.2 / 92.4 99.7 / 98.4 / 99.0    96.1 / 97.8 / 98.0 98.8 / 98.2 / 94.7
+                  Bottle Cap          98.1 / 87.7 / 91.9   98.8 / 91.3 / 95.4 99.4 / 94.3 / 93.0    99.1 / 95.9 / 96.8   99.4 / 91.6 / 88.2 92.4 / 87.1 / 83.4    93.7 / 89.2 / 97.0 97.3 / 89.8 / 93.8
+
+
+
+ Multi-view UAD
+                  End Cap             76.1 / 73.7 / 85.7   75.1 / 66.4 / 87.2 91.9 / 84.1 / 92.2    92.3 / 85.8 / 93.6   94.2 / 83.4 / 82.9 82.3 / 80.3 / 81.6    68.1 / 79.0 / 93.4 89.4 / 80.4 / 85.6
+                  Fire Hood           96.9 / 77.3 / 72.7   87.0 / 80.5 / 93.5 89.3 / 84.1 / 88.6    87.8 / 84.3 / 89.2   95.6 / 81.8 / 82.7 96.9 / 78.9 / 62.7    81.4 / 84.3 / 91.7 83.0 / 79.5 / 84.5
+                  Mounts              98.4 / 82.5 / 89.1   98.2 / 85.3 / 95.6 99.7 / 88.0 / 91.3    99.3 / 85.9 / 89.6   99.4 / 88.2 / 89.2 99.1 / 85.1 / 68.6    92.5 / 85.7 / 94.6 97.0 / 87.2 / 94.3
+                  Plastic Nut         98.2 / 73.8 / 87.4   88.6 / 79.8 / 94.1 97.8 / 90.8 / 95.4    95.7 / 89.3 / 96.2   95.7 / 89.3 / 90.6 94.4 / 90.2 / 81.3    72.8 / 85.0 / 96.7 87.1 / 79.3 / 87.2
+                  Plastic Plug        87.4 / 80.0 / 86.7   90.0 / 83.9 / 93.3 95.7 / 89.7 / 92.2    92.5 / 88.7 / 92.9   94.4 / 87.1 / 84.4 95.6 / 86.0 / 74.4    89.3 / 90.5 / 96.3 78.0 / 78.2 / 87.7
+                  Regulator           96.5 / 76.5 / 85.1   85.1 / 62.9 / 85.0 86.0 / 81.9 / 95.7    82.9 / 82.1 / 95.1   92.0 / 82.2 / 88.7 93.0 / 89.8 / 79.9    92.5 / 87.3 / 97.0 55.5 / 51.8 / 70.3
+                  Rolled Strip Base   98.6 / 97.4 / 96.1   98.8 / 97.1 / 98.4 99.7 / 98.9 / 98.3    99.7 / 99.1 / 99.0   99.6 / 99.4 / 95.7 98.9 / 98.3 / 98.5    80.3 / 94.3 / 98.5 99.3 / 98.6 / 97.7
+                  Toy Brick           84.3 / 71.0 / 76.9   82.9 / 80.7 / 88.7 82.6 / 81.4 / 83.6    78.2 / 79.8 / 85.7   85.7 / 80.8 / 75.7 87.0 / 76.8 / 70.0    72.5 / 73.9 / 88.7 78.3 / 77.9 / 82.3
+                  U Block             98.3 / 84.1 / 89.8   96.7 / 90.5 / 96.7 98.8 / 91.9 / 96.8    98.3 / 91.6 / 96.5   98.5 / 90.7 / 91.7 98.5 / 90.1 / 81.4    86.9 / 91.7 / 97.1 96.3 / 88.8 / 94.0
+                  Vcpill              94.7 / 67.4 / 80.1   87.8 / 85.8 / 93.5 96.5 / 91.4 / 93.5    93.7 / 89.6 / 88.7   97.5 / 91.1 / 85.2 96.4 / 90.0 / 89.2    87.2 / 90.2 / 94.3 89.4 / 88.6 / 94.2
+                  Wooden Beads        91.1 / 82.4 / 78.3   89.3 / 87.4 / 89.4 91.4 / 88.6 / 87.3    90.9 / 89.2 / 87.9   92.9 / 85.7 / 81.6 91.9 / 86.2 / 82.7    85.0 / 87.4 / 89.2 82.5 / 80.7 / 83.0
+                  Woodstick           81.8 / 79.9 / 78.8   83.9 / 78.9 / 89.0 74.5 / 77.2 / 69.1    73.9 / 76.0 / 70.8   81.5 / 77.9 / 71.7 90.2 / 89.0 / 79.2    71.9 / 84.2 / 91.6 76.0 / 78.9 / 77.2
+                  Tape                99.8 / 93.7 / 96.4   98.5 / 96.0 / 98.8 99.9 / 98.2 / 97.9    99.7 / 97.9 / 97.9   100.0 / 96.9 / 95.4 99.1 / 96.1 / 92.8   89.5 / 93.1 / 98.7 99.1 / 97.2 / 97.6
+                  Porcelain Doll      93.8 / 74.3 / 75.2   95.1 / 76.0 / 95.4 96.1 / 88.2 / 94.3    94.7 / 86.1 / 93.4   96.2 / 86.1 / 86.0 94.6 / 83.7 / 68.7    89.6 / 87.8 / 95.1 92.8 / 84.1 / 91.7
+                  Mint                69.1 / 66.9 / 61.4   79.1 / 70.7 / 75.1 85.7 / 76.2 / 81.4    82.1 / 74.5 / 80.8   86.8 / 77.2 / 66.0 77.7 / 70.5 / 71.2    67.7 / 71.6 / 79.9 73.0 / 67.6 / 60.2
+                  Eraser              96.5 / 86.7 / 90.7   87.2 / 88.1 / 97.0 95.6 / 93.4 / 96.1    96.1 / 93.5 / 95.9   94.7 / 91.2 / 90.0 91.9 / 88.2 / 83.3    82.9 / 89.2 / 96.8 91.2 / 89.6 / 93.8
+                  Button Battery      88.7 / 84.8 / 54.1   96.3 / 85.2 / 82.3 90.6 / 87.3 / 88.2    91.9 / 88.5 / 78.9   95.8 / 88.8 / 64.0 93.3 / 91.2 / 90.4    83.3 / 87.0 / 91.1 87.5 / 79.0 / 75.8
+                  Average All         91.2 / 80.3 / 81.8   89.8 / 82.5 / 90.5 93.7 / 89.4 / 91.5    92.8 / 89.4 / 90.8   94.9 / 88.5 / 84.6 94.0 / 86.9 / 81.5    83.7 / 87.1 / 93.8 88.1 / 82.9 / 86.1
+Table 7. FUIAD performance (S-AUROC / I-AUROC / P-AUPRO) comparisons with state-of-the-art anomaly detection methods on multi-
+view Real-IAD with a noisy ratio of 0.
+
+                                                                   Embedding-based                                                 Data-Aug-based                       Reconstruction-based
+                Category
+                                     PaDim[11]             CFlow[15]        PatchCore[29]         SoftPatch[21]          SimpleNet[26]       DeSTSeg[38]            RD[12]            UniAD[34]
+               Audiojack           96.0 / 74.1 / 83.5   80.4 / 78.0 / 87.1 93.0 / 89.0 / 89.7    93.0 / 90.4 / 92.9     94.7 / 90.4 / 89.7 96.7 / 85.4 / 88.6   84.6 / 86.6 / 90.9 95.0 / 87.1 / 86.6
+               PCB                 92.0 / 79.8 / 70.0   81.7 / 78.3 / 87.0 94.4 / 94.1 / 94.1    94.4 / 94.2 / 95.7     93.9 / 89.4 / 90.3 94.0 / 92.9 / 91.9   94.3 / 94.0 / 94.2 87.8 / 85.8 / 84.1
+               Phone Battery       92.0 / 86.0 / 87.3   97.4 / 86.3 / 94.0 96.4 / 92.7 / 94.2    95.3 / 92.7 / 86.2     98.3 / 90.1 / 70.3 98.4 / 89.7 / 94.0   80.4 / 91.4 / 97.7 92.6 / 87.6 / 91.5
+               SIM Card Set        95.0 / 95.2 / 89.1   91.7 / 91.9 / 93.7 98.8 / 98.7 / 91.7    98.0 / 97.9 / 79.8     98.4 / 97.6 / 72.5 96.1 / 93.9 / 90.5   85.2 / 95.5 / 94.4 94.4 / 94.1 / 85.9
+               Switch              83.0 / 81.9 / 89.5   92.5 / 87.6 / 89.4 94.7 / 89.6 / 93.8    98.4 / 96.1 / 96.7     98.8 / 94.8 / 94.2 97.2 / 94.5 / 94.2   91.7 / 91.8 / 94.7 95.6 / 88.3 / 92.3
+               Terminal Block      95.6 / 91.6 / 95.8   92.6 / 89.0 / 95.9 97.1 / 95.2 / 97.3    97.6 / 96.4 / 97.8     96.5 / 94.1 / 95.1 97.3 / 94.9 / 96.9   85.0 / 94.6 / 98.6 96.0 / 89.6 / 94.1
+               Toothbrush          93.6 / 77.0 / 77.1   96.0 / 82.9 / 86.1 95.1 / 88.7 / 92.6    92.8 / 90.0 / 88.9     94.6 / 87.1 / 76.1 99.0 / 89.6 / 85.2   77.8 / 83.2 / 92.1 94.9 / 83.7 / 88.2
+               Toy                 92.7 / 88.9 / 75.8   73.0 / 65.2 / 78.4 95.5 / 90.5 / 92.3    94.2 / 90.0 / 92.6     94.8 / 85.0 / 73.6 98.0 / 88.4 / 77.5   84.9 / 86.5 / 93.2 78.7 / 69.0 / 77.4
+               Transistor1         95.6 / 90.7 / 90.8   99.6 / 95.8 / 95.8 99.9 / 98.4 / 98.0    99.8 / 97.9 / 98.0    100.0 / 97.7 / 95.7 99.3 / 95.5 / 90.0   99.9 / 98.2 / 97.8 99.6 / 95.5 / 94.2
+               USB                 80.5 / 74.4 / 82.5   79.4 / 78.2 / 87.9 95.4 / 93.9 / 96.4    94.2 / 94.0 / 98.1     94.3 / 94.1 / 94.6 93.9 / 92.8 / 93.9   85.7 / 93.2 / 97.4 84.2 / 84.4 / 88.4
+               USB Adaptor         92.7 / 85.8 / 91.7   87.4 / 76.0 / 89.3 90.1 / 84.2 / 92.0    92.6 / 88.6 / 92.3     90.9 / 84.5 / 79.5 93.6 / 82.9 / 85.7   75.1 / 75.7 / 90.6 86.8 / 81.3 / 84.1
+               Zipper              99.3 / 92.1 / 80.5   97.7 / 96.4 / 93.7 100.0 / 97.9 / 91.0   99.8 / 97.5 / 91.2     99.8 / 98.0 / 91.2 99.7 / 99.2 / 95.0   90.7 / 97.5 / 98.4 99.0 / 98.3 / 96.2
+               Bottle Cap          98.5 / 93.2 / 95.5   98.5 / 93.6 / 97.0 99.3 / 96.8 / 94.5    99.4 / 97.6 / 98.3     98.2 / 94.6 / 93.4 97.2 / 91.4 / 92.1   92.0 / 94.9 / 98.0 99.2 / 94.4 / 96.5
+
+
+
+ FUAD-NR-0.0
+               End Cap             79.1 / 74.6 / 85.7   79.3 / 68.1 / 85.3 94.4 / 85.8 / 92.4    95.1 / 87.8 / 93.9     95.9 / 84.3 / 76.2 88.2 / 83.7 / 81.4   66.1 / 76.1 / 93.7 91.1 / 80.7 / 84.3
+               Fire Hood           97.8 / 84.2 / 76.4   87.8 / 84.3 / 93.6 88.3 / 85.4 / 90.0    87.9 / 86.2 / 91.1     93.2 / 82.0 / 80.4 92.0 / 85.5 / 88.1   68.8 / 82.1 / 93.3 81.4 / 79.9 / 86.4
+               Mounts              99.4 / 87.2 / 88.2   98.6 / 88.8 / 95.7 100.0 / 91.1 / 90.1   100.0 / 90.0 / 87.9    99.5 / 89.6 / 89.4 99.7 / 87.3 / 87.4   86.7 / 88.8 / 94.4 97.8 / 89.5 / 93.5
+               Plastic Nut         98.8 / 79.3 / 89.4   89.7 / 82.1 / 92.9 98.9 / 94.7 / 96.1    96.6 / 93.6 / 96.9     96.3 / 93.0 / 90.2 93.7 / 92.7 / 96.4   93.2 / 92.5 / 96.9 89.0 / 82.7 / 89.4
+               Plastic Plug        85.7 / 85.9 / 87.5   82.7 / 81.4 / 94.1 93.4 / 92.9 / 94.0    91.1 / 91.6 / 94.7     95.4 / 90.6 / 84.1 93.4 / 90.7 / 92.9   91.7 / 93.7 / 96.3 83.4 / 83.5 / 87.9
+               Regulator           97.8 / 83.1 / 86.7   81.0 / 66.3 / 83.0 90.7 / 86.4 / 96.9    89.8 / 86.3 / 96.5     94.3 / 81.8 / 85.0 99.0 / 92.6 / 95.2   93.4 / 89.4 / 98.3 64.7 / 61.0 / 74.3
+               Rolled Strip Base   98.9 / 98.0 / 97.3   97.9 / 95.9 / 98.9 99.4 / 99.0 / 98.9    99.6 / 99.3 / 99.2     99.6 / 99.3 / 96.8 98.8 / 98.7 / 98.0   98.2 / 97.0 / 98.7 99.1 / 98.5 / 98.2
+               Toy Brick           88.3 / 73.2 / 77.0   81.6 / 79.3 / 88.1 87.1 / 83.5 / 84.8    82.9 / 81.1 / 87.0     82.6 / 74.9 / 66.4 73.9 / 69.4 / 60.1   78.3 / 78.7 / 89.0 81.2 / 77.6 / 82.5
+               U Block             98.0 / 88.2 / 92.1   95.6 / 91.8 / 95.5 98.2 / 93.7 / 97.0    97.4 / 93.2 / 96.8     97.7 / 93.1 / 92.5 98.7 / 89.3 / 93.6   85.8 / 92.6 / 98.1 95.1 / 91.2 / 94.0
+               Vcpill              93.9 / 73.4 / 82.6   87.7 / 88.1 / 94.0 96.0 / 92.4 / 94.6    94.2 / 90.5 / 90.5     97.8 / 91.6 / 85.9 97.0 / 89.1 / 81.5   96.0 / 89.9 / 95.7 86.5 / 87.7 / 93.9
+               Wooden Beads        92.7 / 89.8 / 84.8   89.9 / 90.9 / 90.8 89.4 / 89.7 / 89.2    89.2 / 90.1 / 89.9     90.0 / 87.1 / 82.7 88.7 / 88.2 / 88.2   83.6 / 88.9 / 91.6 81.9 / 81.6 / 85.6
+               Woodstick           83.7 / 82.9 / 79.8   80.2 / 80.8 / 88.7 75.5 / 81.1 / 71.0    74.8 / 80.6 / 73.3     79.7 / 82.1 / 71.6 89.1 / 88.9 / 90.3   61.9 / 84.4 / 92.8 79.1 / 82.9 / 78.4
+               Tape                99.8 / 95.7 / 96.9   96.8 / 94.7 / 99.3 99.7 / 98.8 / 98.0    99.6 / 98.5 / 98.0     99.9 / 97.6 / 96.3 99.7 / 96.4 / 98.3   97.2 / 98.2 / 99.3 99.6 / 98.2 / 98.6
+               Porcelain Doll      96.3 / 81.0 / 80.2   91.0 / 79.9 / 95.4 96.7 / 91.0 / 96.1    95.8 / 88.2 / 95.4     98.3 / 90.0 / 88.4 95.9 / 87.1 / 90.7   95.1 / 89.4 / 96.9 94.0 / 86.8 / 93.4
+               Mint                76.7 / 71.2 / 64.0   79.7 / 71.4 / 71.6 90.7 / 80.2 / 83.2    88.2 / 77.5 / 83.1     91.0 / 81.7 / 64.6 85.4 / 78.0 / 64.0   70.6 / 74.5 / 86.4 79.2 / 70.0 / 57.8
+               Eraser              96.8 / 90.7 / 94.2   86.0 / 89.2 / 98.2 95.4 / 94.9 / 98.1    95.0 / 95.3 / 97.7     93.5 / 92.0 / 86.4 94.5 / 91.2 / 93.4   89.4 / 92.7 / 97.8 90.4 / 91.6 / 94.8
+               Button Battery      90.6 / 89.2 / 59.1   90.2 / 84.0 / 78.6 87.9 / 87.5 / 90.0    90.3 / 89.2 / 82.3     90.4 / 86.0 / 62.7 89.0 / 87.2 / 85.4   82.7 / 86.8 / 91.9 92.1 / 80.7 / 76.0
+               Average All         92.7 / 84.6 / 84.4   88.8 / 83.9 / 90.6 94.4 / 91.3 / 92.6    93.9 / 91.4 / 92.1     94.9 / 89.8 / 83.9 94.6 / 89.6 / 88.7   85.5 / 89.3 / 95.0 89.6 / 85.4 / 87.6
+Table 8. FUIAD performance (S-AUROC / I-AUROC / P-AUPRO) comparisons with state-of-the-art anomaly detection methods on multi-
+view Real-IAD with a noisy ratio of 0.1.
+
+                                                                   Embedding-based                                               Data-Aug-based                       Reconstruction-based
+                Category
+                                     PaDim[11]             CFlow[15]        PatchCore[29]         SoftPatch[21]        SimpleNet[26]      DeSTSeg[38]             RD[12]            UniAD[34]
+               Audiojack           89.2 / 74.3 / 86.1   75.8 / 71.8 / 86.9 88.2 / 87.1 / 89.6    88.0 / 88.7 / 93.1   84.0 / 84.1 / 85.1 88.8 / 87.6 / 90.6   71.6 / 85.8 / 91.3 88.5 / 85.2 / 85.8
+               PCB                 84.8 / 76.0 / 71.7   79.9 / 74.8 / 86.6 93.9 / 93.5 / 94.3    91.9 / 93.3 / 95.9   84.3 / 83.0 / 87.1 87.5 / 85.7 / 87.8   90.6 / 91.3 / 94.1 85.2 / 83.5 / 83.9
+               Phone Battery       80.3 / 85.4 / 90.0   86.7 / 86.1 / 94.6 90.1 / 92.5 / 95.8    93.4 / 93.0 / 89.0   80.9 / 81.8 / 74.7 76.5 / 85.6 / 88.2   74.4 / 89.2 / 98.0 82.7 / 87.6 / 92.8
+               SIM Card Set        88.2 / 92.5 / 93.8   88.3 / 90.2 / 93.9 94.9 / 97.1 / 97.1    96.0 / 96.4 / 91.9   89.6 / 85.4 / 62.9 81.9 / 82.2 / 87.2   67.7 / 91.0 / 96.2 90.2 / 91.8 / 87.5
+               Switch              77.5 / 78.3 / 89.7   40.4 / 68.3 / 86.3 94.2 / 89.5 / 93.4    98.3 / 95.6 / 96.7   95.5 / 87.9 / 88.4 94.4 / 90.1 / 92.4   64.2 / 83.4 / 93.4 94.8 / 86.8 / 92.2
+               Terminal Block      94.2 / 91.9 / 97.3   89.5 / 86.8 / 96.3 96.8 / 95.5 / 98.2    97.5 / 97.0 / 98.4   97.4 / 90.2 / 93.5 96.8 / 93.2 / 97.2   93.4 / 96.4 / 99.0 95.4 / 89.2 / 95.0
+               Toothbrush          74.8 / 72.8 / 79.4   77.9 / 78.1 / 86.5 87.9 / 89.0 / 93.3    90.1 / 90.8 / 89.7   82.7 / 82.5 / 72.9 88.5 / 82.1 / 72.6   74.4 / 81.5 / 91.7 92.2 / 83.3 / 88.3
+               Toy                 76.5 / 71.3 / 81.3   66.7 / 58.6 / 76.7 93.1 / 87.9 / 92.2    93.4 / 89.1 / 92.7   86.1 / 74.7 / 72.2 86.3 / 82.7 / 77.7   77.1 / 84.7 / 93.5 76.5 / 68.0 / 77.8
+               Transistor1         83.0 / 85.6 / 92.7   96.4 / 91.1 / 94.7 99.5 / 97.1 / 97.9    99.3 / 96.9 / 98.0   96.8 / 89.7 / 89.9 97.3 / 92.6 / 90.1   99.6 / 97.3 / 98.3 99.4 / 93.9 / 93.8
+               USB                 67.8 / 68.6 / 82.3   76.3 / 76.1 / 86.5 93.3 / 92.6 / 96.5    93.8 / 94.0 / 98.0   89.6 / 85.7 / 90.7 92.8 / 89.8 / 93.4   93.5 / 94.5 / 97.3 80.5 / 80.7 / 88.1
+               USB Adaptor         88.6 / 83.9 / 92.6   79.4 / 71.1 / 89.8 87.8 / 79.4 / 92.8    92.6 / 88.1 / 93.2   87.8 / 81.1 / 83.7 87.7 / 80.5 / 88.1   81.2 / 77.5 / 91.8 85.2 / 79.0 / 83.7
+               Zipper              97.2 / 89.9 / 81.6   89.9 / 88.2 / 94.7 99.8 / 97.6 / 91.3    99.4 / 97.2 / 91.3   96.9 / 91.2 / 83.2 90.4 / 88.7 / 85.0   99.1 / 98.6 / 98.2 97.8 / 97.6 / 96.3
+               Bottle Cap          97.3 / 94.0 / 97.2   98.8 / 92.9 / 98.2 99.4 / 96.7 / 97.8    99.4 / 97.6 / 98.6   93.5 / 88.3 / 89.4 96.0 / 92.8 / 95.9   98.7 / 95.6 / 98.2 99.0 / 93.9 / 96.7
+
+
+
+ FUAD-NR-0.1
+               End Cap             73.3 / 71.9 / 85.4   71.0 / 67.1 / 83.1 92.7 / 83.5 / 91.8    95.0 / 87.6 / 93.6   88.3 / 74.7 / 69.1 81.5 / 78.2 / 87.9   63.7 / 79.1 / 93.3 88.8 / 79.0 / 83.8
+               Fire Hood           84.5 / 78.4 / 78.4   83.4 / 80.4 / 94.1 86.3 / 84.6 / 90.0    86.5 / 86.2 / 91.1   81.5 / 78.2 / 69.5 85.7 / 82.1 / 83.4   72.8 / 83.6 / 93.5 80.7 / 79.3 / 85.9
+               Mounts              97.7 / 87.8 / 89.2   96.5 / 88.8 / 95.6 99.8 / 93.1 / 90.2   100.0 / 90.6 / 88.7   92.6 / 83.8 / 86.3 97.6 / 87.6 / 89.4   81.7 / 90.3 / 93.6 97.5 / 89.9 / 94.3
+               Plastic Nut         84.1 / 80.7 / 91.1   84.3 / 82.0 / 94.1 97.9 / 93.5 / 96.1    96.2 / 93.7 / 96.9   87.7 / 85.2 / 76.8 91.1 / 90.3 / 95.2   90.8 / 89.9 / 97.2 87.5 / 80.7 / 90.0
+               Plastic Plug        81.6 / 85.0 / 89.4   89.9 / 87.7 / 93.6 92.3 / 93.0 / 96.0    90.5 / 92.2 / 95.8   89.8 / 84.9 / 78.1 92.1 / 86.7 / 86.5   92.4 / 93.3 / 96.7 79.3 / 81.5 / 88.2
+               Regulator           82.7 / 75.4 / 90.1   65.0 / 65.2 / 84.3 84.4 / 86.1 / 96.9    85.8 / 85.1 / 96.8   84.4 / 81.3 / 86.5 92.2 / 88.1 / 88.1   85.6 / 87.2 / 98.0 63.3 / 58.9 / 73.1
+               Rolled Strip Base   97.6 / 97.1 / 98.2   96.8 / 91.3 / 98.9 99.3 / 98.6 / 98.9    99.7 / 99.3 / 99.2   97.5 / 95.0 / 93.2 94.3 / 94.5 / 97.1   98.6 / 97.0 / 98.9 98.8 / 98.2 / 98.3
+               Toy Brick           85.0 / 71.7 / 78.8   72.7 / 72.6 / 89.0 84.2 / 81.6 / 85.2    81.6 / 81.0 / 87.3   72.6 / 66.7 / 56.7 84.7 / 76.5 / 76.5   73.0 / 72.7 / 88.3 80.0 / 76.8 / 83.1
+               U Block             95.8 / 88.8 / 94.7   91.2 / 89.3 / 96.8 96.4 / 94.8 / 97.7    97.0 / 94.1 / 97.3   89.3 / 88.4 / 88.1 82.5 / 82.3 / 92.6   94.1 / 93.6 / 98.3 94.2 / 90.5 / 93.6
+               Vcpill              85.4 / 71.1 / 83.9   82.5 / 84.3 / 93.7 94.5 / 92.0 / 94.6    93.3 / 89.9 / 90.5   89.6 / 85.3 / 78.5 90.8 / 85.6 / 82.2   90.1 / 76.1 / 94.9 82.2 / 86.3 / 93.9
+               Wooden Beads        89.4 / 88.6 / 87.5   89.1 / 89.9 / 91.1 85.0 / 87.9 / 89.5    88.6 / 89.2 / 90.1   83.6 / 82.4 / 77.9 82.5 / 81.4 / 76.3   57.4 / 82.8 / 91.8 79.2 / 79.6 / 84.9
+               Woodstick           79.1 / 82.1 / 79.8   73.2 / 73.6 / 89.4 73.9 / 80.8 / 70.8    74.3 / 79.9 / 72.4   74.6 / 74.4 / 71.3 82.4 / 87.5 / 88.4   81.6 / 88.7 / 93.8 76.9 / 81.9 / 78.3
+               Tape                97.3 / 96.7 / 97.4   96.5 / 96.7 / 99.2 98.6 / 98.3 / 98.1    99.5 / 98.7 / 98.0   93.7 / 91.5 / 89.5 89.9 / 93.8 / 97.9   97.0 / 98.2 / 99.4 99.2 / 97.9 / 98.6
+               Porcelain Doll      90.6 / 80.5 / 83.7   81.5 / 76.9 / 95.9 95.9 / 90.7 / 96.7    94.8 / 88.5 / 96.1   94.0 / 87.1 / 89.1 89.2 / 83.2 / 86.0   94.0 / 90.4 / 97.7 92.5 / 86.3 / 93.5
+               Mint                72.7 / 69.9 / 64.8   80.2 / 71.0 / 73.9 88.9 / 79.4 / 83.5    87.6 / 75.9 / 84.0   86.9 / 75.8 / 63.6 81.1 / 73.3 / 61.7   87.1 / 76.9 / 87.6 79.2 / 70.3 / 58.6
+               Eraser              93.6 / 90.3 / 96.0   87.0 / 91.1 / 98.0 93.9 / 94.5 / 98.4    94.8 / 94.8 / 97.8   84.3 / 86.7 / 83.8 87.3 / 89.0 / 92.9   75.5 / 90.1 / 97.7 89.6 / 92.0 / 94.7
+               Button Battery      75.8 / 75.7 / 67.4   66.7 / 68.4 / 78.4 83.1 / 83.8 / 90.1    85.1 / 84.2 / 86.4   78.5 / 72.9 / 63.8 73.8 / 74.6 / 79.8   84.0 / 84.9 / 91.7 80.3 / 75.2 / 75.5
+               Average All         85.5 / 81.9 / 86.4   81.8 / 80.3 / 90.7 92.2 / 90.4 / 93.2    92.8 / 90.9 / 92.9   87.8 / 83.3 / 79.9 88.1 / 85.6 / 86.9   83.5 / 88.1 / 95.1 87.2 / 84.2 / 87.7
+Table 9. FUIAD performance (S-AUROC / I-AUROC / P-AUPRO) comparisons with state-of-the-art anomaly detection methods on multi-
+view Real-IAD with a noisy ratio of 0.2.
+
+                                                                   Embedding-based                                               Data-Aug-based                       Reconstruction-based
+                Category
+                                     PaDim[11]             CFlow[15]        PatchCore[29]         SoftPatch[21]        SimpleNet[26]      DeSTSeg[38]             RD[12]            UniAD[34]
+               Audiojack           86.6 / 73.8 / 86.8   66.6 / 67.5 / 87.2 84.8 / 85.9 / 88.8    86.8 / 87.6 / 92.8   76.7 / 80.8 / 81.4 80.1 / 84.1 / 87.6   78.3 / 85.3 / 90.9 81.4 / 83.6 / 85.1
+               PCB                 81.7 / 72.4 / 72.0   77.6 / 72.5 / 84.0 92.3 / 92.5 / 94.3    91.6 / 92.9 / 95.7   82.0 / 80.4 / 84.8 76.9 / 80.1 / 94.5   83.6 / 89.0 / 94.4 83.6 / 81.9 / 83.8
+               Phone Battery       75.9 / 83.5 / 89.7   82.6 / 81.3 / 93.8 84.7 / 91.0 / 95.9    92.6 / 92.1 / 88.8   77.9 / 79.4 / 69.2 80.1 / 86.7 / 90.5   78.1 / 88.9 / 98.0 78.6 / 85.8 / 92.6
+               SIM Card Set        85.8 / 91.0 / 94.2   88.9 / 91.3 / 94.2 94.5 / 96.8 / 97.2    95.6 / 95.7 / 91.4   88.1 / 84.5 / 57.9 70.9 / 71.6 / 78.2   78.9 / 93.6 / 96.6 87.0 / 90.0 / 87.3
+               Switch              75.0 / 75.5 / 89.2   77.2 / 74.4 / 87.0 93.3 / 89.0 / 93.3    98.2 / 95.4 / 96.6   92.2 / 85.1 / 86.7 92.7 / 84.2 / 79.5   67.0 / 81.8 / 93.2 94.0 / 85.5 / 91.8
+               Terminal Block      92.9 / 90.7 / 97.5   86.5 / 83.8 / 96.0 96.8 / 95.2 / 98.3    98.0 / 97.0 / 98.5   90.7 / 85.1 / 88.8 89.1 / 86.6 / 97.4   94.7 / 96.4 / 99.1 95.4 / 89.1 / 95.4
+               Toothbrush          69.3 / 69.8 / 79.0   83.4 / 77.9 / 87.1 86.6 / 87.5 / 93.2    88.9 / 89.5 / 89.5   75.2 / 71.6 / 63.6 84.1 / 72.8 / 65.0   78.9 / 82.3 / 91.1 89.3 / 81.7 / 88.2
+               Toy                 70.6 / 65.9 / 81.6   64.3 / 58.9 / 78.5 91.5 / 86.0 / 91.5    93.0 / 88.0 / 92.5   78.8 / 69.7 / 69.2 85.3 / 77.8 / 76.1   76.6 / 84.0 / 93.1 74.1 / 66.9 / 78.0
+               Transistor1         76.7 / 82.1 / 92.6   96.6 / 91.4 / 95.2 99.1 / 96.5 / 97.8    97.7 / 95.6 / 97.6   90.8 / 82.3 / 81.9 93.1 / 83.6 / 74.4   99.2 / 95.9 / 98.0 99.1 / 92.7 / 93.7
+               USB                 62.4 / 66.2 / 82.0   77.2 / 77.6 / 87.5 92.2 / 92.1 / 96.5    93.8 / 93.6 / 98.0   81.7 / 82.3 / 86.9 82.7 / 84.8 / 89.6   93.3 / 94.3 / 97.0 80.4 / 80.9 / 87.7
+               USB Adaptor         85.8 / 81.9 / 92.5   76.0 / 73.2 / 88.8 85.7 / 76.8 / 92.7    91.5 / 88.0 / 93.1   70.8 / 70.5 / 73.4 85.9 / 80.4 / 89.8   55.3 / 70.7 / 90.3 83.0 / 76.7 / 81.5
+               Zipper              95.2 / 88.1 / 80.9   88.4 / 85.3 / 95.3 99.6 / 97.3 / 91.4    99.0 / 96.9 / 91.4   91.0 / 86.0 / 74.6 88.1 / 84.6 / 76.8   76.5 / 92.3 / 98.1 97.0 / 96.9 / 96.2
+               Bottle Cap          96.7 / 93.3 / 97.3   96.3 / 93.0 / 98.0 98.9 / 96.6 / 98.0    99.3 / 97.7 / 98.7   87.4 / 84.5 / 86.2 91.2 / 91.9 / 97.0   92.1 / 93.5 / 98.4 98.0 / 93.6 / 96.7
+
+
+
+ FUAD-NR-0.2
+               End Cap             69.4 / 69.9 / 84.7   70.4 / 68.2 / 82.4 90.3 / 82.0 / 91.5    93.7 / 86.3 / 93.4   80.0 / 72.4 / 62.5 80.7 / 79.0 / 84.3   68.2 / 76.2 / 93.6 86.9 / 77.8 / 83.1
+               Fire Hood           80.3 / 76.6 / 78.7   85.0 / 84.2 / 95.0 83.8 / 83.8 / 89.8    85.2 / 85.6 / 91.0   75.0 / 76.9 / 76.9 86.8 / 81.6 / 85.3   73.0 / 82.6 / 93.1 79.9 / 78.9 / 85.9
+               Mounts              96.0 / 88.1 / 89.6   97.8 / 89.6 / 95.6 99.0 / 93.0 / 88.2   100.0 / 92.2 / 88.7   92.1 / 83.1 / 82.3 85.2 / 78.9 / 81.6   89.2 / 90.2 / 93.6 96.5 / 90.4 / 94.2
+               Plastic Nut         80.0 / 79.5 / 91.5   85.4 / 83.3 / 93.5 97.4 / 93.3 / 96.2    95.5 / 93.1 / 97.0   87.4 / 81.1 / 79.0 81.3 / 83.5 / 89.3   74.7 / 87.0 / 96.8 82.8 / 77.2 / 89.0
+               Plastic Plug        79.5 / 83.7 / 89.8   69.4 / 75.3 / 94.4 91.8 / 92.6 / 96.5    89.9 / 92.1 / 96.0   85.7 / 83.0 / 74.2 84.8 / 81.4 / 70.4   74.1 / 89.7 / 96.8 78.1 / 78.9 / 87.4
+               Regulator           78.5 / 73.5 / 90.5   70.9 / 67.6 / 85.9 85.0 / 85.1 / 97.2    85.1 / 85.4 / 97.1   80.3 / 74.3 / 81.0 87.9 / 84.0 / 84.8   82.9 / 86.8 / 98.1 58.9 / 58.3 / 73.5
+               Rolled Strip Base   96.4 / 96.2 / 98.1   94.2 / 90.1 / 98.9 98.6 / 97.6 / 98.8    99.5 / 98.8 / 99.1   96.2 / 91.5 / 86.7 87.4 / 89.4 / 94.3   93.7 / 93.7 / 99.0 98.7 / 97.9 / 98.3
+               Toy Brick           82.9 / 70.4 / 78.7   76.6 / 76.1 / 88.6 83.4 / 80.1 / 85.0    80.8 / 80.5 / 87.1   67.6 / 65.7 / 58.7 64.1 / 64.9 / 70.8   84.1 / 78.5 / 88.5 76.7 / 75.4 / 81.8
+               U Block             94.5 / 87.9 / 95.0   87.5 / 88.3 / 96.0 95.8 / 94.7 / 97.8    96.5 / 94.0 / 97.6   84.0 / 83.2 / 78.6 82.9 / 80.5 / 89.6   94.6 / 93.5 / 98.3 93.7 / 89.9 / 93.4
+               Vcpill              77.5 / 68.3 / 83.9   83.1 / 84.9 / 94.7 93.3 / 90.9 / 94.4    92.8 / 89.4 / 90.5   83.8 / 82.7 / 78.1 86.6 / 81.4 / 75.6   81.8 / 91.3 / 96.0 81.4 / 86.7 / 94.0
+               Wooden Beads        85.7 / 87.2 / 88.4   85.7 / 84.3 / 92.1 84.0 / 87.4 / 89.3    85.0 / 88.5 / 90.0   81.5 / 80.7 / 76.8 77.1 / 78.0 / 79.8   84.5 / 87.4 / 91.6 79.1 / 79.0 / 84.1
+               Woodstick           77.4 / 80.8 / 79.3   67.7 / 74.9 / 87.0 73.2 / 79.2 / 69.7    75.4 / 80.1 / 72.7   72.8 / 75.2 / 69.6 79.7 / 85.7 / 92.7   63.1 / 83.8 / 92.5 77.6 / 80.7 / 77.3
+               Tape                96.7 / 96.2 / 97.3   98.0 / 95.6 / 99.3 98.4 / 97.9 / 98.0    99.7 / 98.6 / 98.0   86.4 / 89.3 / 86.9 83.0 / 89.8 / 94.8   94.0 / 97.4 / 99.3 98.9 / 97.8 / 98.6
+               Porcelain Doll      85.6 / 79.7 / 84.1   75.5 / 76.8 / 96.1 95.6 / 90.3 / 96.6    95.0 / 87.9 / 96.2   83.3 / 81.2 / 78.1 85.6 / 83.2 / 92.8   91.2 / 89.6 / 97.7 91.5 / 86.2 / 93.4
+               Mint                69.8 / 68.9 / 65.0   79.4 / 68.1 / 72.8 88.4 / 78.3 / 82.9    87.2 / 75.5 / 84.2   81.0 / 71.7 / 52.9 52.0 / 54.7 / 43.7   68.0 / 72.7 / 86.0 72.0 / 64.7 / 57.2
+               Eraser              93.0 / 90.1 / 96.6   78.4 / 83.9 / 98.0 92.5 / 94.4 / 98.4    94.5 / 94.1 / 97.8   84.2 / 84.6 / 87.9 82.5 / 85.3 / 85.0   76.3 / 90.0 / 97.7 86.9 / 91.0 / 94.7
+               Button Battery      68.7 / 71.5 / 68.7   73.2 / 67.1 / 77.9 81.8 / 82.6 / 89.5    84.1 / 82.9 / 86.0   77.8 / 69.7 / 62.7 54.2 / 58.4 / 86.1   74.6 / 80.5 / 90.8 75.4 / 67.2 / 74.8
+               Average All         82.2 / 80.1 / 86.5   81.3 / 79.6 / 90.7 91.1 / 89.5 / 93.0    92.2 / 90.5 / 92.9   82.7 / 79.6 / 75.9 81.4 / 80.3 / 83.2   80.7 / 87.3 / 94.9 85.2 / 82.8 / 87.3
+Table 10. FUIAD performance (S-AUROC / I-AUROC / P-AUPRO) comparisons with state-of-the-art anomaly detection methods on
+multi-view Real-IAD with a noisy ratio of 0.4.
+
+                                                                  Embedding-based                                               Data-Aug-based                       Reconstruction-based
+                Category
+                                     PaDim[11]             CFlow[15]        PatchCore[29]        SoftPatch[21]        SimpleNet[26]      DeSTSeg[38]             RD[12]            UniAD[34]
+               Audiojack           80.5 / 70.7 / 86.8   66.2 / 73.3 / 85.5 79.7 / 82.8 / 88.3   80.4 / 85.2 / 92.7   73.1 / 73.3 / 82.9 76.9 / 83.4 / 74.8   56.4 / 77.3 / 90.4 78.1 / 80.4 / 84.5
+               PCB                 74.0 / 66.7 / 71.4   70.1 / 70.6 / 86.3 90.7 / 91.2 / 93.9   91.1 / 91.4 / 95.6   80.8 / 76.0 / 84.3 73.2 / 72.5 / 82.1   87.0 / 89.1 / 94.1 77.3 / 75.7 / 82.3
+               Phone Battery       69.4 / 80.5 / 89.1   73.5 / 78.9 / 94.0 80.2 / 88.4 / 95.1   87.9 / 91.0 / 88.7   67.2 / 73.5 / 55.3 62.0 / 78.3 / 83.0   70.7 / 86.8 / 97.7 72.0 / 82.0 / 91.6
+               SIM Card Set        78.7 / 87.2 / 93.9   86.5 / 88.0 / 94.1 92.8 / 96.1 / 97.4   94.3 / 95.0 / 90.9   82.2 / 74.9 / 52.4 78.3 / 80.2 / 86.6   42.2 / 83.9 / 96.7 80.7 / 84.7 / 86.4
+               Switch              68.0 / 70.2 / 87.9   62.4 / 68.6 / 86.3 89.7 / 87.1 / 91.3   97.8 / 94.8 / 95.1   80.6 / 76.3 / 75.5 89.6 / 85.0 / 84.8   73.9 / 71.8 / 90.6 88.8 / 82.6 / 90.8
+               Terminal Block      88.0 / 88.2 / 97.7   79.7 / 77.5 / 95.3 95.3 / 94.1 / 98.4   97.2 / 96.8 / 98.6   83.8 / 79.2 / 84.1 44.7 / 71.9 / 92.9   84.8 / 92.6 / 99.1 91.5 / 87.2 / 95.2
+               Toothbrush          63.2 / 66.3 / 78.2   67.3 / 66.9 / 86.2 84.9 / 85.6 / 92.8   87.3 / 87.6 / 89.2   67.7 / 66.1 / 56.4 43.8 / 59.5 / 69.6   81.3 / 81.3 / 91.0 82.3 / 76.9 / 87.0
+               Toy                 63.1 / 58.7 / 80.6   55.3 / 52.9 / 75.3 90.2 / 83.5 / 91.2   91.1 / 86.5 / 92.1   75.8 / 65.1 / 58.6 77.3 / 68.3 / 75.5   64.8 / 76.2 / 92.3 60.9 / 58.8 / 74.8
+               Transistor1         66.2 / 76.0 / 91.6   91.5 / 87.0 / 94.7 98.5 / 94.5 / 97.4   95.8 / 92.8 / 96.5   83.2 / 76.1 / 79.4 70.4 / 68.9 / 47.2   95.4 / 92.9 / 97.8 96.0 / 87.9 / 92.7
+               USB                 50.4 / 59.9 / 80.1   75.1 / 73.7 / 83.6 88.6 / 89.9 / 95.3   93.2 / 93.3 / 97.8   73.9 / 78.2 / 81.7 84.3 / 83.1 / 84.5   77.0 / 89.4 / 96.4 77.9 / 76.9 / 87.2
+               USB Adaptor         82.9 / 79.7 / 92.1   72.7 / 66.9 / 88.7 82.9 / 74.4 / 92.0   90.3 / 85.1 / 92.9   69.3 / 67.7 / 61.7 81.1 / 71.5 / 82.3   79.8 / 73.1 / 91.1 75.4 / 71.0 / 79.6
+               Zipper              91.9 / 85.6 / 80.0   85.5 / 81.7 / 94.7 98.9 / 96.6 / 91.2   98.1 / 96.3 / 91.1   90.2 / 84.6 / 77.6 81.5 / 78.4 / 68.8   97.0 / 96.7 / 98.0 96.0 / 94.9 / 95.5
+               Bottle Cap          94.9 / 90.9 / 97.1   89.8 / 85.5 / 97.9 97.8 / 95.5 / 98.0   98.7 / 97.4 / 98.7   87.8 / 79.0 / 81.6 83.2 / 79.3 / 75.5   84.4 / 92.2 / 98.3 97.5 / 92.6 / 96.8
+
+
+
+ FUAD-NR-0.4
+               End Cap             63.9 / 67.3 / 84.0   78.8 / 71.5 / 83.5 87.6 / 79.8 / 91.0   90.0 / 84.5 / 92.2   72.2 / 68.3 / 58.0 78.2 / 76.8 / 70.2   81.1 / 77.0 / 92.8 84.4 / 76.2 / 83.3
+               Fire Hood           74.7 / 74.9 / 78.4   84.9 / 82.7 / 94.4 81.0 / 83.0 / 89.6   83.7 / 84.9 / 91.0   77.1 / 73.5 / 70.6 82.8 / 79.0 / 80.7   48.4 / 78.0 / 93.1 78.5 / 77.9 / 85.8
+               Mounts              93.8 / 86.9 / 90.0   96.2 / 88.7 / 96.3 98.2 / 92.6 / 85.8   98.3 / 91.9 / 89.4   82.1 / 79.1 / 69.7 83.2 / 76.3 / 72.3   62.0 / 75.8 / 94.3 94.0 / 90.5 / 94.2
+               Plastic Nut         71.7 / 77.1 / 91.5   78.2 / 82.2 / 94.2 95.8 / 92.6 / 96.0   94.6 / 91.6 / 96.9   74.9 / 77.8 / 69.9 76.7 / 75.2 / 61.4   86.3 / 88.6 / 96.6 79.5 / 74.5 / 88.2
+               Plastic Plug        77.5 / 82.0 / 90.1   87.1 / 86.3 / 94.2 89.6 / 92.2 / 96.6   89.2 / 91.7 / 95.8   85.3 / 79.9 / 70.0 85.2 / 82.3 / 83.3   83.1 / 89.7 / 96.7 72.7 / 75.2 / 87.3
+               Regulator           72.6 / 70.6 / 90.4   67.9 / 63.1 / 82.1 82.6 / 84.3 / 96.7   83.7 / 84.9 / 96.8   73.2 / 71.5 / 78.3 82.6 / 80.7 / 86.5   74.8 / 83.8 / 97.8 59.5 / 57.1 / 72.7
+               Rolled Strip Base   94.4 / 94.4 / 98.0   91.6 / 91.1 / 98.8 97.3 / 95.8 / 98.7   98.3 / 96.6 / 98.8   91.2 / 83.7 / 66.4 81.7 / 80.2 / 86.3   88.7 / 91.0 / 98.6 98.0 / 96.5 / 98.2
+               Toy Brick           78.4 / 68.3 / 78.2   76.0 / 75.9 / 87.1 80.2 / 78.1 / 84.3   80.4 / 78.0 / 86.4   66.6 / 63.8 / 65.7 63.1 / 60.8 / 62.3   81.7 / 78.9 / 88.5 73.9 / 73.1 / 80.9
+               U Block             91.7 / 87.2 / 95.2   90.0 / 89.3 / 96.5 94.8 / 94.5 / 97.8   95.8 / 93.4 / 97.5   77.0 / 78.5 / 73.9 80.3 / 81.5 / 87.0   91.9 / 93.0 / 98.2 90.5 / 88.1 / 93.0
+               Vcpill              63.7 / 64.8 / 83.3   79.9 / 84.1 / 93.8 90.3 / 89.4 / 93.9   90.2 / 88.6 / 90.0   82.6 / 77.8 / 71.2 66.8 / 68.6 / 61.2   69.1 / 84.5 / 94.2 73.4 / 83.5 / 93.2
+               Wooden Beads        81.6 / 84.7 / 88.5   84.6 / 86.2 / 92.7 81.5 / 85.9 / 88.8   82.7 / 87.6 / 89.2   75.9 / 77.3 / 72.3 57.1 / 51.2 / 66.1   73.8 / 82.2 / 91.2 73.9 / 75.4 / 84.0
+               Woodstick           73.6 / 79.0 / 78.7   67.9 / 73.6 / 87.1 70.8 / 78.1 / 68.3   74.7 / 79.7 / 71.8   69.8 / 71.0 / 67.2 76.8 / 79.0 / 73.3   46.1 / 79.9 / 92.6 76.1 / 79.4 / 77.6
+               Tape                95.5 / 95.4 / 97.3   96.3 / 95.9 / 99.3 98.0 / 97.7 / 98.0   99.2 / 97.9 / 97.9   82.6 / 83.4 / 80.6 85.8 / 74.8 / 88.9   98.3 / 97.8 / 99.3 97.0 / 97.0 / 98.4
+               Porcelain Doll      76.5 / 76.4 / 83.7   74.7 / 75.6 / 95.3 94.3 / 89.0 / 96.4   93.5 / 86.7 / 95.9   86.7 / 80.5 / 81.4 78.8 / 76.9 / 77.6   81.6 / 87.8 / 97.8 87.1 / 83.0 / 93.1
+               Mint                63.5 / 66.2 / 64.6   73.2 / 69.6 / 71.7 86.3 / 77.5 / 82.3   84.9 / 74.1 / 83.2   77.4 / 67.0 / 56.8 72.3 / 67.6 / 64.4   78.2 / 75.2 / 86.9 74.1 / 66.8 / 56.3
+               Eraser              89.3 / 88.8 / 96.9   87.4 / 89.4 / 97.7 89.9 / 92.8 / 98.3   93.6 / 94.0 / 97.7   72.7 / 77.2 / 75.9 73.9 / 77.7 / 80.3   83.4 / 89.7 / 97.8 85.4 / 89.6 / 94.3
+               Button Battery      59.9 / 64.3 / 68.9   67.5 / 64.0 / 79.8 79.7 / 79.9 / 88.3   82.7 / 80.7 / 85.0   68.3 / 62.3 / 56.2 64.4 / 62.2 / 56.2   79.7 / 80.0 / 90.4 72.8 / 66.5 / 73.9
+               Average All         76.4 / 77.0 / 86.1   78.6 / 78.0 / 90.2 88.9 / 88.1 / 92.4   90.6 / 89.3 / 92.5   77.7 / 74.7 / 70.5 74.5 / 74.4 / 75.5   76.8 / 84.5 / 94.7 81.5 / 80.1 / 86.6
+

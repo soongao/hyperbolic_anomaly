@@ -1,0 +1,524 @@
+                                           DevPrompt: Deviation-Based Prompt Learning for One-Normal Shot
+                                                              Image Anomaly Detection
+
+                                                                                                                            a
+                                                                          Morteza Poudineh1,2 and Marc Lalonde2
+                                                1 Department of Electrical and Computer Engineering, Concordia University, Montreal, QC H3G 1M8,
+
+                                                                                               Canada
+                                             2 R&D Dept., Computer Research Institute of Montreal (CRIM), 405 Ogilvy Ave., #101, Montreal, Qc,
+
+                                                                                            Canada
+                                                                       morteza.poudineh@concordia.ca, Marc.lalonde@crim.ca
+
+
+
+
+arXiv:2601.15453v1 [cs.CV] 21 Jan 2026
+                                                                                          Keywords:
+                                                  Few-normal-shot anomaly detection, Vision-language models, Prompt learning, Deviation net-
+                                                  works, Multiple instance learning.
+
+                                                                                                Abstract:
+                                                  Few-normal shot anomaly detection (FNSAD) aims to detect abnormal regions in images using
+                                                  only a few normal training samples, making the task highly challenging due to limited supervision
+                                                  and the diversity of potential defects. Recent approaches leverage vision-language models such as
+                                                  CLIP with prompt-based learning to align image and text features. However, existing methods
+                                                  often exhibit weak discriminability between normal and abnormal prompts and lack principled
+                                                  scoring mechanisms for patch-level anomalies. We propose a deviation-guided prompt learning
+                                                  framework that integrates the semantic power of vision-language models with the statistical re-
+                                                  liability of deviation-based scoring. Specifically, we replace fixed prompt prefixes with learnable
+                                                  context vectors shared across normal and abnormal prompts, while anomaly-specific suﬀix to-
+                                                  kens enable class-aware alignment. To enhance separability, we introduce a deviation loss with
+                                                  Top-K Multiple Instance Learning (MIL), modeling patch-level features as Gaussian deviations
+                                                  from the normal distribution. This allows the network to assign higher anomaly scores to patches
+                                                  with statistically significant deviations, improving localization and interpretability. Experiments
+                                                  on the MVTecAD and VISA benchmarks demonstrate superior pixel-level detection performance
+                                                  compared to PromptAD and other baselines. Ablation studies further validate the effectiveness of
+                                                  learnable prompts, deviation-based scoring, and the Top-K MIL strategy.
+
+
+
+                                         1 Introduction                                               detection.
+                                                                                                          To address these limitations, deviation-based
+                                         Few-normal shot anomaly detection (FNSAD)                    learning (Pang et al., 2021) has been explored,
+                                         considers scenarios with only a handful of normal            where anomaly scores are derived from statistical
+                                         samples for training, reflecting realistic industrial        deviations of patch features relative to a Gaus-
+                                         constraints (Roth et al., 2022; Jeong et al., 2023;          sian prior. This provides interpretability and dis-
+                                         Li et al., 2024; El-Tahan and Torki, 2022; Lopes             criminability. Combining deviation-based scor-
+                                         et al., 2020; Hatae et al., 2020). Pioneering                ing with prompt learning allows capturing seman-
+                                         works such as PatchCore, WinCLIP, and Promp-                 tic context while enforcing statistical separation
+                                         tAD emphasize patch-level features, prompt en-               at the patch level.
+                                         gineering, and language-guided representations.                  State-of-the-art FNSAD methods can be cat-
+                                         Nonetheless, challenges remain: heterogeneity of             egorized into (i) prompt-driven representation
+                                         anomalies requires generalization to unseen cases,           learning, focusing on effective textual templates
+                                         and the semantic gap between normality and ab-               for discriminative embedding spaces, and (ii)
+                                         normality needs explicit modeling for fine-grained           deviation-guided anomaly scoring, which enforces
+                                                                                                      statistical constraints to distinguish anomalies.
+                                            a                                                         The former enhances semantic generalization,
+                                                  https://orcid.org/0000-0002-1183-6378
+while the latter improves interpretability and ro-    (Akcay et al., 2018), where anomalies are de-
+bustness.                                             tected via reconstruction errors or latent devi-
+    Building on these insights, we propose a          ations. Self-supervised learning (Golan and El-
+framework integrating learnable prompts with de-      Yaniv, 2018; Noroozi and Favaro, 2016) and one-
+viation loss (Pang et al., 2021) for patch-level      class classification methods such as Deep SVDD
+scoring. Learnable prompts adaptively repre-          (Ruff et al., 2018) further aim to learn compact
+sent both normal and abnormal contexts, while         normal representations. Extensions incorporat-
+Top-K Multiple Instance Learning (MIL) aggre-         ing memory mechanisms (Gong et al., 2019b),
+gates patch-level deviations, improving localiza-     knowledge distillation (Pol et al., 2023), or lim-
+tion. This unified approach combines semantic         ited anomaly supervision (Ruff et al., 2019), met-
+alignment with statistical deviation, advancing       ric learning (Pang et al., 2018; Pang et al., 2023),
+generalizable and interpretable few-normal shot       and MIL-based frameworks (Lv et al., 2023; Chen
+anomaly detection.                                    et al., 2024a) improve discriminability in few-
+    Our contributions are as follows:                 shot settings. DevNet (Pang et al., 2021) in-
+• A unified framework integrating prompt-             troduces a deviation-based objective that directly
+  based anomaly detection with deviation-             optimizes anomaly separation without relying on
+  guided scoring.                                     reconstruction quality. Despite these advances,
+                                                      many methods struggle with subtle or spatially
+• Learnable prompts representing normal and           localized anomalies and often lack interpretabil-
+  abnormal contexts while retaining class-            ity in industrial scenarios.
+  specific cues.
+• Patch-level deviation loss for improved dis-        2.2    CLIP-based Anomaly Detection
+  criminability and interpretability.
+• Top-K MIL aggregation to handle sparse              Recent works leverage vision–language models
+  anomalies and enhance localization.                 such as CLIP (Radford et al., 2021) for anomaly
+• Demonstrated improved generalization to un-         detection via prompt-based similarity modeling.
+  seen anomaly types with minimal normal sam-         CLIP-AD (Chen et al., 2024b) enables zero-shot
+  ples.                                               detection by aligning images with textual de-
+                                                      scriptions of normal and abnormal states, while
+    The rest of the paper is organized as fol-        PromptAD (Li et al., 2024) further learns optimal
+lows. Section 2 reviews anomaly detection litera-     prompts from few-shot normal samples. Other
+ture. Section 3 details our prompt-based anomaly      approaches explore prompt tuning and in-context
+detection framework with MIL-driven deviation         learning strategies (Ho et al., 2024; Zhu and Pang,
+loss. Section 4 presents experimental results. Sec-   2024) to improve generalization. However, exist-
+tion 5 concludes and discusses future directions.     ing CLIP-based methods primarily rely on raw
+                                                      similarity scores, which limits their ability to ex-
+                                                      plicitly model statistical deviations between nor-
+2 Related works                                       mal and anomalous regions, especially for fine-
+                                                      grained or localized defects.
+Anomaly detection has been explored in unsuper-
+vised, supervised, and few-shot settings, or lim-
+ited labeled anomalies. In following we review        3     Methodology
+some of these works.
+                                                      In this section, we present our proposed frame-
+2.1 Unsupervised and Few-shot                         work for few-normal shot anomaly detection.
+    Anomaly Detection                                 The method is designed to capture discrimina-
+                                                      tive alignment between image patches and textual
+Most anomaly detection methods operate under          prompts while providing a statistically grounded
+unsupervised or weakly supervised settings using      measure of deviation for anomaly scoring. The
+only normal data for training. Early approaches       overall pipeline consists of four key stages: (i)
+rely on reconstruction-based models such as au-       visual–textual embedding, (ii) prompt construc-
+toencoders (Gong et al., 2019a; Zhou and Paf-         tion with learnable context, (iii) deviation-based
+fenroth, 2017) and generative methods including       anomaly scoring, and (iv) optimization with
+AnoGAN (Schlegl et al., 2019) and GANomaly            deviation-aware loss.
+Figure 1: Visualization of patch-wise anomaly scores computed using the proposed deviation-guided prompt
+learning approach. Higher deviation scores correspond to more anomalous regions.
+
+
+3.1 Problem Definition                                     where suﬀixn and suﬀixa are fixed, semanti-
+                                                       cally meaningful tokens corresponding to class-
+Let X = {xi }Ni=1 denote the input images, where       specific and anomaly-specific textual descrip-
+each xi may contain normal or anomalous regions.       tions. For instance, for a given object class c =
+Each image is decomposed into P non-overlapping        “bottle”, the normal and abnormal prompts may
+patches, denoted as x = {x p }Pp=1 . A dual-encoder    be expressed as “a photo of a normal bottle” and
+model is employed, where the visual encoder f (·)      “a photo of a defective bottle”, respectively. This
+extracts patch-level embeddings and the textual        design preserves interpretability while enabling
+encoder g(·) projects tokenized prompts into the       the model to adaptively learn discriminative con-
+same embedding space:                                  text.
+     z p = f (x p ) ∈ Rd ,
+                                                (1)    3.3 Patch-to-Prompt Alignment
+     ea = g(Ta ) ∈ Rd ,    en = g(Tn ) ∈ Rd
+where z p is the embedding of patch p, ea and en       Given patch embeddings z p and prompt embed-
+are the representations of textual prompt Ta and       dings en , ea , we compute cosine similarities:
+Tn respectively.                                                       z p · en                z p · ea
+                                                          sn (p) =                , sa (p) =              . (3)
+                                                                     ∥z p ∥ ∥en ∥            ∥z p ∥ ∥ea ∥
+3.2 Prompt Construction with
+                                                       Here, sn (p) measures the alignment of patch p
+    Learnable Context                                  with normal semantics, while sa (p) captures its
+                                                       alignment with abnormal cues. Collecting these
+Traditional prompt-based approaches, including
+                                                       scores over all patches provides a fine-grained rep-
+PromptAD (Li et al., 2024), rely on fixed textual
+                                                       resentation of how an image relates to both nor-
+tokens, such as manually designed prefixes and
+                                                       mality and abnormality.
+suﬀixes, to represent normal and abnormal con-
+texts. While this design provides stability and
+class-specific guidance, it can limit discriminabil-   3.4    MIL-Driven Deviation Loss
+ity when anomaly patterns are subtle or diverse.
+Our work builds on this framework by retain-           Cosine similarities alone are insuﬀicient to reli-
+ing the fixed prompt structure but introducing         ably distinguish anomalies, because the distribu-
+deviation-based scoring at the patch level, which      tions of similarity scores for normal and abnor-
+explicitly enforces statistical separation between     mal patches often overlap. To address this, we
+normal and abnormal features. This allows the          introduce a deviation-based scoring mechanism
+model to leverage the stable prompt representa-        grounded in statistical modeling.
+tion while improving anomaly localization and ro-          We assume that the distribution of normal
+bustness in few-shot scenarios.                        patch-to-normal prompt similarities follows a
+    The normal and abnormal prompts are con-           Gaussian distribution:
+structed as                                                              sn (p) ∼ N (µ, σ2 ),              (4)
+       Tn = [C; suﬀixn ],    Ta = [C; suﬀixa ], (2)
+   Input: Training images Xtrain (normal                              both anomaly detection and hard negative min-
+            samples)                                                  ing. Finally the aggregated image-level deviation
+   Output: Image-level anomaly score D(x)                             is computed as
+   Training Phase:;                                                                             1
+                                                                                                K m∈∑
+   for each normal image xi ∈ Xtrain do                                                D(x) =             m.              (7)
+       Divide xi into P patches: {xi,p }Pp=1 ;                                                      M (x)
+       Extract patch embeddings:
+                                                                          We then define the deviation loss to encour-
+        zi,p = f (xi,p );
+                                                                      age a statistically significant separation between
+   end                                                                normal and anomalous images:
+   Initialize learnable context vectors                                                                          (           )
+    C = [c1 , ..., ck ];                                              Ldev (xi , yi ) = λ∗(1−yi ) |D(xi )|+yi max 0, a−D(xi ) ,
+   Construct normal and abnormal prompts:                                                                                (8)
+    Tn = [C; suﬀixn ], Ta = [C; suﬀixa ];                             where yi = 1 if xi is anomalous, 0 otherwise, and a
+   Compute prompt embeddings:                                         is a confidence parameter (Z-score threshold) con-
+    en = g(Tn ), ea = g(Ta );                                         trolling the margin between normal and anoma-
+   for each patch embedding zi,p do                                   lous deviations. Following (Pang et al., 2021),
+       Compute cosine similarities:                                   we set a = 5 for high statistical significance. The
+                       z ·e                   z ·e
+        sn (p) = ∥zi,pi,p∥∥enn ∥ , sa (p) = ∥zi,pi,p∥∥eaa ∥ ;         coeﬀicient λ represents the deviation scaling fac-
+   end                                                                tor, we empirically set it to 1 in our experiments.
+   Estimate Gaussian prior (µ, σ) from sn (p);                        This formulation ensures that: (i) The deviation
+   Compute deviation scores:                                          of normal images are pushed to have deviations
+    d(p) = |sa (p)−µ| ;                                               close to zero. (ii) Anomalous images are forced
+                σ                                                     to exceed a threshold a.
+   Optimize the model by minimizing:
+                          L = λLdev
+   Return: trained parameters θ ;                                     4    Experimental Results
+ Algorithm 1: Proposed Few-normal shot Anomaly
+ Detection Framework
+                                                                      Table 1: MVTecAD Dataset: Class-wise AUROC
+                                                                      (%). Bold indicates improvement over the baseline
+where µ and σ are estimated following DevNet                          PromptAD.
+(Pang et al., 2021), where a fixed standard Gaus-
+                                                                       Class           WinCLIP        PromptAD       Proposed
+sian prior is defined, and a large set of reference
+values is sampled from this distribution to deter-                     Bottle            96.8           97.31          97.28
+mine the µ and σ.                                                      Cable             93.6           94.10          93.79
+    For each patch, the deviation score is defined                     Capsule          96.04           95.60          96.25
+as:                                                                    Carpet            99.1           99.54          99.54
+                         |s(p) − µ|                                    Grid              96.3           97.99          97.97
+                 d(p) =             .           (5)                    Hazelnut         97.76           98.21          98.27
+                             σ
+                                                                       Leather           99.2           99.34          99.36
+Intuitively, d(p) quantifies how strongly a patch
+                                                                       Metal Nut         89.5           91.65          92.67
+deviates from the expected normal similarity,
+                                                                       Pill              93.8           93.63          95.26
+with larger values indicating potential anomalies.
+                                                                       Screw             95.9           95.19          94.11
+To robustly aggregate patch-level evidence, we
+                                                                       Tile              95.7           96.05          96.06
+adopt a Top-K Multiple Instance Learning (MIL)
+                                                                       Toothbrush         97            98.63          98.67
+strategy inspired by (Pang et al., 2021). We de-
+                                                                       Transistor        84.3           85.65          85.66
+fine the set of top-K patches with the largest de-
+                                                                       Wood              94.8           95.44          95.29
+viations as
+                                                                       Zipper            91.4           90.77          92.04
+        M (x) = Top-K{d(p) | p = 1, . . . , P}.                 (6)
+This selection is motivated by two observations:                         In this section, we present a comprehensive
+(i) anomalous images contain normal background                        evaluation of the proposed PromptAD framework
+patches, and (ii) normal images may contain                           augmented with deviation-based patch-wise scor-
+“hard” patches resembling anomalies. Learning                         ing for anomaly detection. All experiments are
+from only the top-K patches ensures that the                          conducted on the MVTecAD (Bergmann et al.,
+model focuses on the most informative regions for                     2019) and VISA (Zou et al., 2022) datasets,
+with a particular focus on pixel-level anomaly          the original PromptAD paper and reflects real-
+score. The evaluation highlights the effective-         istic industrial scenarios where abundant normal
+ness of patch-level Top-K MIL scoring in captur-        data may not be available at design time.
+ing fine-grained anomalies. We report class-wise            All images are resized to 256 × 256 prior to
+AUROC (%) and perform sensitivity analayzes to          training and evaluation to ensure consistent input
+measure the impact of the deviation coeﬀicient λ,       dimensions across categories and datasets.
+the Top-K parameter K and the confidence pa-
+rameter a on model performance.                         4.2    Training Setting
+4.1 Datasets                                            We adopt the exact hyperparameter configura-
+                                                        tion used in the baseline (Li et al., 2024) im-
+The MVTecAD dataset consists of 15 industrial           plementation for fair comparison. The backbone
+object categories (e.g., bottle, cable, hazelnut,       network uses pretrained CLIP weights (Radford
+transistor) with high-resolution images of size ap-     et al., 2021). No additional finetuning of the
+proximately 700 × 900 pixels. The dataset in-           backbone is performed; only learnable prompt to-
+cludes both normal and defective samples, with          kens and deviation-based scoring parameters are
+pixel-level ground truth annotations for anoma-         optimized.
+lies. Training is conducted on normal images                Importantly, in contrast to image-level classi-
+only, while the test set includes both normal and       fication, our deviation-based patch scoring and
+anomalous images.                                       Multiple Instance Learning (MIL) are applied
+    The VISA dataset contains 12 object cate-           only at the pixel level. The rationale behind
+gories (e.g., cashew, chewinggum, PCB), with an         this design is that anomaly pixel level focuses
+average image resolution of approximately 1500 ×        on local regions (patches) rather than global im-
+1000 pixels. Similar to MVTec, VISA provides            age structure. By operating at the patch level,
+normal samples for training and both normal and         the model can better highlight spatially localized
+anomalous samples with fine-grained pixel-level         defects and achieve higher pixel-level AUROC.
+annotations for testing. For both datasets, we          Extending MIL to the full image in a one-shot
+Table 2: VISA Dataset: Class-wise AUROC (%) for         setting would not be meaningful, as global rep-
+pixel-level segmentation. Bold indicates improvement    resentations are insuﬀiciently diverse to capture
+over PromptAD.                                          anomalous variations.
+ Class            WinCLIP      PromptAD        Proposed
+ Candle            94.53         94.65           94.69 4.3 MVTecAD Results
+ Capsules           95.9         94.01           94.01
+ Cashew             97.9         98.85           98.88 Table 1 summarizes the class-wise AUROC scores
+ Chewinggum          99          99.24           99.25 on the MVTecAD dataset, comparing the base-
+ Fryum             95.33         95.58           95.63 line PromptAD and WinCLIP against our pro-
+ Macaroni1          96.8         97.81           97.73 posed deviation-based method. Improvements
+ Macaroni2         94.87         95.39           95.49 achieved comparing to our baseline are high-
+ PCB1              95.31         95.72           95.83 lighted in bold.
+ PCB2              93.04         94.30           93.34
+ PCB3              94.34         94.66           94.65 Analysis. The results indicate that deviation-
+ PCB4               95.3         94.62           94.49 based patch scoring is particularly beneficial for
+ Pipe_Fryum        98.92         99.16           99.19 categories with localized defects. Classes such
+                                                        as Capsule, Pill, and Metal Nut, which contain
+follow the standard train/test split defined in the     cracks, contaminations, or missing regions, ex-
+benchmark (Li et al., 2024). Since the focus of         hibit noticeable improvements due to the Top-K
+this work is on few-normal-shot anomaly detec-          MIL mechanism emphasizing the most anomalous
+tion, all experiments are conducted under a 1-          patches. Similarly, performance gains in Zipper
+shot setting, meaning that only one normal image        and Hazelnut suggest that fine-grained texture ir-
+per class is used during training. The training set     regularities are effectively distinguished from nor-
+contains only 1 defect-free image per class, and        mal patterns.
+no anomalous samples are used during training,             Minor reductions in AUROC for Cable, Screw,
+and generalization is achieved by learning patch-       and Wood are observed. These categories contain
+level normality statistics. This setting aligns with    anomalies that are either globally distributed or
+            97
+                     Few-Shot Anomaly Detection Performance                                 gest that anomalies dispersed across fine circuit
+                                                 96.10 96.17 95.97                          patterns are less sensitive to patch-level devia-
+            96   95.48
+                         95.27                                                              tions and may require global structural reason-
+                                                                     94.86
+            95                   94.70                                                      ing. Categories with simpler or more uniform de-
+                                                                                Proposed    fect patterns, such as Capsules, PCB3, and Mac-
+AUROC (%)
+            94
+                                                                                PromptAD
+                                                                                WinCLIP     aroni1, maintain robust performance, confirming
+            93                                                                  PatchCore   the method’s generalization across defect types.
+            92
+                                         91.24
+            91                                                                              Overall Performance Comparison. To provide a
+                                                                                            comprehensive view of the method’s effective-
+            90
+                         MVTecAD                          VisA                              ness, Figure 2 presents the average AUROC of
+Figure 2: Average AUROC comparison of Promp-                                                PromptAD, WinCLIP, PatchCore, and the pro-
+tAD, WinCLIP, PatchCore, and the proposed                                                   posed approach across both MVTecAD and VISA
+method across MVTecAD and VISA datasets.                                                    datasets. As illustrated, the proposed method
+                                                                                            achieves the best performance on MVTecAD, in-
+exhibit high intra-class variability, which are less                                        dicating its strong ability to capture fine-grained,
+sensitive to patch-level deviation modeling. Cat-                                           localized anomalies. On the VISA dataset, it
+egories such as Carpet, Grid, and Leather main-                                             maintains competitive results, closely matching
+tain stable performance, indicating that both the                                           or exceeding the baseline methods. This com-
+baseline and our method have already saturated                                              parative visualization underscores that integrat-
+for simpler anomaly patterns.                                                               ing deviation-guided scoring with prompt-based
+                                                                                            representations leads to consistent performance
+4.4 VISA Dataset Results                                                                    gains across benchmarks with diverse anomaly
+                                                                                            patterns.
+Table 2 presents the segmentation results on the                                               It is seen from Tables 1, and 2, that the
+VISA dataset. Bold entries highlight improve-                                               improvements over PromptAD are numerically
+ments introduced by the deviation-based scoring.                                            small, but the consistent behavior across datasets
+                                                                                            and metrics in the few-shot setting reflects im-
+Analysis. The proposed deviation-based scor-                                                proved robustness and generalization without
+ing consistently improves the performance our                                               added supervision or model complexity.
+model in categories with spatially concentrated
+anomalies, such as Cashew, Chewinggum, and                                                  4.5   Sensitivity Analysis
+Pipe_Fryum. Notably, PCB1 also benefits from
+patch-level deviation, demonstrating that struc-                                            We further conduct a sensitivity analysis to ex-
+tured defects, such as scratches or missing cir-                                            amine how variations in key hyperparameters af-
+cuitry, can be accurately localized. Slight re-                                             fect the performance of our model. In particular,
+                                                                                            we analyze the impact of the deviation coeﬀicient
+Table 3: Impact of the deviation coeﬀicient λ (VISA,                                        λ, the Top-K percentage parameter and the im-
+AUROC %).
+                                                                                            pact of the confidence parameter a used in the
+        Class                               Proposed      λ = 0.1            λ = 0.01       MIL-based deviation scoring. This analysis pro-
+        Candle                                94.69        94.43              94.57         vides insight into the robustness of the proposed
+        Capsules                              94.01        94.00              94.00         method and helps identify stable operating ranges
+        Cashew                                98.88        98.83              98.86         for different anomaly distributions.
+        Chewinggum                            99.25        99.23              99.25
+        Fryum                                 95.63        95.77              95.49         Impact of Deviation Coeﬀicient λ. To evaluate
+        Macaroni1                             97.73        97.72              97.76         the influence of the deviation coeﬀicient λ on the
+        Macaroni2                             95.49        95.32              95.31         performance of the proposed method„ we conduct
+        PCB1                                  95.83        95.72              95.73         analayze on the VISA dataset. Table 5 reports
+        PCB2                                  93.34        93.93              94.58         class-wise AUROC scores for three different val-
+        PCB3                                  94.65        94.53              94.59         ues of λ.
+        PCB4                                  94.49        94.46              94.31             The results indicate that the method is rela-
+        Pipe_Fryum                            99.19        99.14              99.17         tively stable across different λ values. For cat-
+                                                                                            egories with more globally distributed anoma-
+ductions in AUROC for PCB2 and PCB4 sug-                                                    lies, such as PCB2, a smaller deviation coeﬀicient
+ Table 4: Impact of Top-K% (VISA, AUROC %).
+                                                         the spatial extent of anomalies is governed by the
+ Class           Proposed      K = 20%         K = 30%   underlying manufacturing process.
+ Candle            94.69        94.59           94.75
+ Capsules          94.01        94.00           94.01
+                                                         Impact of the confidence parameter a. The pa-
+ Cashew            98.88        98.79           98.93
+                                                         rameter a defines the minimum deviation mar-
+ Chewinggum        99.25        99.26           99.24
+                                                         gin between normal and anomalous samples dur-
+ Fryum             95.63        95.54           95.49
+                                                         ing training. We evaluate a ∈ {1, 3, 5, 7, 9} on the
+ Macaroni1         97.73        97.77           97.73
+                                                         VISA dataset. It is seen from Table 5 that small
+ Macaroni2         95.49        95.27           95.14
+                                                         values of a lead to insuﬀicient separation, while
+ PCB1              95.83        95.72           95.17
+                                                         performance stabilizes once a meaningful margin
+ PCB2              93.34        94.43           94.45
+                                                         is reached, with a = 5 providing the best trade-off
+ PCB3              94.65        94.64           94.58
+                                                         between accuracy and stability.
+ PCB4              94.49        94.11           94.06
+ Pipe_Fryum        99.19        99.18            99.1
+
+Table 5: Impact of confidence parameter a (VISA,
+                                                         5   Conclusion
+AUROC %).
+                                                         Few-shot anomaly detection remains challenging
+ Class         a=1     a=3     a=5       7      a=9
+                                                         due to the need for accurate localization un-
+ Candle        94.38   94.49   94.69    94.7    94.65
+ Capsules      93.47   93.98   94.01     94      94      der extremely limited supervision. In this work,
+ Cashew        98.43   98.72   98.88   98.87    98.84    we proposed a deviation-guided prompt learn-
+ Chewinggum     99.1   99.16   99.25   99.26    99.22    ing framework that integrates vision–language
+ Fryum         94.38   95.01   95.63   95.61    95.59    alignment with statistically grounded patch-level
+ Macaroni1     97.08   97.58   97.73   97.71    97.68    anomaly scoring. By introducing learnable con-
+ Macaroni2      94.7    95.1   95.49   95.46    95.39
+                                                         text vectors into textual prompts and optimiz-
+ PCB1           95.3   95.71   95.83   95.79    95.72
+ PCB2          92.82   93.11   93.34   93.35    93.27    ing a Top-K MIL-driven deviation loss, the pro-
+ PCB3          94.68   94.62   94.65   94.64    94.58    posed method enhances discrimination between
+ PCB4          94.31   94.39   94.49   94.45    94.37    normal and anomalous regions while preserving
+ Pipe_Fryum    99.01   99.12   99.19   99.17    99.14    interpretability. Experiments on MVTecAD and
+                                                         VISA demonstrate that the proposed approach
+                                                         consistently improves pixel-level anomaly detec-
+(λ = 0.01) slightly improves segmentation by re-
+                                                         tion, particularly for localized and texture-rich
+ducing over-penalization of moderate deviations.
+                                                         defects, while remaining stable across a wide
+                                                         range of hyperparameter settings. These results
+Impact of Top-K Parameter. We further inves-             indicate that combining prompt-based global se-
+tigate the effect of the Top-K parameter on the          mantics with deviation-based local scoring is well
+performance of the proposed method, as reported          suited for industrial anomaly detection scenarios.
+in Table 4. A higher K increases the number                  Future work may extend this framework to
+of patch scores considered when computing the            video-based anomaly detection, explore overlap-
+MIL-based deviation score. Specifically, K is            ping patch designs within CLIP to improve spa-
+defined as a percentage of the total number of           tial sensitivity, or incorporate more structured
+patches in an image (e.g., K = 10% or 20%),              priors into prompt construction.
+meaning that only the top K highest deviation
+scores are used for final anomaly scoring.
+    Increasing K generally improves performance
+for categories where anomalies are distributed           Acknowledgments
+across multiple regions, as observed in PCB2.
+Conversely, categories with highly localized de-         Work performed while M. Poudineh was an intern
+fects, such as Fryum or Pipe_Fryum, exhibit              at CRIM. The internship was financed by CRIM
+limited sensitivity to K, demonstrating that the         with support from the Ministry of Economy, In-
+method is robust to this hyperparameter in such          novation, and Energy (MEIE) of the Government
+scenarios. Importantly, this behavior does not as-       of Quebec.
+sume prior knowledge of anomaly characteristics,
+rather, it reflects intrinsic defect patterns com-
+monly encountered in industrial inspection, where
+REFERENCES                                               based on deep captioning. In VISIGRAPP
+                                                         (5: VISAPP), pages 326–335.
+Akcay, S., Atapour-Abarghouei, A., and Breckon,     Ho, C.-H., Peng, K.-C., and Vasconcelos, N.
+    T. P. (2018). Ganomaly: Semi-supervised              (2024). Long-tailed anomaly detection with
+    anomaly detection via adversarial training.          learnable class names. In Proceedings of
+    In Asian conference on computer vision,              the IEEE/CVF Conference on Computer Vi-
+    pages 622–637. Springer.                             sion and Pattern Recognition, pages 12435–
+Bergmann, P., Fauser, M., Sattlegger, D., and            12446.
+    Steger, C. (2019). Mvtec ad–a compre-           Jeong, J., Zou, Y., Kim, T., Zhang, D., Ravichan-
+    hensive real-world dataset for unsupervised          dran, A., and Dabeer, O. (2023). Win-
+    anomaly detection. In Proceedings of the             clip: Zero-/few-shot anomaly classification
+    IEEE/CVF conference on computer vision               and segmentation. In Proceedings of the
+    and pattern recognition, pages 9592–9600.            IEEE/CVF Conference on Computer Vi-
+Chen, J., Li, L., Su, L., Zha, Z.-j., and Huang,         sion and Pattern Recognition, pages 19606–
+    Q. (2024a). Prompt-enhanced multiple in-             19616.
+    stance learning for weakly supervised video     Li, X., Zhang, Z., Tan, X., Chen, C., Qu, Y., Xie,
+    anomaly detection. In Proceedings of the             Y., and Ma, L. (2024). Promptad: Learning
+    IEEE/CVF Conference on Computer Vi-                  prompts with only normal samples for few-
+    sion and Pattern Recognition, pages 18319–           shot anomaly detection. In Proceedings of
+    18329.                                               the IEEE/CVF Conference on Computer Vi-
+Chen, X., Zhang, J., Tian, G., He, H., Zhang, W.,        sion and Pattern Recognition, pages 16838–
+    Wang, Y., Wang, C., and Liu, Y. (2024b).             16848.
+    Clip-ad: A language-guided staged dual-         Lopes, L. T., Valem, L. P., Pedronette, D.
+    path model for zero-shot anomaly detection.          C. G., Guilherme, I. R., Papa, J. P., San-
+    In International Joint Conference on Artifi-         tana, M. C. S., Colombo, D., Farinella, G.,
+    cial Intelligence, pages 17–33. Springer.            Radeva, P., and Braz, J. (2020). Manifold
+El-Tahan, K. and Torki, M. (2022). Semi-                 learning-based clustering approach applied
+    supervised anomaly detection for weakly-             to anomaly detection in surveillance videos.
+    annotated videos. In VISIGRAPP (5: VIS-              In VISIGRAPP (5: VISAPP), pages 404–
+    APP), pages 871–878.                                 412.
+Golan, I. and El-Yaniv, R. (2018). Deep anomaly     Lv, H., Yue, Z., Sun, Q., Luo, B., Cui, Z., and
+    detection using geometric transformations.           Zhang, H. (2023). Unbiased multiple in-
+    Advances in neural information processing            stance learning for weakly supervised video
+    systems, 31.                                         anomaly detection. In Proceedings of the
+Gong, D., Liu, L., Le, V., Saha, B., Mansour,            IEEE/CVF conference on computer vision
+    M. R., Venkatesh, S., and Hengel, A. v. d.           and pattern recognition, pages 8022–8031.
+    (2019a). Memorizing normality to detect         Noroozi, M. and Favaro, P. (2016). Unsupervised
+    anomaly: Memory-augmented deep autoen-               learning of visual representations by solving
+    coder for unsupervised anomaly detection. In         jigsaw puzzles. In European conference on
+    Proceedings of the IEEE/CVF international            computer vision, pages 69–84. Springer.
+    conference on computer vision, pages 1705–      Pang, G., Cao, L., Chen, L., and Liu, H. (2018).
+    1714.                                                Learning representations of ultrahigh-
+Gong, D., Liu, L., Le, V., Saha, B., Mansour,            dimensional data for random distance-based
+    M. R., Venkatesh, S., and Hengel, A. v. d.           outlier detection. In Proceedings of the 24th
+    (2019b). Memorizing normality to detect              ACM SIGKDD international conference on
+    anomaly: Memory-augmented deep autoen-               knowledge discovery & data mining, pages
+    coder for unsupervised anomaly detection. In         2041–2050.
+    Proceedings of the IEEE/CVF international       Pang, G., Ding, C., Shen, C., and Hengel, A. v. d.
+    conference on computer vision, pages 1705–           (2021). Explainable deep few-shot anomaly
+    1714.                                                detection with deviation networks. arXiv
+Hatae, Y., Yang, Q., Fadjrimiratno, M. F., Li,           preprint arXiv:2108.00462.
+    Y., Matsukawa, T., and Suzuki, E. (2020).       Pang, G., Shen, C., Jin, H., and Van Den Hengel,
+    Detecting anomalous regions from an image            A. (2023). Deep weakly-supervised anomaly
+     detection. In Proceedings of the 29th ACM
+     SIGKDD Conference on Knowledge Discov-
+     ery and Data Mining, pages 1795–1807.
+Pol, A. A., Govorkova, E., Gronroos, S.,
+     Chernyavskaya, N., Harris, P., Pierini, M.,
+     Ojalvo, I., and Elmer, P. (2023). Knowledge
+     distillation for anomaly detection. arXiv
+     preprint arXiv:2310.06047.
+Radford, A., Kim, J. W., Hallacy, C., Ramesh,
+     A., Goh, G., Agarwal, S., Sastry, G., Askell,
+     A., Mishkin, P., Clark, J., et al. (2021).
+     Learning transferable visual models from
+     natural language supervision. In Interna-
+     tional conference on machine learning, pages
+     8748–8763. PmLR.
+Roth, K., Pemula, L., Zepeda, J., Schölkopf, B.,
+     Brox, T., and Gehler, P. (2022). Towards
+     total recall in industrial anomaly detection.
+     In Proceedings of the IEEE/CVF conference
+     on computer vision and pattern recognition,
+     pages 14318–14328.
+Ruff, L., Vandermeulen, R., Goernitz, N., Deecke,
+     L., Siddiqui, S. A., Binder, A., Müller, E.,
+     and Kloft, M. (2018). Deep one-class classi-
+     fication. In International conference on ma-
+     chine learning, pages 4393–4402. PMLR.
+Ruff, L., Vandermeulen, R. A., Görnitz,
+     N., Binder, A., Müller, E., Müller, K.-
+     R., and Kloft, M. (2019).        Deep semi-
+     supervised anomaly detection.           arXiv
+     preprint arXiv:1906.02694.
+Schlegl, T., Seeböck, P., Waldstein, S. M., Langs,
+     G., and Schmidt-Erfurth, U. (2019). f-
+     anogan: Fast unsupervised anomaly detec-
+     tion with generative adversarial networks [j].
+     Medical image analysis, 54:30–44.
+Zhou, C. and Paffenroth, R. C. (2017). Anomaly
+     detection with robust deep autoencoders. In
+     Proceedings of the 23rd ACM SIGKDD in-
+     ternational conference on knowledge discov-
+     ery and data mining, pages 665–674.
+Zhu, J. and Pang, G. (2024). Toward general-
+     ist anomaly detection via in-context resid-
+     ual learning with few-shot sample prompts.
+     In Proceedings of the IEEE/CVF conference
+     on computer vision and pattern recognition,
+     pages 17826–17836.
+Zou, Y., Jeong, J., Pemula, L., Zhang, D., and
+     Dabeer, O. (2022). Spot-the-difference self-
+     supervised pre-training for anomaly detec-
+     tion and segmentation. In European con-
+     ference on computer vision, pages 392–408.
+     Springer.
+

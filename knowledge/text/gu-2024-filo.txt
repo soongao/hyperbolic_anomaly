@@ -1,0 +1,1383 @@
+                                                 FiLo: Zero-Shot Anomaly Detection by Fine-Grained Description and
+                                                                    High-Quality Localization
+
+                                                              Zhaopeng Gu1,2 Bingke Zhu1,3 Guibo Zhu1,2 Yingying Chen1,3
+                                                                          Hao Li4 * Ming Tang1,2 Jinqiao Wang1,2,3
+                                                                  1
+                                                                    Foundation Model Research Center, Institute of Automation,
+                                                                         Chinese Academy of Sciences, Beijing, China
+                                                                  2
+                                                                    University of Chinese Academy of Sciences, Beijing, China
+
+
+
+
+arXiv:2404.13671v3 [cs.CV] 28 Feb 2026
+                                                                                 3
+                                                                                   Objecteye Inc., Beijing, China
+                                                                            4
+                                                                              Central South University, Hunan, China
+                                                                                        guzhaopeng2023@ia.ac.cn
+                                                                  {bingke.zhu,gbzhu,yingying.chen,tangm,jqwang}@nlpr.ia.ac.cn
+                                                                                         8209210109@csu.edu.cn
+
+
+
+                                                                    Abstract                                  Anomaly Detection                                      0.6
+                                                                                                                                                                           abnormal
+                                                                                                                                                                     0.4
+                                                                                                                                                                                       STATE
+                                                                                                                             0.45
+                                                                                                                                  abnormal                       cos
+                                                                                                                                                                           normal
+                                                                                                                         cos
+                                            Zero-shot anomaly detection (ZSAD) methods detect                            sim 0.55
+                                                                                                                                    normal
+                                                                                                                                             STATE               sim 0.5
+                                                                                                                                                                           cut
+                                                                                                                                                                                       ANOMALY
+                                         anomalies without prior access to known normal or ab-                                                                       0.7   color
+                                                                                                                                                                           pollution
+                                                                                                                                                                                       CLASS
+                                                                                                                                                       Text template:
+                                         normal samples within target categories. Existing meth-               Text template:
+                                                                                                                                                       [w1][w2]…[wn] [STATE] wood
+                                                                                                               A photo of [STATE] wood.
+                                         ods typically rely on pretrained multimodal models, com-                                                      with [ANOMALY CLASS].
+                                                                                                                    Previous ZSAD methods                              FG-Des
+                                         puting similarities between manually crafted textual fea-
+                                                                                                               Anomaly Localization
+                                         tures representing ”normal” or ”abnormal” semantics and
+                                         image patch features to detect anomalies. However, the                             Patch                    Grounding               MMCI
+                                         generic descriptions of ”abnormal” often fail to precisely                        Matching
+
+                                         match diverse types of anomalies across different object
+                                         categories. Additionally, computing feature similarities for               Previous ZSAD methods                              HQ-Loc
+
+                                         single patches struggles to pinpoint specific locations of
+                                         anomalies with various sizes and scales. To address these          Figure 1. Comparison of anomaly detection and localization be-
+                                         issues, we propose a novel ZSAD method called FiLo, com-           tween FiLo and previous ZSAD methods. Previous ZSAD meth-
+                                         prising two components: adaptively learned Fine-Grained            ods utilize fixed templates and generic anomaly descriptions, po-
+                                         Description (FG-Des) and position-enhanced High-Quality            tentially resulting in errors. Our FG-Des enhances detection ac-
+                                                                                                            curacy with adaptively learned text templates and fine-grained
+                                         Localization (HQ-Loc). FG-Des introduces fine-grained
+                                                                                                            anomaly descriptions. For localization, ZSAD methods often pro-
+                                         anomaly descriptions for each category using Large Lan-
+                                                                                                            duce false positives in background areas by directly comparing
+                                         guage Models (LLMs) and employs adaptively learned tex-            image patches with text features. Our HQ-Loc approach, using
+                                         tual templates to enhance the accuracy and interpretabil-          Grounding DINO, location enhancement, and MMCI, effectively
+                                         ity of anomaly detection. HQ-Loc, utilizing Grounding              removes background regions and improves localization accuracy.
+                                         DINO for preliminary localization, position-enhanced text
+                                         prompts, and Multi-scale Multi-shape Cross-modal Inter-
+                                         action (MMCI) module, facilitates more accurate localiza-          a pixel-level AUC of 95.9% on the VisA dataset. Code is
+                                         tion of anomalies of different sizes and shapes. Experimen-        available at https://github.com/CASIA-IVA-Lab/FiLo.
+                                         tal results on datasets like MVTec and VisA demonstrate
+                                         that FiLo significantly improves the performance of ZSAD
+                                         in both detection and localization, achieving state-of-the-        1. Introduction
+                                         art performance with an image-level AUC of 83.9% and
+                                                                                                            The anomaly detection task aims to identify whether indus-
+                                           * Work done as intern in CASIA.                                  trial products contain abnormalities or defects and locate the
+
+
+                                                                                                        1
+abnormal regions within the samples, which plays a crucial            Our FG-Des not only improves the accuracy of anomaly
+role in product quality control and safety monitoring. Tra-           detection but also enables the identification of the specific
+ditional anomaly detection methods [5, 6, 30, 34] typically           anomaly categories present in the samples, thus enhancing
+require a large number of normal samples for model train-             the interpretability.
+ing. While performing well in some scenarios, they often                  Regarding anomaly localization, existing methods [4, 7,
+fail in situations requiring protection of user data privacy or       15] localize anomalies by computing the similarity between
+when applied to new production lines. Zero-Shot Anomaly               the features of each image patch and the textual features.
+Detection (ZSAD) has emerged as a research direction tai-             However, anomalies often span multiple patches with dif-
+lored to such scenarios, aiming to perform anomaly detec-             ferent shapes and sizes, sometimes requiring comparison
+tion tasks without prior data on the target item categories,          with surrounding normal regions to determine their abnor-
+demanding high generalization ability from the model.                 mality. While WinCLIP [16] addresses this issue by em-
+    Multimodal pre-trained models [17, 18, 28] have re-               ploying windows of different sizes, it incurs significant time
+cently demonstrated strong zero-shot recognition capabil-             and space costs by inputting a large number of images cor-
+ities in various visual tasks. Many works have sought                 responding to each window into CLIP’s image encoder dur-
+to leverage the vision-language comprehension ability of              ing inference. To tackle this problem, we design HQ-Loc,
+multimodal pre-trained models for ZSAD tasks, such as                 which consists of three main components: first, prelimi-
+WinCLIP [16], APRIL-GAN [4], and AnomalyGPT [15].                     nary anomaly localization based on Grounding DINO [21].
+These methods assess whether an image contains anoma-                 Considering that even in abnormal samples, most regions
+lies by computing the similarity between image features               are normal, and anomalies only exist in small local areas,
+and manually crafted textual features representing ”nor-              we utilize the detailed anomaly descriptions generated in
+mal” and ”abnormal” semantics. They also localize abnor-              the previous step and employ Grounding DINO [21] for
+mal regions by calculating the similarity between the im-             preliminary anomaly localization. Although directly using
+age patch features and the textual features. While these ap-          Grounding DINO for zero-shot anomaly localization yields
+proaches partly address the challenges of ZSAD, they en-              low accuracy, the localized regions are always in the fore-
+counter issues in both anomaly detection and localization.            ground, effectively avoiding false positives in background
+The generic ”abnormal” descriptions fail to precisely match           regions. Second, position enhancement involves adding the
+the diverse types of anomalies across different object cate-          position detected by Grounding DINO to the text prompt,
+gories. Moreover, computing feature similarity for individ-           resulting in a more accurate description of the anomaly
+ual patches struggles to precisely locate abnormal regions            position. Third, the Multi-scale Multi-shape Cross-modal
+of varying sizes and shapes. To tackle these issues, we               Interaction (MMCI) module aggregates patch features ex-
+propose FiLo (Fine-Grained Description and High-Quality               tracted by the Image Encoder using convolutional kernels
+Localization), which addresses the shortcomings of existing           of different sizes and shapes to enhance the method’s abil-
+ZSAD methods through adaptively learned Fine-Grained                  ity to localize anomalies of different sizes and shapes.
+Description (FG-Des) and High-Quality Localization (HQ-                   Extensive experiments are conducted on multiple
+Loc), as depicted in Figure 1.                                        datasets like MVTec [2] and VisA [38]. Our FiLo improves
+    Concerning anomaly detection, manually crafted abnor-             the accuracy of anomaly detection and localization, achiev-
+mal descriptions typically employ generic terms such as               ing new state-of-the-art zero-shot performance. Trained on
+”damaged” or ”defect” [4, 15, 16], which do not adequately            the MVTec dataset and tested on the VisA dataset, FiLo
+capture the specific types of anomalies present across differ-        achieves an image-level AUC of 83.9% and a pixel-level
+ent object categories. Furthermore, existing methods’ text            AUC of 95.9%, outperforming other ZSAD methods.
+prompt templates like A xxx photo of xxx. are primarily de-               Our contributions can be summarized as follows:
+signed for foreground object classification tasks and may             • We propose an adaptively learned Fine-Grained Descrip-
+not be suitable for identifying normal and abnormal parts                tion (FG-Des) that leverages domain-specific knowledge
+within objects. In FG-Des, we first leverage the capabilities            to introduce detailed anomaly descriptions, replacing
+of Large Language Models (LLMs) to generate fine-grained                 generic ”normal” and ”abnormal” descriptions. Also,
+anomaly types for each object category, replacing generic                we use learnable vectors instead of manually crafted text
+abnormal descriptions with specific anomaly content that                 templates to learn textual content which is more suitable
+matches the anomaly samples better. Next, we utilize learn-              for anomaly detection task, improving both the accuracy
+able text vectors instead of manually crafted sentence tem-              and interpretability.
+plates and embed the detailed anomaly content generated in            • Additionally, we design a position-enhanced High-
+the previous step into the adaptively learned text templates             Quality Localization method (HQ-Loc) that employs
+to improve the match between the text and the abnormal im-               Grounding DINO [21] for preliminary anomaly localiza-
+ages, enhancing the textual features for anomaly detection.              tion, enhances text prompts with descriptions of anomaly
+
+
+                                                                  2
+  positions, and utilizes an MMCI module to localize               2.2. Zero-shot Anomaly Detection
+  anomalies of different sizes and shapes more accurately,
+                                                                   Most zero-shot anomaly detection methods leverage the
+  improving anomaly localization accuracy.
+                                                                   transferability of pre-trained vision-language models. Early
+• Experiments on multiple datasets demonstrate significant
+                                                                   methods like ZoC [12] and CLIP-AD [22], simply ap-
+  performance improvements in anomaly detection and lo-
+                                                                   ply CLIP to anomaly detection data, resulting in low ac-
+  calization compared to baseline methods. FiLo has been
+                                                                   curacy and inability to localize abnormal regions. Win-
+  proved to be effective for zero-shot anomaly detection and
+                                                                   CLIP [16] first achieves anomaly localization by cropping
+  localization, achieving state-of-the-art performance.
+                                                                   windows of different sizes in images and significantly en-
+                                                                   hances anomaly detection by employing carefully crafted
+                                                                   text prompts. APRIL-GAN [4] aligns patch-level im-
+2. Related work                                                    age features with textual features using a learnable lin-
+                                                                   ear projection layer to accomplish anomaly localization,
+2.1. Vision-Language Models                                        overcoming the inefficiency caused by WinCLIP’s input
+                                                                   of numerous windows and further enhancing performance.
+Recently, multimodal models integrating visual and textual         AnoVL [7] resolves the mismatch between patch-level im-
+content have achieved significant success in various visual        age features and textual features by introducing V-V atten-
+tasks [18, 21, 28]. Among these, CLIP [28], pre-trained            tion [19], enabling direct application of CLIP to anomaly
+on a massive scale internet dataset, emerges as one of the         detection tasks without any additional training. However,
+most prominent methods. CLIP employs two structurally              all the above methods require carefully designed and man-
+similar Transformer [33] encoders to extract features from         ually crafted text templates. AnomalyCLIP [37], an emerg-
+images and text, aligning features with the same seman-            ing approach, substitutes object-agnostic learnable text vec-
+tics through contrastive learning methods. With appropriate        tors for manually crafted text templates. Nevertheless,
+prompts, CLIP demonstrates remarkable zero-shot general-           AnomalyCLIP describes anomalies uniformly using the
+ization capabilities across multiple datasets for downstream       word ”damaged”, which is evidently insufficient to cover
+image classification tasks. However, the quality of prompts        all types of anomalies.
+significantly affects the performance of downstream tasks.             Segment Any Anomay (SAA) [3] is a zero-shot anomaly
+Traditional approaches [3, 16] require experts to manu-            localization method based on the Grounded-SAM [29]
+ally craft suitable text prompts for each task, demanding          approach. SAA utilizes Grounding DINO to generate
+domain-specific knowledge and being time-consuming. Re-            anomaly bounding boxes, which are then used as prompts
+cent methods like coop [36] and cocoop [35] propose using          input into the Segment Anything Model [17] to obtain
+learnable vectors instead of manually crafted prompts, re-         anomaly localization results. However, SAA [3] requires
+quiring minimal training cost while achieving superior per-        expertly crafted text inputs for Grounding DINO, and its
+formance across multiple datasets.                                 results heavily rely on the detection outcomes of Ground-
+                                                                   ing DINO, which may lead to low precision when directly
+    While the original CLIP was designed for image clas-           applied to ZSAD. In our method, Grounding DINO serves
+sification tasks, researchers have extended their efforts to       solely as a preliminary anomaly localization module, aim-
+explore vision-language models for object detection and se-        ing to prevent false positives in background regions of im-
+mantic segmentation tasks. Grounding DINO [21] is a no-            ages. The primary dependency of our approach lies in the
+table example, combining the Transformer-based object de-          MMCI module for anomaly localization.
+tector DINO with Grounded pretraining, achieving excel-                Moreover, none of the above methods incorporate loca-
+lent performance as an open-set object detector.                   tion information of anomalies in the text prompt. Compared
+   Our FG-Des method, incorporating adaptive learned               to existing methods, our approach enhances anomaly detec-
+fine-grained anomaly descriptions, is built upon CLIP [28]         tion performance and interpretability by adaptive learned
+and cocoop [35]. However, straightforward utilization of           Fine-Grained anomaly Descriptions. We also improve the
+cocoop-enhanced CLIP does not excel in anomaly detection           localization capability for anomalies of different sizes and
+tasks. Detailed anomaly descriptions for each item category        shapes through our position-enhanced High-Quality local-
+are crucial for achieving outstanding performance. Ground-         ization method HQ-Loc.
+ing DINO [21] serves as a vital component of HQ-Loc.
+                                                                   2.3. Visual Description Enhancement
+Yet, employing Grounding DINO [21] directly for zero-
+shot anomaly localization yields low accuracy. We utilize          Numerous prior studies [35, 36] have extensively demon-
+Grounding DINO solely for preliminary anomaly localiza-            strated that the quality of the text prompt significantly im-
+tion, capturing the approximate location of anomalies and          pacts the performance of downstream tasks for pretrained
+avoiding false positives in background regions.                    Vision-Language models like CLIP [28]. In contrast to text
+
+
+                                                               3
+content meticulously crafted by experts, recent works [13,          employs preliminary localization via Grounding DINO,
+24, 25] have delegated the task of generating high-quality          position-enhanced text prompts, and a Multi-scale, Multi-
+text prompts to LLMs, which are called visual description           shape Cross-modal Interaction module to more accurately
+enhancement. LLMs such as GPT-3.5 [27] and GPT-4 [1]                pinpoint anomalies of various sizes and shapes.
+encapsulate extensive knowledge across various domains,
+showcasing impressive performance across a spectrum of              3.1. Overall Architecture
+tasks. FiLo harnesses the profound domain knowledge em-             The overall architecture of the model is illustrated in Fig-
+bedded within LLMs to generate potential anomaly types              ure 2. For an input image I ∈ RH×W ×3 , we first uti-
+for each item category, deriving fine-grained anomaly de-           lize information from the dataset or LLM to generate a list
+scriptions. We are the first to apply visual description en-        of fine-grained anomaly types that may exist for this item
+hancement techniques to anomaly detection tasks.                    category. Subsequently, the anomaly text is inputted into
+2.4. Multi-Scale Convolution                                        Grounding DINO to obtain preliminary bounding boxes for
+                                                                    anomaly localization. Simultaneously, the combination of
+In recent years, multi-scale convolution has been a research        fine-grained anomaly type and previously learned text vec-
+hotspot to detect objects of different sizes appearing in im-       tor templates yields text descriptions for both normal and
+ages [9, 10, 31, 32]. Multi-scale convolution methods ag-           abnormal cases. These descriptions are then fed into the
+gregate features of regions with different sizes by using           CLIP Text Encoder for feature extraction, resulting in rep-
+convolutional kernels of various sizes, achieving significant       resentations of normal and abnormal text features. Next,
+performance improvements in image classification, seman-            the image is passed through the CLIP Image Encoder to ex-
+tic segmentation, and object detection. InceptionNet [31] is        tract intermediate patch features Pi ∈ RHi ×Wi ×Ci from M
+a typical representative, simultaneously employing convo-           stages, where i indicates the i-th stage. These intermediate
+lutional kernels of 1 × 1, 3 × 3, 5 × 5, etc. within the same       patch features are subjected to the MMCI module together
+layer to address the uncertainty of the optimal kernel size         with text features to generate anomaly map for each layer
+across different samples. MixConv [32] groups input chan-           Mi ∈ RH×W . Subsequently, after filtering with bound-
+nels and applies convolutional kernels of different sizes to        ing boxes, the score maps for each layer are summed and
+each channel group. RepVGG [10] decomposes all sizes of             normalized to obtain the final anomaly map M ∈ RH×W .
+convolutional kernels into a series of composite operations         The global features of the image are compared with text
+of 3 × 3 convolutions. ACNet [9] changes the order of con-          features after adaptation, and the maximum value of the fi-
+volution and summation, first summing convolutional ker-            nal anomaly map M is added to derive the global anomaly
+nels of different sizes and then performing a single convo-         score for the image.
+lution operation, thereby reducing computational overhead.
+Most existing multi-scale methods focus on square convolu-          3.2. FG-Des
+tional kernels of different sizes. ACNet [9] employs multi-
+                                                                    Numerous existing methods [4, 7, 16] have demonstrated
+shape convolutional kernels, but its emphasis is on com-
+                                                                    that the quality of text prompts significantly affects the ef-
+putational efficiency, neglecting multi-scale aspects. Since
+                                                                    fectiveness of anomaly detection when performing zero-
+anomalies in images may exhibit various shapes and sizes,
+                                                                    shot inference on new categories. Therefore, we first fo-
+our MMCI module introduces convolutional kernels of dif-
+                                                                    cus on prompt engineering to generate more accurate and
+ferent sizes and shapes to fully localize anomalies.
+                                                                    efficient text prompts for enhancing anomaly detection in
+                                                                    ZSAD. In FG-Des, we achieve this goal through adaptively
+3. FiLo
+                                                                    learned text templates and fine-grained anomaly descrip-
+In this paper, we propose a vision-language ZSAD method,            tions generated by LLMs.
+FiLo, to enhance the capability of zero-shot anomaly de-
+tection and localization. Regarding anomaly detection,              3.2.1   Adaptively Learned Text Templates
+we devise the adaptively learned Fine-Grained Description
+method (FG-Des, Sec 3.2), which leverages fine-grained              Following the success of methods like WinCLIP [16], sub-
+anomaly descriptions generated by LLMs and adaptable                sequent methods such as APRIL-GAN [4] and Anoma-
+text vectors to identify the most precise textual represen-         lyGPT [15] directly adopt the text templates used in Win-
+tation for each anomaly sample. FG-Des facilitates more             CLIP to construct text prompts. However, the text tem-
+accurate judgments regarding the presence of anomalies in           plate in WinCLIP, A xxx photo of [state] [class], is pri-
+images and determines detailed anomaly types, thereby en-           marily derived from the text template used by CLIP for im-
+hancing the interpretability of the method. For anomaly             age classification tasks on the ImageNet [8] dataset, which
+localization, we introduce the position-enhanced High-              mainly indicates the category of foreground objects in the
+Quality Localization method (HQ-Loc, Sec 3.3), which                image rather than whether the object contains anomalies
+
+
+                                                                4
+    Normal Texts
+   [v1][v2]…[vn][STATE][CLASS].
+
+   e.g. [v1][v2]…[vn] normal chewinggum.
+                                                                       Normal Abnormal                                                 Global
+   Detailed Abnormal Texts                   CLIP Text                   Text    Text
+                                              Encoder                  Features Features                                            Anomaly Score
+    [w1][w2]…[wn][STATE][CLASS]
+    with [ANOMALY CLASS] at [POS].                                                Fn & Fa
+    e.g. [w1][w2]…[wn] abnormal            [POS]                                                                                      Max
+    chewinggum with scratch at right.                                      Fn Fa              MMCI                                    Value
+                       Abnormal
+                         Texts
+                       w/o [POS]
+                                                                                                                       Add
+                                                                                                                        &
+                                                         bbox                                            bbox          Norm
+       Grounding DINO
+                                                                                Conv
+                                                                                                                                     Anomaly Map
+
+                                                                P1              P2              P3            P4
+                                                                                                                   Adapter
+
+                                                                                                                          Global
+                                                                                                                           Image
+                                                                Stage1          Stage2          Stage3        Stage4      Feature
+                                            CLIP Image
+                                             Encoder
+                                                                Trained Modules              Frozen Modules            Matrix Multiplication
+
+                                                            Pi ： Patch Features of Stage i     Fn & Fa ： Normal and Abnormal Text Features
+
+
+
+Figure 2. Overall architecture of FiLo. Given an input image, fine-grained anomaly types are generated by LLM. Then normal and
+detailed abnormal texts are input into Grounding DINO to obtain bounding boxes and are fed into CLIP Text Encoder to get Fn and Fa .
+Intermediate patch features of input image are subjected to MMCI together with text features to compute anomaly map, and the global
+image features are compared with text features after adaptation to obtain global anomaly score.
+
+
+internally. To address this issue, we employ adaptive text                  different objects to generate different text prompt content.
+templates learned based on anomaly detection-related data.
+During the learning process, these templates can combine                    3.2.2       Fine-Grained Anomaly Descriptions
+the normal and abnormal content in the image to generate
+text prompts that better distinguish between normal and ab-                 As mentioned earlier, the generic ”anomaly” texts in ex-
+normal cases, while avoiding the need for extensive manual                  isting methods are insufficient to accurately describe the di-
+template engineering. Our adaptive normal and abnormal                      verse types of anomalies that may appear on different object
+text templates are defined as follows:                                      categories. Therefore, there is an urgent need for more per-
+                                                                            sonalized, informative text prompts to accurately character-
+                                                                            ize each image. LLMs such as GPT-4 [1] possess rich expert
+     Tn = [V1 ][V2 ]...[Vn ][ST AT E][CLASS].                               knowledge across various domains. We harness the power
+     Ta = [W1 ][W2 ]...[Wn ][ST AT E][CLASS]                                of LLMs to generate specific lists of potential anomaly
+              with [AN OM ALY CLASS] at [P OS].                             types for each item category, replacing the vague and gen-
+                                                                            eral ”anomaly” or ”damaged” descriptions used in previous
+[Vi ] and [Wi ] are learnable text vectors, [ST AT E] repre-                methods. Such detailed textual features, when combined
+sents the general ”normal” or ”abnormal” state, [CLASS]                     with features extracted by CLIP from images, lead to better
+denotes the item category, [AN OM ALY CLASS] speci-                         anomaly detection results.
+fies the detailed anomaly content, and [P OS] indicates the                     By incorporating fine-grained anomaly descriptions gen-
+location of the anomaly region, which can be one of nine                    erated by large language models (LLMs) into the adaptive
+possible scenarios, e.g., ”top left” or ”bottom”.                           text templates’ [AN OM ALY CLASS] section, we obtain
+    Based on this template, we only need to replace the                     complete text prompts. These prompts are then inputted
+[CLASS], [AN OM ALY CLASS], and [P OS] parts for                            into the CLIP Text Encoder, and after group averaging,
+
+
+                                                                       5
+we obtain text features representing normal and abnormal              we adopt a strategy of suppressing anomaly scores outside
+cases, denoted as F = [Fn , Fa ] ∈ R2×C . For the global              all boxes by multiplying them with a parameter λ.
+features G extracted from the image via the CLIP Image
+Encoder, we first pass them through a linear adapter layer
+                                                                      3.3.2   Position-Enhanced Textual Prompt
+to obtain adapted image features A ∈ RC that better match
+the textual content. Next, we calculate the global anomaly            After obtaining the preliminary anomaly localization results
+score by Eq (1):                                                      from Grounding DINO, we incorporate the position infor-
+                                                                      mation from the localization boxes into textual prompts to
+         Sglobal = sof tmax(A · FaT ) + max(M ).           (1)        enhance position descriptions. Textual prompts with de-
+M represents the anomaly map calculated in Sec 3.3 and                tailed anomaly descriptions and position enhancements are
+max(·) denotes the maximum operation.                                 more aligned with the content in the image being examined.
+   Fine-grained anomaly descriptions not only improve the             This alignment assists the model in concentrating on spe-
+accuracy of anomaly detection but also enhance the inter-             cific areas of the image during anomaly localization in the
+pretability of the detection results. Specifically, we can cal-       subsequent step, thereby improving localization accuracy.
+culate the similarity between image features and each pre-
+cise anomaly description. By examining the textual descrip-           3.3.3   MMCI Module
+tions with high similarity, we can determine which category
+the anomaly in the image belongs to, thus gaining deeper              To comprehensively locate anomalies of different shapes
+insight into the model’s decision-making process.                     and sizes, our approach does not directly compute the sim-
+                                                                      ilarity between each image patch feature and textual fea-
+3.3. HQ-Loc                                                           tures. Instead, we design a Multi-Scale Multi-Shape Cross-
+Existing Zero-Shot Anomaly Detection (ZSAD) methods                   Modal Interaction Module (MMCI). MMCI is inspired by
+often locate anomaly positions by computing the similar-              WinCLIP’s use of windows of different sizes to select sub-
+ity between the features of each image patch and textual              regions in images and then determine if each subregion con-
+features. However, an anomaly region often spans multi-               tains an anomaly. However, MMCI significantly reduces
+ple patches, exhibiting various positions, shapes, and sizes.         the computational overhead incurred by WinCLIP when si-
+Sometimes, it requires comparison with surrounding nor-               multaneously inputting dozens of images selected by win-
+mal regions to determine if it’s an anomaly. To address               dows into the CLIP’s Image Encoder. Specifically, we de-
+this, we propose this position-enhanced High-Quality Lo-              sign convolutional kernels of different sizes and shapes to
+calization method HQ-Loc, which enhances anomaly local-               process patch features extracted by the CLIP Image En-
+ization from coarse to fine. This is achieved through three           coder in parallel. Subsequently, we aggregate these features
+key components: Grounding DINO preliminary localiza-                  and compute their similarity with position-enhanced textual
+tion, position-enhanced textual prompts, and Multi-Scale              features. Through this approach, our MMCI module can
+Multi-Shape Cross-modal Interaction Module (MMCI). Be-                effectively handle anomalies of different sizes and shapes,
+low, we provide detailed explanations for each component.             enhancing the model’s ability to localize anomaly regions.
+                                                                          Let n different shaped convolutional kernels be denoted
+                                                                      as Cj , where j ranges from 1 to n. Given patch features
+3.3.1   Grounding DINO Preliminary Localization
+                                                                      Pi ∈ RHi Wi ×C , position-enhanced text features [Fn , Fa ] ∈
+Existing ZSAD methods typically lack discrimination be-               R2×C , normal map Min ∈ RH×W and anomaly map Mia ∈
+tween patches at different positions in the image, often              RH×W can be calculated by Eq. (2):
+resulting in the misidentification of background perturba-
+tions as anomalies. To mitigate this, we utilize detailed                                     n
+anomaly descriptions generated in the previous step to per-
+                                                                                             X
+                                                                       Min , Mia = U p(N orm(   S(Cj (Pi ) · [Fn , Fa ]T ))), (2)
+form preliminary anomaly localization using Grounding                                           j=1
+DINO. While direct application of Grounding DINO may
+not precisely determine the exact location of anomalies,              where U p(·) denotes the upsampling operation, S(·) is the
+the localization boxes obtained generally reside in the fore-         softmax operation, and N orm(·) represents the normaliza-
+ground of objects, often near the anomaly area. Therefore,            tion operation, ensuring that the values in the anomaly map
+using the localization results from Grounding DINO to re-             lie between 0 and 1. By summing and normalizing Mi for
+strict anomaly regions effectively avoids false positives in          each layer, we can obtain the normal and anomaly map:
+the background, thus enhancing the accuracy of anomaly
+localization. Additionally, since Grounding DINO localiza-
+                                                                                    X                    X
+                                                                        M n = N orm(  Min ), M a = N orm(  Mia ),               (3)
+tion is not entirely accurate and may have missed detections,                             i                         i
+
+
+                                                                  6
+and the final localization result can be calculated by Eq (4)       regions is relatively small. Focal loss can be calculated by
+                                                                    Eq. (7):
+               M = Gσ (M a + 1 − M n )/2,                 (4)                              1X
+                                                                                              n
+                                                                                  Lf = −         (1 − pi )γ log(pi ),        (7)
+                                                                                           n i=1
+where Gσ is a Gaussian filter, and σ controls smoothing.
+                                                                    where n = H × W represents the total number of pixels,
+3.4. Adapter                                                        pi is the predicted probability of the positive classes and γ
+We employ a common bottleneck structure Adapter to align            is a tunable parameter for adjusting the weight of hard-to-
+global image features and text features, consisting of two          classify samples. In our implementation, we set γ to 2.
+linear layers, one ReLU [14] layer, and one SiLU [11] layer,           Dice loss can be calculated by Eq. (8):
+as shown in Algorithm 1.                                                                         Pn
+                                                                                                     i=1 yP
+                                                                                                          i ŷi
+                                                                                   Ld = − Pn         2+       n     2,        (8)
+Algorithm 1 Adapter Module                                                                    i=1 iy          i=1 ŷi
+
+Require: Input vector x ∈ R768                                      where n = H × W , yi is the output of decoder and ŷi is the
+Ensure: Output vector y ∈ R768                                      ground truth value.
+ 1: h1 = ReLU(W1 x + b1 ) ∈ R384                                       Our local loss can be calculated by Eq. (9):
+ 2: y = SiLU(W2 h1 + b2 )
+
+                                                                     Llocal = Lf (M a , G)+Ld (M a , G)+Ld (M n , 1−G), (9)
+3.5. Loss Functions                                                 where G denotes the ground truth.
+To learn the content of adaptive text templates and the con-
+volutional kernel parameters in MMCI, we chose different            4. Experiments
+loss functions for training from the perspectives of global         4.1. Datasets
+anomaly detection and local anomaly localization.
+                                                                    Our experiments primarily focus on two datasets:
+                                                                    MVTec [2] and VisA [38]. MVTec [2] is one of the
+3.5.1   Global Loss                                                 most widely used industrial anomaly detection datasets,
+We employ cross-entropy loss to optimize our global                 containing 5354 images of both normal and abnormal
+anomaly score. Cross-entropy loss is a commonly used loss           samples from 15 different object categories, with reso-
+function in various tasks and its formula is as follows:            lutions ranging from 700 × 700 to 1024 × 1024 pixels.
+                                                                    VisA [38] is an emerging industrial anomaly detection
+                            n
+                            X                                       dataset comprising 10821 images of normal and abnormal
+                  Lce = −         yi log(pi ),            (5)       samples covering 12 image categories, with resolutions
+                            i=1
+                                                                    around 1500 × 1000 pixels. Similar to APRIL-GAN [4]
+where n is the number of instances, yi is the true label for        and AnomalyCLIP [37], we conduct supervised training on
+instance i and pi is the score for instance i. we use cross-        the test set of one dataset and directly performed zero-shot
+entropy loss to calculate our global loss:                          testing on the other dataset.
+
+                                                                    4.2. Evaluation Metrics
+              Lglobal = Lce (Sglobal , Label),            (6)
+                                                                    Following existing AD methods [5, 34], we employ the
+where Sglobal represents the global anomaly score calcu-            Area Under the receiver operating Characteristic (AUC)
+lated in Sec 3.2.2, and Label denotes the label indicating          as our evaluation metric, with image-level and pixel-level
+whether the image is anomalous or not.                              AUC used to assess anomaly detection and anomaly local-
+                                                                    ization performance, respectively.
+3.5.2   Local Loss                                                  4.3. Implementation Details
+We employ Focal loss [20] and Dice loss [26] to opti-               We utilize the publicly available CLIP-L/14@336px model
+mize our anomaly map M . Focal Loss and Dice Loss                   as our backbone, with frozen parameters for CLIP’s Text
+are common loss functions used in semantic segmentation             Encoder and Image Encoder. Training is conducted on
+tasks. Specifically, Focal Loss is particularly effective in        either the MVTec or VisA dataset, with zero-shot test-
+addressing class imbalance issues, making it well-suited for        ing performed on the other dataset. For intermediate-level
+anomaly localization tasks where the proportion of anomaly          patch-based image features, we employ features from the
+
+
+                                                                7
+                                                                                          VisA                   MVTec-AD
+           Method               Backbone              Anomaly Description
+                                                                                Image-AUC     Pixel-AUC    Image-AUC      Pixel-AUC
+         CLIP [28]          ViT-L/14@336px             normal / anomalous          66.4          46.6          74.1          38.4
+       CLIP-AC [28]         ViT-L/14@336px             normal / anomalous          65.0          47.8          71.5          38.2
+       WinCLIP [16]         ViT-B/16@240px                state ensemble           78.1          79.6          91.8          85.1
+      APRIL-GAN [4]         ViT-L/14@336px                state ensemble           78.0          94.2          86.1          87.6
+     AnomalyCLIP [37]       ViT-L/14@336px              normal / damaged           82.1          95.5          91.5          91.1
+      AnomalyCLIP-          ViT-L/14@336px              normal / damaged           81.7          95.0          90.8          89.5
+        FiLo (ours)         ViT-L/14@336px           fine-grained description      83.9          95.9          91.2          92.3
+
+              Table 1. Comparison results between FiLo and other ZSAD methods. The best-performing method is in bold.
+
+
+               Setup                     VisA             MVTec             GAN [4], and AnomalyCLIP [37]. Following [37], for
+                                                                            CLIP, we conduct experiments using simple text prompts
+          CLIP baseline               (65.0, 47.8)      (71.5, 38.2)
+         + generic [state]            (65.4, 83.9)      (79.9, 83.5)        A photo of a normal [class]. and A photo of an anoma-
+ + fine-grained [anomaly class]       (71.2, 85.5)      (80.8, 83.8)        lous [class], and we add more text prompt templates that
+                                                                            are recommended for ImageNet dataset for CLIP-AC. Re-
+Table 2. Ablation results of anomaly descriptions. Results are              sults for WinCLIP [16], APRIL-GAN [4], and Anomaly-
+displayed in the format of (Image-AUC, Pixel-AUC).                          CLIP [37] are adopted from their respective papers. Specif-
+                                                                            ically, AnomalyCLIP [37] incorporates additional learnable
+             Setup                      VisA             MVTec              embeddings in the CLIP Text Encoder, while other meth-
+                                                                            ods, including our FiLo, directly utlize the frozen param-
+        CLIP baseline               (65.0, 47.8)       (71.5, 38.2)         eters of CLIP. To ensure fair comparison, we reproduce
+     + learnable template           (72.5, 93.1)       (82.1, 85.2)         AnomalyCLIP without learnable embeddings, which is re-
+ + fine-grained description         (78.1, 93.2)       (85.8, 85.1)         ferred as AnomalyCLIP-.
+                                                                                Table 1 presents the experimental results of FiLo and ex-
+Table 3. Ablation results of text template. Results are displayed in        isting methods on the VisA and MVTec datasets, which
+the format of (Image-AUC, Pixel-AUC).                                       demonstrates superiority of FiLo across most metrics on
+                                                                            both datasets, validating the effectiveness of our FG-Des
+6-th, 12-th, 18-th, and 24-th layers of the CLIP Image En-                  and HQ-Loc modules. Compared to the state-of-the-art
+coder. Starting from the 6-th layer, both QKV Attention and                 ZSAD method AnomalyCLIP [37], after introducing the
+V-V Attention results are simultaneously utilized, where                    FG-Des and HQ-Loc modules, FiLo achieves a 1.1% im-
+the outputs of QKV Attention are aligned with text fea-                     provement in image-level AUC and a 0.4% improvement in
+tures through a simple linear layer, and the outputs of V-                  pixel-level AUC on the VisA dataset. Additionally, FiLo
+V Attention are inputted into the MMCI module for multi-                    also achieves a 1.2% improvement in pixel-level AUC on
+scale, multi-shape deep interaction with text features. Dur-                the MVTec dataset.
+ing training, input images are resized to a resolution of
+                                                                            4.5. Ablation Study
+518 × 518, and the AdamW [23] optimizer is used to op-
+timize model parameters for 15 epochs. The learning rate                    To investigate the effectiveness of each proposed module,
+for learnable text vectors is set to 1e-3, while the learning               we conduct extensive ablation experiments on the VisA and
+rate for the MMCI module is set to 1e-4. After that, we train               MVTec datasets, confirming the efficacy of every compo-
+the adapter for 5 epochs with a learning rate of 1e-5. Addi-                nent in our approach, including fine-grained descriptions,
+tionally, due to the varying number of fine-grained anomaly                 learnable text templates, grounding, position enhancement
+descriptions for each item category, training is conducted                  and MMCI. Table 2, Table 3 and Table 4 present the exper-
+with a batch size of 1. Following previous methods [34, 37],                imental results of FiLo on the MVTec and VisA datasets.
+a Gaussian filter with σ = 4 is applied to obtain a smoother                   In Table 2, we initially employ the same setup as CLIP-
+anomaly score map during testing.                                           AC as our baseline, using simple two-category texts A photo
+                                                                            of a normal [class] and A photo of an anomalous [class].
+4.4. Main Results
+                                                                            Upon realizing that the simple words ”normal” and ”anoma-
+To demonstrate the effectiveness of our FiLo, we com-                       lous” alone did not effectively distinguish between normal
+pare FiLo with several existing ZSAD methods, includ-                       and abnormal samples, we modify the sentence structure
+ing CLIP [28], CLIP-AC [28], WinCLIP [16], APRIL-                           to A photo of a [state] [class], where [state] encompasses
+
+
+                                                                        8
+                                                          MMCI                              VisA                         MVTec
+      Grounding      Position Enhancement
+                                               Multi-shape    Multi-scale       Image-AUC       Pixel-AUC       Image-AUC      Pixel-AUC
+                                                                                   78.1            93.2           85.8           85.1
+          ✓                                                                        78.1            93.4           85.8           85.3
+          ✓                     ✓                                                  78.6            93.6           85.5           85.7
+          ✓                     ✓                   ✓                              79.2            95.3           86.2           89.4
+          ✓                     ✓                                  ✓               80.7            95.6           88.9           91.4
+          ✓                     ✓                   ✓              ✓               83.9            95.9           91.2           92.3
+
+                              Table 4. The results of ablation experiments for each proposed modules in HQ-Loc.
+
+
+
+   Test samples
+
+
+
+
+    CLIP output
+
+
+
+
+  Grounding output
+
+
+
+
+     Final mask
+
+
+
+
+   Ground Truth
+
+
+                        (a)             (b)             (c)            (d)                (e)             (f)            (g)            (h)
+
+Figure 3. Visualization result of FiLo on MVTec and VisA datasets. ”CLIP output” refers to the localization results without HQ-Loc, while
+”Final mask” represents the final localization result.
+
+
+some generic descriptions for normal (e.g., perfect, flaw-                   class], resulting in significant improvements.
+less) and abnormal (e.g., damaged, defective) states, and ob-                   In Table 4, we experiment with each component of HQ-
+serve a significant performance improvement with the intro-                  Loc. From the table, it can be observed that both Grounding
+duction of more detailed [state] descriptions. Subsequently,                 and Position Enhancement contribute to improvements in
+we utilize LLMs to generate more fine-grained [anomaly                       pixel-level AUC. Additionally, the MMCI module, which
+class] for each class of items, resulting in further perfor-                 integrates multi-shape and multi-size capabilities, can ef-
+mance enhancements. This experiment underscores the ef-                      fectively detect anomalies of various sizes and shapes, re-
+fectiveness of fine-grained anomaly descriptions.                            sulting in performance enhancements in both detection and
+   In Table 3, also starting from the CLIP baseline, we first                localization aspects.
+replace all parts of the text except for [class] with learnable
+                                                                             4.6. Visulization Results
+vectors, i.e., [v1][v2]...[vn][class]. We find that compared
+to handcrafted text, the text vectors learned by the model are               Figure 3 illustrates the visualization results of FiLo on the
+more suitable for anomaly detection tasks, exhibiting higher                 MVTec and VisA datasets. In the absence of any prior ac-
+detection and localization accuracy. Further, by combin-                     cess to data from the target dataset, FiLo achieves anomaly
+ing the learned text vectors with detailed anomaly descrip-                  localization results that closely resemble the ground truth,
+tions generated by LLMs as described earlier, we utilize                     showcasing FiLo’s robust ZSAD capability.
+the text prompt [v1][v2]...[vn][state][class] with [anomaly                     As observed in the second row of Figure 3, directly com-
+
+
+                                                                       9
+puting the similarity between all patch features extracted us-                framework for anomaly detection and localization. In Inter-
+ing CLIP and textual features representing normal and ab-                     national Conference on Pattern Recognition, pages 475–489.
+normal semantics often yields imprecise anomaly localiza-                     Springer, 2021.
+tion results. This approach sometimes leads to false pos-                 [6] Hanqiu Deng and Xingyu Li. Anomaly detection via reverse
+itives in non-anomalous objects or background regions of                      distillation from one-class embedding. In Proceedings of
+                                                                              the IEEE/CVF Conference on Computer Vision and Pattern
+the image. However, by employing HQ-Loc’s grounding
+                                                                              Recognition, pages 9737–9746, 2022.
+for preliminary localization and position enhancement, the
+                                                                          [7] Hanqiu Deng, Zhaoxiang Zhang, Jinan Bao, and Xingyu Li.
+final output effectively mitigates this phenomenon.                           Anovl: Adapting vision-language models for unified zero-
+    Furthermore, during the preliminary localization pro-                     shot anomaly localization. arXiv preprint arXiv:2308.15939,
+cess, Grounding associates each bounding box with                             2023.
+matched textual descriptions, indicating the type of                      [8] Jia Deng, Wei Dong, Richard Socher, Li-Jia Li, Kai Li,
+anomaly present in that area. For instance, in Figure 3(e),                   and Li Fei-Fei. Imagenet: A large-scale hierarchical image
+the corresponding text for the bounding box accurately                        database. In 2009 IEEE conference on computer vision and
+identifies anomalies on the hazelnut: ”hole” and ”crack”.                     pattern recognition, pages 248–255. Ieee, 2009.
+                                                                          [9] Xiaohan Ding, Yuchen Guo, Guiguang Ding, and Jungong
+5. Conclusion                                                                 Han. Acnet: Strengthening the kernel skeletons for powerful
+                                                                              cnn via asymmetric convolution blocks. In Proceedings of
+Our FiLo method represents a significant advancement in                       the IEEE/CVF international conference on computer vision,
+the field of Zero-Shot Anomaly Detection (ZSAD), effec-                       pages 1911–1920, 2019.
+tively addressing prevalent challenges in both anomaly de-               [10] Xiaohan Ding, Xiangyu Zhang, Ningning Ma, Jungong Han,
+tection and localization. Our FG-Des method harnesses the                     Guiguang Ding, and Jian Sun. Repvgg: Making vgg-style
+capabilities of Large Language Models (LLMs) by gener-                        convnets great again. In Proceedings of the IEEE/CVF con-
+ating specific descriptions for potential anomaly types as-                   ference on computer vision and pattern recognition, pages
+sociated with each object category. This approach notably                     13733–13742, 2021.
+enhances both the precision and interpretability of anomaly              [11] Stefan Elfwing, Eiji Uchibe, and Kenji Doya. Sigmoid-
+detection. Furthermore, our devised HQ-Loc strategy ef-                       weighted linear units for neural network function approxima-
+fectively mitigates the deficiencies of existing methods in                   tion in reinforcement learning. Neural networks, 107:3–11,
+terms of anomaly localization accuracy, particularly demon-                   2018.
+strating superior performance in localizing anomalies of                 [12] Sepideh Esmaeilpour, Bing Liu, Eric Robertson, and Lei
+various sizes and shapes. Extensive experiments validate                      Shu. Zero-shot out-of-distribution detection based on the
+the superiority of FiLo across multiple datasets, affirm-                     pre-trained model clip. In Proceedings of the AAAI confer-
+ing its efficacy and practicality in the realm of zero-shot                   ence on artificial intelligence, pages 6568–6576, 2022.
+anomaly detection tasks.                                                 [13] Zhili Feng, Anna Bair, and J Zico Kolter. Leveraging mul-
+                                                                              tiple descriptive features for robust few-shot image learning.
+References                                                                    arXiv preprint arXiv:2307.04317, 2023.
+                                                                         [14] Xavier Glorot, Antoine Bordes, and Yoshua Bengio. Deep
+ [1] Josh Achiam, Steven Adler, Sandhini Agarwal, Lama Ah-                    sparse rectifier neural networks. In Proceedings of the four-
+     mad, Ilge Akkaya, Florencia Leoni Aleman, Diogo Almeida,                 teenth international conference on artificial intelligence and
+     Janko Altenschmidt, Sam Altman, Shyamal Anadkat, et al.                  statistics, pages 315–323. JMLR Workshop and Conference
+     Gpt-4 technical report. arXiv preprint arXiv:2303.08774,                 Proceedings, 2011.
+     2023.                                                               [15] Zhaopeng Gu, Bingke Zhu, Guibo Zhu, Yingying Chen,
+ [2] Paul Bergmann, Michael Fauser, David Sattlegger, and                     Ming Tang, and Jinqiao Wang. Anomalygpt: Detecting in-
+     Carsten Steger. Mvtec ad–a comprehensive real-world                      dustrial anomalies using large vision-language models. In
+     dataset for unsupervised anomaly detection. In Proceedings               Proceedings of the AAAI Conference on Artificial Intelli-
+     of the IEEE/CVF conference on computer vision and pattern                gence, pages 1932–1940, 2024.
+     recognition, pages 9592–9600, 2019.                                 [16] Jongheon Jeong, Yang Zou, Taewan Kim, Dongqing Zhang,
+ [3] Yunkang Cao, Xiaohao Xu, Chen Sun, Yuqi Cheng, Zongwei                   Avinash Ravichandran, and Onkar Dabeer. Winclip: Zero-
+     Du, Liang Gao, and Weiming Shen. Segment any anomaly                     /few-shot anomaly classification and segmentation. In Pro-
+     without training via hybrid prompt regularization. arXiv                 ceedings of the IEEE/CVF Conference on Computer Vision
+     preprint arXiv:2305.10724, 2023.                                         and Pattern Recognition, pages 19606–19616, 2023.
+ [4] Xuhai Chen, Yue Han, and Jiangning Zhang. A zero-/few-              [17] Alexander Kirillov, Eric Mintun, Nikhila Ravi, Hanzi Mao,
+     shot anomaly classification and segmentation method for                  Chloe Rolland, Laura Gustafson, Tete Xiao, Spencer White-
+     cvpr 2023 vand workshop challenge tracks 1&2: 1st place                  head, Alexander C Berg, Wan-Yen Lo, et al. Segment any-
+     on zero-shot ad and 4th place on few-shot ad. arXiv preprint             thing. In Proceedings of the IEEE/CVF International Con-
+     arXiv:2305.17382, 2023.                                                  ference on Computer Vision, pages 4015–4026, 2023.
+ [5] Thomas Defard, Aleksandr Setkov, Angelique Loesch, and              [18] Junnan Li, Dongxu Li, Silvio Savarese, and Steven Hoi.
+     Romaric Audigier. Padim: a patch distribution modeling                   Blip-2: Bootstrapping language-image pre-training with
+
+
+                                                                    10
+     frozen image encoders and large language models. In In-                   Vanhoucke, and Andrew Rabinovich. Going deeper with
+     ternational conference on machine learning, pages 19730–                  convolutions. In Proceedings of the IEEE conference on
+     19742. PMLR, 2023.                                                        computer vision and pattern recognition, pages 1–9, 2015.
+[19] Yi Li, Hualiang Wang, Yiqun Duan, and Xiaomeng Li. Clip              [32] Mingxing Tan and Quoc V Le. Mixconv: Mixed depthwise
+     surgery for better explainability with enhancement in open-               convolutional kernels. arXiv preprint arXiv:1907.09595,
+     vocabulary tasks. arXiv preprint arXiv:2304.05653, 2023.                  2019.
+[20] Tsung-Yi Lin, Priya Goyal, Ross Girshick, Kaiming He, and            [33] Ashish Vaswani, Noam Shazeer, Niki Parmar, Jakob Uszko-
+     Piotr Dollár. Focal loss for dense object detection. In Pro-             reit, Llion Jones, Aidan N Gomez, Łukasz Kaiser, and Illia
+     ceedings of the IEEE international conference on computer                 Polosukhin. Attention is all you need. Advances in neural
+     vision, pages 2980–2988, 2017.                                            information processing systems, 30, 2017.
+[21] Shilong Liu, Zhaoyang Zeng, Tianhe Ren, Feng Li, Hao                 [34] Zhiyuan You, Lei Cui, Yujun Shen, Kai Yang, Xin Lu,
+     Zhang, Jie Yang, Chunyuan Li, Jianwei Yang, Hang Su, Jun                  Yu Zheng, and Xinyi Le. A unified model for multi-class
+     Zhu, et al. Grounding dino: Marrying dino with grounded                   anomaly detection. Advances in Neural Information Pro-
+     pre-training for open-set object detection. arXiv preprint                cessing Systems, 35:4571–4584, 2022.
+     arXiv:2303.05499, 2023.                                              [35] Kaiyang Zhou, Jingkang Yang, Chen Change Loy, and Ziwei
+[22] Philipp Liznerski, Lukas Ruff, Robert A Vandermeulen,                     Liu. Conditional prompt learning for vision-language mod-
+     Billy Joe Franks, Klaus-Robert Müller, and Marius Kloft.                 els. In Proceedings of the IEEE/CVF conference on com-
+     Exposing outlier exposure: What can be learned from                       puter vision and pattern recognition, pages 16816–16825,
+     few, one, and zero outlier images.            arXiv preprint              2022.
+     arXiv:2205.11474, 2022.                                              [36] Kaiyang Zhou, Jingkang Yang, Chen Change Loy, and Ziwei
+[23] Ilya Loshchilov and Frank Hutter. Decoupled weight decay                  Liu. Learning to prompt for vision-language models. In-
+     regularization. arXiv preprint arXiv:1711.05101, 2017.                    ternational Journal of Computer Vision, 130(9):2337–2348,
+[24] Mayug Maniparambil, Chris Vorster, Derek Molloy, Noel                     2022.
+     Murphy, Kevin McGuinness, and Noel E O’Connor. En-                   [37] Qihang Zhou, Guansong Pang, Yu Tian, Shibo He, and
+     hancing clip with gpt-4: Harnessing visual descriptions as                Jiming Chen. Anomalyclip: Object-agnostic prompt learn-
+     prompts. In Proceedings of the IEEE/CVF International                     ing for zero-shot anomaly detection.        arXiv preprint
+     Conference on Computer Vision, pages 262–271, 2023.                       arXiv:2310.18961, 2023.
+[25] Sachit Menon and Carl Vondrick. Visual classification via
+                                                                          [38] Yang Zou, Jongheon Jeong, Latha Pemula, Dongqing Zhang,
+     description from large language models. arXiv preprint
+                                                                               and Onkar Dabeer. Spot-the-difference self-supervised pre-
+     arXiv:2210.07183, 2022.
+                                                                               training for anomaly detection and segmentation. In Eu-
+[26] Fausto Milletari, Nassir Navab, and Seyed-Ahmad Ahmadi.                   ropean Conference on Computer Vision, pages 392–408.
+     V-net: Fully convolutional neural networks for volumetric                 Springer, 2022.
+     medical image segmentation. In 2016 fourth international
+     conference on 3D vision (3DV), pages 565–571. Ieee, 2016.
+[27] Long Ouyang, Jeffrey Wu, Xu Jiang, Diogo Almeida, Car-
+     roll Wainwright, Pamela Mishkin, Chong Zhang, Sandhini
+     Agarwal, Katarina Slama, Alex Ray, et al. Training language
+     models to follow instructions with human feedback. Ad-
+     vances in neural information processing systems, 35:27730–
+     27744, 2022.
+[28] Alec Radford, Jong Wook Kim, Chris Hallacy, Aditya
+     Ramesh, Gabriel Goh, Sandhini Agarwal, Girish Sastry,
+     Amanda Askell, Pamela Mishkin, Jack Clark, et al. Learning
+     transferable visual models from natural language supervi-
+     sion. In International conference on machine learning, pages
+     8748–8763. PMLR, 2021.
+[29] Tianhe Ren, Shilong Liu, Ailing Zeng, Jing Lin, Kunchang
+     Li, He Cao, Jiayu Chen, Xinyu Huang, Yukang Chen, Feng
+     Yan, et al. Grounded sam: Assembling open-world models
+     for diverse visual tasks. arXiv preprint arXiv:2401.14159,
+     2024.
+[30] Karsten Roth, Latha Pemula, Joaquin Zepeda, Bernhard
+     Schölkopf, Thomas Brox, and Peter Gehler. Towards to-
+     tal recall in industrial anomaly detection. In Proceedings of
+     the IEEE/CVF Conference on Computer Vision and Pattern
+     Recognition, pages 14318–14328, 2022.
+[31] Christian Szegedy, Wei Liu, Yangqing Jia, Pierre Sermanet,
+     Scott Reed, Dragomir Anguelov, Dumitru Erhan, Vincent
+
+
+                                                                     11
+                                                         Appendix
+
+
+A. Fine-grained ZSAD performance                                      able vectors, the structure and connectivity of Adapters, etc.
+                                                                      Below are detailed analyses for each aspect.
+In the main paper, we have compared FiLo with exist-
+ing ZSAD methods on anomaly detection and localiza-                   C.1. Different Backbones and Learning Rates
+tion across the MVTec [2] and VisA [38] datasets. Our
+evaluation primarily utilizes Image-level AUC and Pixel-              Previous anomaly detection methods based on CLIP have
+level AUC as metrics for detection and localization, respec-          typically utilized different CLIP backbones. WinCLIP[16]
+tively. Here, we provide detailed performance analysis of             employs ViT-B-16@240px, while methods like APRIL-
+FiLo and other ZSAD methods at the fine-grained data sub-             GAN [4] and AnomalyCLIP [37] use ViT-L-14@336px.
+set level, including the methods we using for comparison:             Existing methods have shown that using a backbone with
+CLIP [28], CLIP-AC [28], WinCLIP [16], APRIL-GAN [4]                  higher image resolution is more beneficial for pixel-level
+and AnomalyCLIP [37].                                                 anomaly localization. However, these methods with higher
+    Tables 5 and Tables 6 depict the anomaly localization             resolutions have not surpassed WinCLIP, which uses a res-
+performance of FiLo on the MVTec and VisA datasets, and               olution of 240x240, in terms of image-level AUC. We also
+the anomaly detection performance of FiLo on the VisA and             implemented our FiLo method on these two commonly used
+MVTec datasets is showcased in Table 8 and Table 7 respec-            backbones, and the results are shown in Table 11.
+tively. Across the 15 classes in the MVTec dataset, FiLo                 In addition to the choice of backbone, the setting of
+achieves the highest Pixel-level AUC in 12 classes, while             learning rates also influences experimental results. Table 11
+in the VisA dataset comprising 12 classes, FiLo attains the           further illustrates the experimental results of FiLo under
+highest Pixel-level AUC in 8 classes. Notably, FiLo sur-              different learning rates ranging from 1e-3 to 1e-5. It can
+passes the state-of-the-art method AnomalyCLIP [37] by                be observed that FiLo achieves the best anomaly detection
+1.1% on Pixel-level AUC in the MVTec dataset and by 0.4%              and localization performance on both datasets when using
+in the VisA dataset, demonstrating the efficacy of FiLo.              a learning rate of 1e-3 for the learnable text vectors and a
+                                                                      learning rate of 1e-4 for the MMCI module.
+B. Fine-Grained Anomaly Descriptions
+                                                                      C.2. Adaptively Learned Text Templates
+Table 9 and Table 10 present the detailed anomaly types
+                                                                      CoOp [36] and CoCoOp [35] are two distinct methods that
+generated by leveraging LLM for each category within the
+                                                                      utilize learnable vectors to replace manually crafted text
+MVTec and VisA datasets. During the inference process
+                                                                      prompts. These methods exhibit some differences in their
+with FiLo, we substitute these detailed anomaly descrip-
+                                                                      approaches. Specifically, the learnable vectors in CoOp are
+tions generated by LLM for the ”[ANOMALY CLASS]”
+                                                                      agnostic to image content and are directly embedded into
+portion in the text template to obtain the detailed anomaly
+                                                                      the text prompt, emphasizing the universality and unifor-
+description content for each category of items.
+                                                                      mity of the text prompt. On the other hand, CoCoOp builds
+   In Figure 4, we additionally display the similarity be-
+                                                                      upon the learnable vectors embedded in the text prompt by
+tween each detailed anomaly description generated by LLM
+                                                                      incorporating a lightweight meta-net to append image fea-
+and the image features. We showcase the top 5 detailed
+                                                                      tures to the text prompt. This approach emphasizes gener-
+anomaly descriptions with the highest similarity to the im-
+                                                                      ating tailored text prompts for each image, aiming to better
+age, highlighting the most similar descriptions in red. By
+                                                                      match the image content.
+identifying the detailed anomaly description with the high-
+                                                                          Table 12 presents the experimental results of FiLo un-
+est similarity, we can further discern the type of anomaly
+                                                                      der the respective usage of CoOp and CoCoOp. Inspired
+present in the sample.
+                                                                      by AnomalyCLIP [37], we also explored the performance
+                                                                      under the addition of class name information in the text
+C. Additional Ablations
+                                                                      content. The experimental results indicate that when using
+In this section, we conducted further ablation studies on var-        CoOp, omitting class name from the text yields better re-
+ious detailed components of FiLo, including the backbone              sults, consistent with findings in AnomalyCLIP. This is be-
+utilized, learning rate, employment of VV Attention, differ-          cause CoOp inherently emphasizes the generality and uni-
+ent treatments on QKV and VV Attention results, learning              formity of the text prompt. Conversely, when employing
+strategies for adaptive learning templates, number of learn-          CoCoOp for learning text templates, including class name
+
+
+                                                                 12
+   Object name     CLIP [28]     CLIP-AC [28]      WinCLIP [16]       APRIL-GAN [4]        AnomalyCLIP [37]       FiLo (ours)
+     Carpet           11.5            10.7              95.4                 98.4                  98.8               99.4
+     Bottle           17.5            23.3              89.5                 83.4                  90.4               92.6
+    Hazelnut          25.2            34.0              94.3                 96.1                  97.1               97.6
+     Leather           9.9             5.6              96.7                 99.1                  98.6               99.4
+      Cable           37.4            37.5              77.0                 72.3                  78.9               78.4
+    Capsule           50.9            49.1              86.9                 92.0                  95.8               96.9
+      Grid             8.7            11.9              82.2                 95.8                  97.3               97.8
+       Pill           55.8            60.8              80.0                 76.2                   92                89.1
+   Transistor         51.1            48.5              74.7                 62.4                   71                74.8
+    Metal nut         43.9            53.6              61.0                 65.4                  74.4               72.5
+     Screw            80.1            76.4              89.6                 97.8                  97.5               98.1
+   Toothbrush         36.3            35.0              86.9                 95.8                  91.9               96.0
+     Zipper           51.5            44.7              91.6                 91.1                  91.4               96.6
+       Tile           49.9            39.1              77.6                 92.7                  94.6               97.4
+      Wood            45.7            42.4              93.4                 95.8                  96.5               98.3
+      Mean            38.4            38.2              85.1                 87.6                  91.1               92.3
+
+Table 5. Fine-grained data-subset-wise performance comparison (AUROC) for anomaly localization on MVTec-AD. The best performance
+is in bold, and the second-best is underlined.
+
+
+   Object name     CLIP [28]     CLIP-AC [28]      WinCLIP [16]        APRIL-GAN [4]       AnomalyCLIP [37]       FiLo (ours)
+     Candle           33.6            50.0               88.9                97.8                  98.8               98.7
+    Capsules          56.8            61.5               81.6                97.5                  95.0               92.3
+     Cashew           64.5            62.5               84.7                86.0                  93.8               95.1
+  Chewinggum          43.0            56.5               93.3                99.5                  99.3               99.4
+     Fryum            45.6            62.7               88.5                92.0                  94.6               95.2
+   Macaroni1          20.3            22.9               70.9                98.8                  98.3               99.1
+   Macaroni2          37.7            28.8               59.3                97.8                  97.6               98.1
+      Pcb1            57.8            51.6               61.2                92.7                  94.1               94.4
+      Pcb2            34.7            38.4               71.6                89.7                  92.4               93.7
+      Pcb3            54.6            44.6               85.3                88.4                  88.4               90.8
+      Pcb4            52.1            49.9               94.4                94.6                  95.7               95.8
+   Pipe fryum         58.7            44.7               75.4                96.0                  98.2               97.7
+      Mean            46.6            47.8               79.6                94.2                  95.5               95.9
+
+Table 6. Fine-grained data-subset-wise performance comparison (AUROC) for anomaly localization on VisA. The best performance is in
+bold, and the second-best is underlined.
+
+
+information improves performance. This is attributed to the              We also examined the impact of varying the number of
+alignment of CoCoOp’s approach, which incorporates im-               learnable vectors in adaptively learned text templates. The
+age features into the text prompt via a meta-net, with the           findings are illustrated in Figure 5. It can be observed that
+concept of FiLo, utilizing fine-grained anomaly description          utilizing 12 learnable vectors yields the best performance in
+and position enhancement to obtain precise representations           both anomaly detection and localization tasks.
+of each image’s text content, aiming for a better match with
+image content.                                                       C.3. Utilization of V-V Attention
+   The results in Table 12 further demonstrate that Co-              Pre-trained on large-scale datasets, CLIP exhibits excellent
+CoOp outperforms CoOp, highlighting the effectiveness of             zero-shot performance on downstream image classification
+leveraging fine-grained anomaly descriptions to enhance              tasks. However, directly using the features extracted from
+anomaly detection.                                                   the CLIP Image Encoder for each position in the feature
+
+
+                                                                13
+                                                     Tears (0.552)
+                                                     Creases (0.545)
+                                        Similarity
+                                                     Discoloration (0.543)
+                                                     Scratches (0.531)
+                                                     Uneven texture (0.526)
+
+
+
+                                                     Holes (0.620)
+                                                     Knots (0.612)
+                                        Similarity
+                                                     Cracks along the grain (0.593)
+                                                     Mold growth on the surface (0.578)
+                                                     Warping (0.565)
+
+
+
+                                                     Discoloration in a specific area (0.619)
+                                                     Burn mark or scorching (0.617)
+                                        Similarity
+                                                     Frayed edges or unraveling fibers (0.589)
+                                                     Irregular patch or section with a different texture (0.499)
+                                                     Normal (0.339)
+
+
+
+                                                     Unusual texture (0.656)
+                                                     Insect infestation (0.653)
+                                        Similarity
+                                                     Misshapen shell (0.650)
+                                                     Wetness (0.641)
+                                                     Unusual discoloration (0.639)
+
+                 Figure 4. Illustration of similarities between images and different fine-grained anomaly descriptions.
+
+
+map and measuring their similarity with textual features of-           tered in WinCLIP and APRIL-GAN, achieving remarkable
+ten results in significant noise activation outside of objects         zero-shot performance. However, V-V attention suffers
+during fine-grained semantic segmentation or object detec-             from training difficulties, as slight mishandling may result
+tion tasks. CLIP Surgery [19] addresses this issue, identi-            in model outputs entirely comprised of zeros, causing the
+fying it as stemming from the QKV attention mechanism                  AUC to plummet to 50. To address this challenge, we si-
+within CLIP, which leads to feature pooling from seman-                multaneously utilize the output results of both QKV atten-
+tically disparate regions, consequently causing noise acti-            tion and V-V attention, exploring the differential effects of
+vation in erroneous areas. The proposed solution involves              applying distinct processing methods to the output results
+employing V-V self-attention to mitigate this problem.                 of QKV attention and V-V attention. The results, as shown
+                                                                       in Table 13, indicate that employing a simple linear layer on
+   Approaches such as AnoVL [7] and AnomalyCLIP [37]
+                                                                       the output results of QKV attention and inputting the output
+have also incorporated V-V attention into anomaly detection
+                                                                       results of V-V attention into the MMCI module yields the
+and localization tasks, resolving the issue of misalignment
+                                                                       best detection and localization performance for FiLo.
+between patch-level features and textual features encoun-
+
+
+                                                                  14
+  Object name      CLIP [28]    CLIP-AC [28]      WinCLIP [16]        APRIL-GAN [4]       AnomalyCLIP [37]       FiLo (ours)
+     Carpet            96            93.1              100.0                 99.5                 100.0              99.9
+     Bottle           45.9           46.1               99.2                 92.0                  89.3              98.6
+    Hazelnut          88.7           91.1               93.9                 89.6                 97.2               92.8
+     Leather          99.4           99.5              100.0                 99.7                 99.8               100
+      Cable           58.1           46.6               86.5                 88.4                 69.8               77.9
+    Capsule           71.4           68.8              72.9                  79.9                 89.9               89.2
+      Grid            72.5           63.7               98.8                 86.3                  97.0              97.4
+       Pill           73.6           73.8               79.1                 80.5                 81.8               87.8
+   Transistor         48.8           51.2              88.0                  80.8                 92.8               80.5
+    Metal nut         62.8           63.4               97.1                 68.4                  93.6               77
+     Screw            78.2           66.7              83.3                  84.9                 81.1               74.5
+   Toothbrush         73.3           89.2               88.0                 53.8                  84.7              94.2
+     Zipper           60.1           36.1               91.5                 89.6                  98.5              98.1
+       Tile           88.5           89.0              100.0                 99.9                 100.0              100
+      Wood             94            94.9              99.4                  99.0                 96.8               99.7
+      Mean            74.1           71.5              91.8                  86.1                 91.5               91.2
+
+Table 7. Fine-grained data-subset-wise performance comparison (AUROC) for anomaly detection on MVTec AD. The best performance is
+in bold, and the second-best is underlined.
+
+
+  Object name      CLIP [28]     CLIP-AC [28]      WinCLIP [16]        APRIL-GAN [4]       AnomalyCLIP [37]       FiLo (ours)
+     Candle           37.9            33.0              95.4                 83.8                 79.3                79.3
+    Capsules          69.7            75.3              85.0                 61.2                 81.5                80.9
+     Cashew           69.1            72.7              92.1                 87.3                 76.3                 90
+  Chewinggum          77.5            76.9              96.5                 96.4                 97.4                98.4
+     Fryum            67.2            60.9              80.3                 94.3                 93.0                88.3
+   Macaroni1          64.4            67.4              76.2                 71.6                 87.2                88.3
+   Macaroni2           65             65.7              63.7                 64.6                 73.4                68.5
+      Pcb1            54.9            43.9              73.6                 53.4                 85.4                 87
+      Pcb2            62.6            59.5              51.2                 71.8                 62.2                77.6
+      Pcb3            52.2            49.0              73.4                 66.8                 62.7                69.5
+      Pcb4            87.7            89.0              79.6                 95.0                 93.9                95.7
+   Pipe fryum         88.8            86.4              69.7                 89.9                 92.4                83.8
+      Mean            66.4            65.0              78.1                 78.0                 82.1                83.9
+
+Table 8. Fine-grained data-subset-wise performance comparison (AUROC) for anomaly detection on VisA. The best performance is in
+bold, and the second-best is underlined.
+
+
+C.4. Ablations of Adapter                                            C.5. Convolution Kernel’s Shape of MMCI
+
+In this section, we compare the performance impact of the            We extensively experiment on the impact of different kernel
+structure and connection methods of the adapter on FiLo.             shapes used in MMCI. Starting with the sole use of 1x1 con-
+Regarding structure, we test the use of a simple linear layer        volutional kernels and gradually incorporate shapes such as
+and the bottleneck structure as shown in Sec 3 of the main           3x3, 5x5, 7x7, 1x5, 5x1, and 9x9, we evaluate the various
+paper. We also conduct experiments to assess the perfor-             experimental results, as depicted in Figure 6. Based on the
+mance difference of the adapter when utilizing residual con-         experimental findings, we ultimately select a combination
+nection versus not utilizing it. Experimental results are            of kernel shapes including 1x1, 3x3, 5x5, 7x7, 1x5, and
+shown in Table 14. It can be observed that when employ-              5x1. This combination harnesses the advantages of multi-
+ing the bottleneck structure without residual connection, the        scale and multi-shape kernels, enabling precise localization
+adapter achieves the best performance.                               of anomalous regions of different sizes and shapes.
+
+
+                                                                15
+       Class name                                                  Descriptions
+                              discoloration in a specific area, irregular patch or section with a different texture,
+         Carpet
+                                          frayed edges or unraveling fibers, burn mark or scorching
+                                    crooked, cracks, excessive gaps, discoloration, deformation, missing,
+          Grid
+                                inconsistent spacing between grid elements, corrosion, visible signs, chipping
+                                            scratches, discoloration, creases, uneven texture, tears,
+         Leather
+                                                brittleness, damage, seams, heat damage, mold
+                                         chipped, irregularities, discoloration, efflorescence, warping,
+          Tile
+                                               missing, depressions, lippage, fungus, damage
+                      knots, warping, cracks along the grain, mold growth on the surface, staining from water damage,
+         Wood
+                                        wood rot, woodworm holes, rough patches, protruding knots
+                                cracked large, cracked small, dented large, dented small, leaking, discolored,
+         Bottle
+                                       deformed, missing cap, excessive condensation, unusual odor
+                                  twisted, knotted cable strands, detached connectors, excessive stretching,
+         Cable
+                                  dents, corrosion, scorching along the cable, exposed conductive material
+                                       irregular shape, discoloration coloring, crinkled, uneven seam,
+        Capsule
+                                   condensation inside the capsule, foreign particles, unusually soft or hard
+                           fungal growth, Unusual discoloration, rotten or foul odor emanating, insect infestation,
+        Hazelnut
+                                  wetness, misshapen shell, unusually thin, contaminants, unusual texture
+                               cracks, irregular threading, corrosion, missing, distortion, signs of discoloration,
+       Metal nut
+                                            excessive wear on contact surfaces, inconsistent texture
+                                    irregular shape, crumbling texture, excessive powder, uneven coating,
+           Pill
+                                           presence of air bubbles, disintegration, abnormal specks
+                                  rust on the surface, bent, damaged threads, stripped threads, deformed top,
+         Screw
+                                               coating damage, uneven grooves, inconsistent size
+                                   loose bristles, uneven bristle distribution, excessive shedding of bristles,
+       Toothbrush
+                                      staining on the bristles, abrasive texture, irregularities in the shape
+                                 burn marks, detached leads, signs of corrosion, irregularities in the shape,
+       Transistor
+                        presence of cracks or fractures, signs of physical trauma, irregularities in the surface texture
+         Zipper                bent, frayed, misaligned, excessive stiffness, corroded, detaches, loose, warped
+
+                          Table 9. Fine-Grained anomaly description of every object within MVTec dataset.
+
+
+D. Visualization                                                       ples. In contrast, Figure 9 and Figure 10 illustrate FiLo’s
+                                                                       visualization results on these two datasets. It can be ob-
+D.1. Anomaly Scores for Every Categories                               served that the scores for normal samples significantly de-
+In this section, we present the statistical analysis of anomaly        crease while those for abnormal samples notably increase,
+scores generated by WinCLIP [16] and FiLo for each class               resulting in a significant reduction in the overlapping area.
+object in the MVTec and VisA datasets. These visualiza-
+                                                                       D.2. Anomaly Maps
+tions aim to illustrate the effectiveness of FiLo’s detailed
+anomaly descriptions and adaptively learned text templates             Figure 11 further demonstrates the Anomaly Maps gener-
+compared to WinCLIP’s manually crafted two-class text ad-              ated by FiLo on additional samples from the MVTec and
+justment. As depicted in Figure 7 and Figure 8, WinCLIP’s              VisA datasets. The three rows from top to bottom in the
+scores for both normal and abnormal samples heavily over-              figure represent the test samples, FiLo’s output, and the
+lap and are concentrated around 0.5, indicating its failure to         Ground Truth, respectively, demonstrating FiLo’s robust
+effectively distinguish between normal and abnormal sam-               anomaly localization capability.
+
+
+                                                                  16
+ Class name                                                            Descriptions
+                  cracks or fissures in the wax, Wax pooling unevenly around the wick, tunneling, incomplete wax melt pool,
+   Candle
+                              irregular or flickering flame, other, extra wax in candle, wax melded out of the candle
+                                        uneven capsule size, capsule shell appears brittle, excessively soft,
+  Capsules
+                                              dents, condensation, irregular seams or joints, specks
+                                             uneven coloring, fungal growth, presence of foreign objects,
+   Cashew
+                                            unusual texture, empty shells, signs of moisture, stuck together
+Chewinggum             consistency, presence of foreign objects, uneven coloring, excessive hardness, similar colour spot
+                                            irregular shape, unusual odor, uneven coloring, unusual texture,
+   Fryum
+                                           small scratches, different colour spot, fryum stuck together, other
+                                             uneven shape , small scratches, small cracks, uneven coloring,
+ Macaroni1
+                                            signs of insect infestation, uneven texture, Unusual consistency
+                                         irregular shape, small scratches, presence of foreign particles,
+ Macaroni2
+                                      excessive moisture, signs of infestation, small cracks, unusual texture
+                                 oxidation on the copper traces, separation of layers, presence of solder bridges,
+    Pcb1
+                         excessive solder residue, discoloration, Uneven solder joints, bowing of the board, missing vias
+                                 oxidation on the copper traces, separation of layers, presence of solder bridges,
+    Pcb2
+                         excessive solder residue, discoloration, Uneven solder joints, bowing of the board, missing vias
+                                 oxidation on the copper traces, separation of layers, presence of solder bridges,
+    Pcb3
+                         excessive solder residue, discoloration, Uneven solder joints, bowing of the board, missing vias
+                                 oxidation on the copper traces, separation of layers, presence of solder bridges,
+    Pcb4
+                         excessive solder residue, discoloration, Uneven solder joints, bowing of the board, missing vias
+                                  uneven shape, presence of foreign objects, different colour spot, unusual odor,
+ Pipe fryum
+                                       empty interior, unusual texture, similar colour spot, stuck together
+
+                            Table 10. Fine-Grained anomaly description of every object within VisA dataset.
+
+
+                                                                              VisA                      MVTec-AD
+            Backbone         learnable vec’s lr     MMCI’s lr
+                                                                  Image-AUC       Pixel-AUC      Image-AUC       Pixel-AUC
+        ViT-B-16@240                1e-3               1e-4            78.1           93.5           77.9            88.2
+        ViT-L-14@336                1e-3               1e-4            83.9           95.9           91.2            92.3
+        ViT-L-14@336                1e-3               1e-3            80.3           95.7           86.2            89.7
+        ViT-L-14@336                1e-4               1e-4            82.4           95.7            88             91.2
+        ViT-L-14@336                1e-4               1e-5            78.2           95.1           83.5             89
+        ViT-L-14@336                1e-5               1e-5            80.4           95.2           85.8            90.7
+
+            Table 11. Experimental results of FiLo on MVTec and VisA datasets under different backbones and learning rates.
+
+
+E. Limitation and future work                                          normal and abnormal samples is more distinct compared
+                                                                       to previous methods, significant overlap still exists in cer-
+Compared to previous works like WinCLIP [16], FiLo has                 tain categories such as zipper and metal nut. In the future,
+made advancements in anomaly detection, localization, and              we plan to further improve the differentiation between nor-
+interpretability through the use of Fine-Grained Description           mal and abnormal sample scores through approaches such
+and High-Quality Localization methods. However, despite                as metric learning.
+these strides forward, certain limitations still persist, war-
+ranting further investigation and refinement. As illustrated
+in Figure 9 and Figure 10, while the differentiation between
+
+
+                                                                  17
+                                                                                     VisA                                                         MVTec-AD
+    learning method                         with class name
+                                                                             Image-AUC Pixel-AUC                                            Image-AUC Pixel-AUC
+         CoOp                                                                   81.7       95                                                  90.8       89.5
+         CoOp                                            ✓                      80.9      95.5                                                 89.9       90.4
+        CoCoOp                                                                  82.3      95.4                                                  91        90.5
+        CoCoOp                                           ✓                      83.9      95.9                                                 91.2       92.3
+
+    Table 12. Comparison of different learning methods for learnable vectors and whether to use class name.
+
+
+
+
+                                                                                            VisA                                                          MVTec-AD
+QKV results       VV results                        VV’s first layer
+                                                                                    Image-AUC Pixel-AUC                                             Image-AUC Pixel-AUC
+  Linear                         MMCI                             1                    81.9      95.3                                                  87.8       89.2
+  Linear                         MMCI                             7                    83.9      95.9                                                  91.2       92.3
+  Linear                         Linear                           7                    82.7      95.1                                                  88.5       88.8
+  MMCI                           MMCI                             7                    83.2      95.5                                                   50         50
+  MMCI                           Linear                           7                    82.5      95.7                                                  56.9       57.6
+
+Table 13. Comparison of results of different processing methods for the output results of QKV and VV Attention.
+
+
+
+
+                                                                                     VisA                                                    MVTec-AD
+         Adapter’s arch                           residual
+                                                                      Image-AUC                      Pixel-AUC                      Image-AUC               Pixel-AUC
+           Bottleneck                                                       83.9                                 95.9                   91.2                      92.3
+           Bottleneck                                    ✓                  83.6                                 95.8                   89.9                      91.4
+             Linear                                                         83.9                                 95.9                   90.2                      92.3
+             Linear                                      ✓                  83.8                                 95.9                   88.6                      91.1
+
+                                  Table 14. Comparison of different adapter structures and connection types.
+
+
+
+
+                                                                  Ablation on the length of learnable text prompt E
+                                          MVTec                                                             96       MVTec
+                                          VisA                                                                       VisA
+                                 90                                                                         95
+
+                                                                                                            94
+                                 88
+
+
+               Image-level AUC                                                            Pixel-level AUC
+                                                                                                            93
+                                 86
+                                                                                                            92
+
+                                 84                                                                         91
+
+                                                                                                            90
+                                 82
+                                      4      6       8       10       12     14     16                           4      6       8      10      12      14    16
+                                                  Length of Text Prompt E                                                    Length of Text Prompt E
+
+
+    Figure 5. Comparison of FiLo on MVTec and VisA datasets with different numbers of learnable vectors.
+
+
+
+
+                                                                                         18
+                                                                                      Ablation on the kernels in MMCI
+                                                 MVTec                                                                          96
+                                                 VisA
+                                      90
+
+                                                                                                                                94
+                                      88
+
+
+
+
+                    Image-level AUC                                                                           Pixel-level AUC
+                                      86
+                                                                                                                                92
+                                      84
+                                                                                                                                90
+                                      82
+
+                                      80                                                                                                                                                   MVTec
+                                                                                                                                88                                                         VisA
+                                           1x1       +3x3           +5x5      +7x7 +1x5 & 5x1 +9x9                                   1x1      +3x3       +5x5       +7x7 +1x5 & 5x1 +9x9
+                                                                    Kernels in MMCI                                                                      Kernels in MMCI
+
+               Figure 6. Comparison of FiLo on MVTec and VisA datasets with different convolution kernels.
+
+
+
+
+                                                        Anomaly scores of every categories in MVTec dataset via WinCLIP
+                          bottle                                           cable                           capsule                                        carpet                                   grid
+                                           Normal                                  Normal      100                              Normal                             Normal       50                        Normal
+         30                                Anomaly       80                        Anomaly                                      Anomaly       60                   Anomaly                                Anomaly
+                                                                                                80                                                                              40
+                                                         60
+         20                                                                                     60                                            40                                30
+                                                         40                                                                                                                     20
+                                                                                                40
+         10                                                                                                                                   20
+                                                         20                                     20                                                                              10
+          0                                               0                                      0                                             0                                 0
+              0.0                0.5              1.0         0.0           0.5          1.0         0.0      0.5                      1.0         0.0      0.5          1.0         0.0           0.5          1.0
+                    hazelnut                                            leather                            metal nut                                        pill                               screw
+         60                                              60                                                                                                                    120
+                 Normal                                                            Normal                                       Normal                             Normal                                 Normal
+         50      Anomaly                                 50                        Anomaly      80                              Anomaly      125                   Anomaly     100                        Anomaly
+         40                                              40                                     60                                           100                                80
+         30                                              30                                                                                   75                                60
+                                                                                                40
+         20                                              20                                                                                   50                                40
+         10                                              10                                     20                                            25                                20
+          0                                               0                                      0                                             0                                 0
+           0.500    0.505                        0.510        0.0           0.5          1.0         0.0      0.5                      1.0         0.0      0.5          1.0         0.0           0.5          1.0
+                                tile                                  toothbrush                           transistor                                      wood                                zipper
+         60                                              30                                     60                                                                             120
+                                           Normal                                  Normal                                       Normal        30                   Normal                                 Normal
+         50                                Anomaly       25                        Anomaly      50                              Anomaly       25                   Anomaly     100                        Anomaly
+         40                                              20                                     40                                            20                                80
+         30                                              15                                     30                                            15                                60
+         20                                              10                                     20                                            10                                40
+         10                                               5                                     10                                             5                                20
+          0                                               0                                      0                                             0                                 0
+              0.0                0.5              1.0         0.0           0.5          1.0         0.0      0.5                      1.0         0.0      0.5          1.0         0.0           0.5          1.0
+
+
+Figure 7. Anomaly scores of WinCLIP on the MVTec dataset. Each sub-figure represents the visualization of one object.
+
+
+
+
+                                                                                                            19
+                                                   Anomaly scores of every categories in MVTec dataset via WinCLIP
+                              candle                                                      capsules                                                              cashew                                                chewinggum
+        100            Normal                                                       Normal                                            100               Normal                                      100                                         Normal
+                       Anomaly                                     60               Anomaly                                                             Anomaly                                                                                 Anomaly
+         80                                                                                                                               80                                                         80
+         60                                                        40                                                                     60                                                         60
+         40                                                                                                                               40                                                         40
+                                                                   20
+         20                                                                                                                               20                                                         20
+          0                                                         0                                                                      0                                                          0
+              0.0     0.2    0.4      0.6        0.8   1.0           0.490 0.492 0.494 0.496 0.498 0.500                                       0.0     0.2      0.4     0.6     0.8     1.0               0.0    0.2        0.4         0.6     0.8     1.0
+                              fryum                                                       macaroni1                                                          macaroni2                                                       pcb1
+        100            Normal                                     100               Normal                                                                                                          100              Normal
+                       Anomaly                                                      Anomaly                                               60                                                                         Anomaly
+         80                                                        80                                                                                                                                80
+         60                                                        60                                                                     40                                                         60
+         40                                                        40                                                                                                                                40
+                                                                                                                                          20
+         20                                                        20                                                                                                 Normal                         20
+                                                                                                                                                                      Anomaly
+          0                                                         0                                                                      0                                                          0
+              0.0     0.2    0.4      0.6        0.8   1.0              0.0         0.2     0.4         0.6       0.8         1.0           0.500 0.502 0.504 0.506 0.508 0.510                           0.0    0.2        0.4         0.6     0.8     1.0
+                               pcb2                                                          pcb3                                                                pcb4                                                  pipe fryum
+        100            Normal                                     100               Normal                                            100               Normal                                      100              Normal
+         80            Anomaly                                                      Anomaly                                                             Anomaly                                      80              Anomaly
+                                                                   80                                                                     80
+         60                                                        60                                                                     60                                                         60
+         40                                                        40                                                                     40                                                         40
+         20                                                        20                                                                     20                                                         20
+          0                                                         0                                                                      0                                                          0
+              0.0     0.2    0.4      0.6        0.8   1.0              0.0         0.2     0.4         0.6       0.8         1.0              0.0     0.2      0.4     0.6     0.8     1.0               0.0    0.2        0.4         0.6     0.8     1.0
+
+
+Figure 8. Anomaly scores of WinCLIP on the VisA dataset. Each sub-figure represents the visualization of one object.
+
+
+
+
+                                                       Anomaly scores of every categories in MVTec dataset via FiLo
+                            bottle                                       cable                                                  capsule                                          carpet                                                 grid
+                                    Normal             12                            Normal              15.0                                  Normal           25                       Normal                                                 Normal
+          8                         Anomaly            10                            Anomaly             12.5                                  Anomaly                                   Anomaly                 6                              Anomaly
+                                                                                                                                                                20
+          6                                             8                                                10.0
+                                                                                                                                                                15                                               4
+          4                                             6                                                 7.5
+                                                        4                                                 5.0                                                   10
+                                                                                                                                                                                                                 2
+          2                                             2                                                 2.5                                                    5
+          0                                             0                                                 0.0                                                    0                                               0
+                    0.25     0.50         0.75              0.4               0.6                 0.8              0.25         0.50           0.75     1.00              0.2     0.4         0.6     0.8             0.1         0.2         0.3     0.4
+                           hazelnut                                     leather                                                metal nut                                          pill                                             screw
+         10            Normal                                                        Normal                   8                                Normal                                    Normal                                                 Normal
+                       Anomaly                         20                            Anomaly                                                   Anomaly         12.5                      Anomaly                                                Anomaly
+          8                                                                                                                                                                                                     15
+                                                                                                              6                                                10.0
+          6                                            15
+                                                                                                              4                                                 7.5                                             10
+          4                                            10
+                                                                                                                                                                5.0
+                                                                                                              2                                                                                                  5
+          2                                             5                                                                                                       2.5
+          0                                             0                                                     0                                                 0.0                                              0
+                       0.6          0.8          1.0              0.25 0.50 0.75 1.00                                   0.4         0.6         0.8                       0.25        0.50      0.75                          0.6               0.8
+                             tile                                   toothbrush                                                 transistor                                        wood                                              zipper
+         12                         Normal              4                            Normal              15.0                                  Normal                                    Normal                 30                              Normal
+         10                         Anomaly                                          Anomaly             12.5                                  Anomaly           6                       Anomaly                25                              Anomaly
+                                                        3
+          8                                                                                              10.0                                                                                                   20
+                                                                                                                                                                 4
+          6                                             2                                                 7.5                                                                                                   15
+          4                                                                                               5.0                                                    2                                              10
+                                                        1
+          2                                                                                               2.5                                                                                                    5
+          0                                             0                                                 0.0                                                    0                                               0
+                    0.25     0.50     0.75                  0.2         0.4           0.6                                0.4           0.6            0.8                0.25     0.50        0.75                          0.2               0.4           0.6
+
+
+ Figure 9. Anomaly scores of FiLo on the MVTec dataset. Each sub-figure represents the visualization of one object.
+
+
+
+
+                                                                                                                                20
+                                                         Anomaly scores of every categories in VisA dataset via FiLo
+                              candle                                           capsules                                     cashew                                  chewinggum
+                                                Normal      12                              Normal      10                             Normal                 Normal
+                                                Anomaly                                     Anomaly                                    Anomaly   12.5         Anomaly
+      15                                                    10                                              8                                    10.0
+                                                             8
+      10                                                                                                    6                                     7.5
+                                                             6
+                                                             4                                              4                                     5.0
+       5
+                                                             2                                              2                                     2.5
+       0                                                     0                                              0                                     0.0
+            0.5         0.6         0.7           0.8             0.65 0.70 0.75 0.80 0.85                           0.4        0.6     0.8             0.6         0.7     0.8   0.9   1.0
+                              fryum                                        macaroni1                                       macaroni2                                      pcb1
+      10                                        Normal                                      Normal      12            Normal                                                       Normal
+                                                           12.5                                                                                   12
+       8                                        Anomaly                                     Anomaly     10            Anomaly                                                      Anomaly
+                                                           10.0                                                                                   10
+                                                                                                         8                                         8
+       6
+                                                            7.5                                          6                                         6
+       4                                                    5.0                                          4                                         4
+       2                                                    2.5                                          2                                         2
+       0                                                    0.0                                          0                                         0
+            0.6         0.7         0.8          0.9              0.4    0.5         0.6   0.7   0.8            0.70 0.75 0.80 0.85 0.90 0.95                 0.6         0.7     0.8    0.9
+                              pcb2                                              pcb3                                         pcb4                                   pipe fryum
+                   Normal                                               Normal                                                         Normal     12          Normal
+                                                           12.5                                        15.0
+                   Anomaly                                              Anomaly                                                        Anomaly    10          Anomaly
+      15                                                                                               12.5
+                                                           10.0                                                                                    8
+                                                                                                       10.0
+      10                                                    7.5                                                                                    6
+                                                                                                        7.5
+                                                            5.0                                         5.0                                        4
+       5
+                                                            2.5                                         2.5                                        2
+       0                                                    0.0                                         0.0                                        0
+        0.5       0.6         0.7         0.8      0.9            0.7          0.8         0.9                      0.7      0.8       0.9              0.3 0.4 0.5 0.6 0.7 0.8
+
+
+Figure 10. Anomaly scores of FiLo on the VisA dataset. Each sub-figure represents the visualization of one object.
+
+
+
+           Input
+
+
+
+     FiLo Output
+
+
+
+            GT
+
+
+
+
+           Input
+
+
+
+     FiLo Output
+
+
+
+           GT
+
+
+
+
+           Input
+
+
+
+     FiLo Output
+
+
+
+            GT
+
+
+
+                                            Figure 11. More visualization results on MVTec and VisA datasets.
+
+
+                                                                                                       21
+

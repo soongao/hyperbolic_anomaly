@@ -1,0 +1,890 @@
+                                                              AnomalyGPT: Detecting Industrial Anomalies Using
+                                                                      Large Vision-Language Models
+
+                                                                     Zhaopeng Gu1,2 Bingke Zhu1,3,4 Guibo Zhu1,2,4
+                                                                    Yingying Chen1,3,4 Ming Tang1,2 Jinqiao Wang1,2,3,4
+                                                                 1
+                                                                   Foundation Model Research Center, Institute of Automation,
+                                                                         Chinese Academy of Sciences, Beijing, China
+                                                                 2
+                                                                   University of Chinese Academy of Sciences, Beijing, China
+
+
+
+
+arXiv:2308.15366v4 [cs.CV] 28 Dec 2023
+                                                                                3
+                                                                                  Objecteye Inc., Beijing, China
+                                                                             4
+                                                                               Wuhan AI Research, Wuhan, China
+                                                                                       guzhaopeng2023@ia.ac.cn
+                                                              {bingke.zhu,gbzhu,yingying.chen,tangm,jqwang}@nlpr.ia.ac.cn
+
+
+                                                                Abstract
+                                             Large Vision-Language Models (LVLMs) such as
+                                         MiniGPT-4 and LLaVA have demonstrated the capability
+                                         of understanding images and achieved remarkable perfor-
+                                         mance in various visual tasks. Despite their strong abili-
+                                         ties in recognizing common objects due to extensive train-
+                                         ing datasets, they lack specific domain knowledge and have
+                                         a weaker understanding of localized details within objects,
+                                         which hinders their effectiveness in the Industrial Anomaly
+                                         Detection (IAD) task. On the other hand, most existing IAD
+                                         methods only provide anomaly scores and necessitate the
+                                         manual setting of thresholds to distinguish between normal
+                                         and abnormal samples, which restricts their practical im-
+                                         plementation. In this paper, we explore the utilization of
+                                         LVLM to address the IAD problem and propose Anoma-
+                                         lyGPT, a novel IAD approach based on LVLM. We generate
+                                         training data by simulating anomalous images and produc-          Figure 1. Comparison between our AnomalyGPT, existing IAD
+                                         ing corresponding textual descriptions for each image. We         methods and existing LVLMs. Existing IAD methods can only
+                                         also employ an image decoder to provide fine-grained se-          provide anomaly scores and need manually threshold setting,
+                                         mantic and design a prompt learner to fine-tune the LVLM          while existing LVLMs cannot detect anomalies in the image.
+                                                                                                           AnomalyGPT can not only provide information about the image
+                                         using prompt embeddings. Our AnomalyGPT eliminates
+                                                                                                           but also indicate the presence and location of anomaly.
+                                         the need for manual threshold adjustments, thus directly
+                                         assesses the presence and locations of anomalies. Addi-
+                                         tionally, AnomalyGPT supports multi-turn dialogues and
+                                         exhibits impressive few-shot in-context learning capabili-        on a range of Natural Language Processing (NLP) tasks.
+                                         ties. With only one normal shot, AnomalyGPT achieves the          More recently, novel methods including MiniGPT-4 [36],
+                                         state-of-the-art performance with an accuracy of 86.1%, an        BLIP-2 [15], and PandaGPT [25] have further extended the
+                                         image-level AUC of 94.1%, and a pixel-level AUC of 95.3%          ability of LLMs into visual processing by aligning visual
+                                         on the MVTec-AD dataset. Code is available at https:              features with text features, bringing a significant revolu-
+                                         //github.com/CASIA-IVA-Lab/AnomalyGPT.                            tion in the domain of Artificial General Intelligence (AGI).
+                                                                                                           While LVLMs are pre-trained on amounts of data sourced
+                                                                                                           from the Internet, their domain-specific knowledge is rela-
+                                         1. Introduction                                                   tively limited and they lack sensitivity to local details within
+                                         Large Language Models (LLMs) like GPT-3.5 [19] and                objects, which restricts their potentiality in IAD task.
+                                         LLaMA [26] have demonstrated remarkable performance                  IAD task aims to detect and localize anomalies in in-
+
+
+                                                                                                       1
+        Methods             Few-shot learning   Anomaly score     Anomaly localization    Anomaly judgement      Multi-turn dialogue
+Traditional IAD methods                               ✓                    ✓
+ Few-shot IAD methods              ✓                  ✓                    ✓
+         LVLMs                     ✓                                                                                     ✓
+  AnomalyGPT (ours)                ✓                  ✓                    ✓                       ✓                     ✓
+
+Table 1. Comparison between our AnomalyGPT and existing methods across various functionalities. The “Traditional IAD methods” in the
+table refers to “one-class-one-model” methods such as PatchCore [23], InTra [21], and PyramidFlow [13]. “Few-shot IAD methods” refers
+to methods that can perform few-shot learning like RegAD [10], Graphcore [29], and WinCLIP [27]. “LVLMs” represents general large
+vision-language models like MiniGPT-4 [36], LLaVA [17], and PandaGPT [25]. “Anomaly score” in the table represents just providing
+scores for anomaly detection, while “Anomaly judgement” indicates directly assessing the presence of anomaly.
+
+
+dustrial product images. Due to the rarity and unpre-                   Experimentally, we conduct extensive experiments on
+dictability of real-world samples, models are required to            the MVTec-AD [1] and VisA [37] datasets. With unsu-
+be trained only on normal samples and distinguish anoma-             pervised training on the MVTec-AD dataset, we achieve
+lous samples that deviate from normal samples. Current               an accuracy of 93.3%, an image-level AUC of 97.4%, and
+IAD methods [10, 11, 32] typically only provide anomaly              a pixel-level AUC of 93.1%. When one-shot transferred
+scores for test samples and require manually specification           to the VisA dataset, we achieve an accuracy of 77.4%,
+of thresholds to distinguish between normal and anomalous            an image-level AUC of 87.4%, and a pixel-level AUC of
+instances for each class of items, which is not suitable for         96.2%. Conversely, after unsupervised training on the VisA
+real production environments.                                        dataset, one-shot transferred to the MVTec-AD dataset re-
+   As illustrated in Figure 1 and Table 1, neither existing          sult in an accuracy of 86.1%, an image-level AUC of 94.1%,
+IAD methods nor LVLMs can address IAD problem well,                  and a pixel-level AUC of 95.3%.
+so we introduce AnomalyGPT, a novel IAD approach based                  Our contributions are summarized as follows:
+on LVLM. AnomalyGPT can detect the presence and loca-                • We present the pioneering utilization of LVLM for ad-
+tion of anomalies without the need for manual threshold set-           dressing IAD task. Our method not only detects and lo-
+tings. Moreover, our method can provide information about              cates anomaly without manually threshold adjustments
+the image and allows for interactive engagement, enabling              but also supports multi-round dialogues. To the best of
+users to ask follow-up questions based on their needs and              our knowledge, we are the first to successfully apply
+the provided answers. AnomalyGPT can also perform in-                  LVLM to the domain of industrial anomaly detection.
+context learning with a small number of normal samples,              • The lightweight, visual-textual feature-matching-based
+enabling swift adaptation to previously unseen objects.                decoder in our work addresses the limitation of the LLM’s
+   Specifically, we focus on fine-tuning the LVLM using                weaker discernment of fine-grained semantic and allevi-
+synthesized anomalous visual-textual data, integrating IAD             ates the constraint of LLM’s restricted ability to solely
+knowledge into the model. However, direct training with                generate text outputs.
+IAD data presents numerous challenges. The first is data             • We employ prompt embeddings for fine-tuning and train
+scarcity. Methods like LLaVA [17] and PandaGPT [25] are                our model concurrently with the data utilized during
+pre-trained on 160k images with corresponding multi-turn               LVLM pre-training, thus preserving the LVLM’s inherent
+dialogues. However, existing IAD datasets [1, 37] contain              capabilities and enabling multi-turn dialogues.
+only a few thousand samples, rendering direct fine-tuning            • Our method retains robust transferability and is capable of
+easy to overfitting and catastrophic forgetting. To address            engaging in in-context few-shot learning on new datasets,
+this, we use prompt embeddings to fine-tune the LVLM in-               yielding outstanding performance.
+stead of parameter fine-tuning. Additional prompt embed-
+dings are added after image inputs, introducing supplemen-           2. Related Work
+tary IAD knowledge into the LVLM. The second challenge
+relates to fine-grained semantic. We propose a lightweight,          Industrial Anomaly Detection: Existing IAD methods
+visual-textual feature-matching-based decoder to generate            can be categorized into reconstruction-based and feature
+pixel-level anomaly localization results. The decoder’s out-         embedding-based approaches. Reconstruction-based meth-
+puts are introduced to the LVLM along with the original              ods primarily aim to reconstruct anomalous samples to
+test images through prompt embeddings, which allows the              their corresponding normal counterparts and detect anoma-
+LVLM to utilize both the raw image and the decoder’s out-            lies by calculating the reconstruction error. RIAD [33],
+puts to make anomaly determinations, improving the accu-             SCADN [30], InTra [21] and AnoDDPM [28] employ dif-
+racy of its judgments.                                               ferent reconstruction network architectures, ranging from
+
+
+                                                                 2
+autoencoder and Generative Adversarial Network (GAN) to             the potential of LLM-based polymathic models.
+Transformer and diffusion model.                                        However, as mentioned earlier, these models are trained
+   Feature embedding-based methods focus on modeling                on general data and lack domain-specific expertise. In this
+the feature embeddings of normal samples. Approaches                paper, through the utilization of simulated anomaly data,
+such as PatchSVDD [31] aim to find a hypersphere that               image decoder and prompt embeddings, AnomalyGPT is
+tightly encapsulates normal samples. Cflow-AD [9] and               introduced as an novel approach that achieves IAD task
+PyramidFlow [13] use normalizing flows to project normal            without the need for manually specified thresholds, while
+samples onto a Gaussian distribution. PatchCore [23] and            also enabling few-shot in-context learning. Table 1 illus-
+CFA [12] establish a memory bank of patch embeddings                trates a comparison between AnomalyGPT and existing
+from normal samples and detect anomalies by measuring               methods across various functionalities.
+the distance between a test sample embedding and its near-
+est normal embedding in the memory bank.                            3. Method
+   These methods typically follow the “one-class-one-               AnomalyGPT is a novel conversational IAD vision-
+model” learning paradigm, requiring plentiful normal sam-           language model, primarily designed for detecting anoma-
+ples for each object class to learn its distribution, making        lies in images of industrial artifacts and pinpointing their
+them impractical for novel object categories and less suit-         positions. We leverage a pre-trained image encoder and
+able for dynamic production environments. In contrast, our          a LLM to align IAD images and their corresponding tex-
+method facilitates in-context learning for novel object cate-       tual descriptions via simulated anomaly data. We intro-
+gories, enabling inference with only few normal samples.            duce a decoder module and a prompt learner module to
+Zero-/Few-shot Industrial Anomaly Detection: Recent                 enhance IAD performance and achieve pixel-level localiza-
+efforts have focused on methods utilizing minimal normal            tion output. Employing prompt tuning and alternate training
+samples to accomplish IAD task. PatchCore [23] constructs           with pre-training data preserves the LLM’s transferability
+a memory bank using only a few normal samples, resulting            and prevents catastrophic forgetting. Our method exhibits
+in a noticeable performance decline. RegAD [10] trained             robust few-shot transfer capability, enabling anomaly de-
+an image registration network to align test images with nor-        tection and localization for previously unseen items with
+mal samples, followed by similarity computation for cor-            merely one normal sample provided.
+responding patches. WinCLIP [11] leveraged CLIP [22] to
+compute similarity between images and textual descriptions          3.1. Model Architecture
+representing normal and anomalous semantics, distinguish-           Figure 2 illustrates the comprehensive architecture of
+ing anomalies based on their relative scores.       However,        AnomalyGPT. Given a query image x ∈ RH×W ×C , the fi-
+these methods can only provide anomaly scores for test              nal features Fimg ∈ RC1 extracted by the image encoder are
+samples during inference. To distinguish normal samples             passed through the linear layer to obtain the image embed-
+from anomalous ones, it’s necessary to experimentally de-           ding Eimg ∈ RCemb , which is then fed into the LLM. In un-
+termine the optimal threshold on a test set, which contra-          supervised setting, the patch-level features extracted by in-
+dicts the original intent of IAD task that only utilize nor-        termediate layers of image encoder are fed into the decoder
+mal data. For instance, while PatchCore [23] achieves an            together with text features to generate pixel-level anomaly
+image-level AUC of 99.3% on MVTec-AD in unsupervised                localization results. In few-shot setting, the patch-level fea-
+setting, its accuracy drops to 79.76% when using a unified          tures from normal samples are stored in memory banks and
+threshold for inference. The detailed experimental results          the localization result can be obtained by calculating the dis-
+and analyses can be found in Appendix A. Our method, in             tance between query patches and their most similar coun-
+contrast, enables the LVLM to directly assess test samples          terparts in the memory bank. The localization results is
+for the presence of anomalies and pinpoint their locations,         subsequently transformed into prompt embeddings through
+demonstrating enhanced practicality.                                the prompt learner, serving as a part of LLM input. The
+Large Vision-Language Models: LLMs, traditionally suc-              LLM leverages image input, prompt embeddings, and user-
+cessful in NLP, are now explored for visual tasks. BLIP-            provided textual input to detect anomalies and identify their
+2 [15] leverages Q-Former to input visual features from Vi-         locations, thus generating responses for the user.
+sion Transformer [7] into the Flan-T5 [4] model. MiniGPT-
+                                                                    3.2. Decoder and Prompt Learner
+4 [36] connects the image segment of BLIP-2 and the
+Vicuna [3] model with a linear layer, performing a two-             Decoder To achieve pixel-level anomaly localization, we
+stage fine-tuning process using extensive image-text data.          employ a lightweight feature-matching-based image de-
+PandaGPT [25] establishes a connection between Image-               coder that supports both unsupervised IAD and few-shot
+Bind [8] and the Vicuna [3] model via a linear layer, al-           IAD. The design of the decoder is primarily inspired by
+lowing for multi-modal input. These approaches showcase             PatchCore [23], WinCLIP [11], and APRIL-GAN [2].
+
+                                                                3
+Figure 2. The architecture of AnomalyGPT. The query image is passed to the frozen image encoder and the patch-level features extracted
+from intermediate layers are fed into image decoder to compute their similarity with normal and abnormal texts to obtain localization
+result. The final features extracted by the image encoder are fed to a linear layer and then passed to the prompt learner along with the
+localization result. The prompt learner converts them into prompt embeddings suitable for input into the LLM together with user text
+inputs. In few-shot setting, the patch-level features from normal samples are stored in memory banks and the localization result can be
+obtained by calculating the distance between query patches and their most similar counterparts in the memory bank.
+
+
+    As illustrated in the upper part of Figure 2, we parti-              we calculate the distance between each patch and its most
+tion the image encoder into 4 stages and obtain the in-                  similar counterpart in the memory bank, and the localiza-
+termediate patch-level features extracted by every stage                 tion result M ∈ RH×W can be obtained by Eq. (2):
+  i
+Fpatch   ∈ RHi ×Wi ×Ci , where i indicates the i-th stage.
+Following the idea from WinCLIP [11], a natural approach
+                                            i
+is to compute the similarity between Fpatch      and the text                                 4                              
+                                                                                                                                  !
+                                                                                              X
+                                                                                                             i         T
+features Ftext ∈ R    2×Ctext
+                               respectively representing nor-             M = U psample             1 − max(Fpatch · Bi )             . (2)
+mality and abnormality. Detailed texts representing nor-                                      i=1
+mal and abnormal cases are presented in Appendix B. How-
+ever, since these intermediate features have not undergone               Prompt Learner To leverage fine-grained semantic from
+the final image-text alignment, they cannot be directly com-             images and maintain semantic consistency between LLM
+pared with text features. To address this, we introduce addi-            and decoder outputs, we introduce a prompt learner that
+tional linear layers to project these intermediate features to           transforms the localization result into prompt embeddings.
+  i
+F̃patch  ∈ RHi ×Wi ×Ctext , and align them with text features            Additionally, learnable base prompt embeddings, unrelated
+representing normal and abnormal semantics. The localiza-                to decoder outputs, are incorporated into the prompt learner
+tion result M ∈ RH×W can be obtained by Eq. (1):                         to provide extra information for the IAD task. Finally, these
+                                                                         embeddings, along with the original image information, are
+                                                                         fed into the LLM.
+                        4
+                                                       !
+                        X
+                                         i      T
+   M = U psample              sof tmax(F̃patch Ftext )     .   (1)          As illustrated in Figure 2, the prompt learner consists of
+                        i=1
+                                                                         the learnable base prompt embeddings Ebase ∈ Rn1 ×Cemb
+   For few-shot IAD, as illustrated in the lower part of Fig-            and a convolutional neural network. The network converts
+ure 2, we utilize the same image encoder to extract inter-               the localization result M ∈ RH×W into n2 prompt embed-
+mediate patch-level features from normal samples and store               dings Edec ∈ Rn2 ×Cemb . Ebase and Edec form a set of
+them in memory banks B i ∈ RN ×Ci , where i indicates the                n1 + n2 prompt embeddings Eprompt ∈ R(n1 +n2 )×Cemb
+                                       i
+i-th stage. For patch-level features Fpatch  ∈ RHi ×Wi ×Ci ,             that are combined with the image embedding into the LLM.
+
+
+                                                                     4
+3.3. Data for Image-Text Alignment                                      capable of performing IAD task based solely on the pro-
+                                                                        vided image input. Detailed description for each category
+Anomaly Simulation We primarily adopt the approach
+                                                                        are provided in Appendix C.
+proposed by NSA [24] to simulate anomalous data. The
+NSA [24] method builds upon the Cut-paste [14] technique
+by incorporating the Poisson image editing [20] method
+to alleviate the discontinuity introduced by pasting image
+segments. Cut-paste [14] is a common technique in IAD
+domain for generating simulated anomaly images. This
+method involves randomly cropping a block region from an
+image and then pasting it onto a random location in another
+image, thus creating a simulated anomalous portion. Sim-
+ulated anomaly samples can significantly enhance the per-
+formance of IAD models, but this procedure often results
+in noticeable discontinuities, as illustrated in Figure 3. The
+Poisson editing method [20] has been developed to seam-                 Figure 4. Illustration of the 3 × 3 grid of image, which is used to
+lessly clone an object from one image into another image                let LLM verbally indicate the abnormal position.
+by solving the Poisson partial differential equations.
+                                                                           Prompts fed to the LLM typically follow the format:
+                                                                           ### Human: <Img>Eimg </Img>Eprompt [Image De-
+                                                                        scription]Is there any anomaly in the image?###Assistant:
+                                                                           Eimg ∈ RCemb represents the image embedding be-
+                                                                        ing processed through the image encoder and linear layer,
+                                                                        Eprompt ∈ R(n1 +n2 )×Cemb refers to the prompt embed-
+                                                                        dings generated by the prompt learner, and [Image Descrip-
+                                                                        tion] corresponds to the textual description of the image.
+Figure 3. Illustration of the comparison between cut-paste and          3.4. Loss Functions
+poisson image editing. The results of cut-paste exhibit evident
+discontinuities and the results of poisson image editing are more       To train the decoder and prompt learner, we primarily
+natural.                                                                employed three loss functions: cross-entropy loss, focal
+                                                                        loss [16], and dice loss [18]. The latter two are primarily
+Question and Answer Content To conduct prompt tuning                    utilized to enhance the pixel-level localization accuracy of
+on the LVLM, we generate corresponding textual queries                  the decoder.
+based on the simulated anomalous images. Specifically,                  Cross-Entropy Loss Cross-entropy loss is commonly em-
+each query consists of two components. The first part in-               ployed for training language models, which quantifies the
+volves a description of the input image, providing infor-               disparity between the text sequence generated by the model
+mation about the objects present in the image and their ex-             and the target text sequence. The formula is as follows:
+pected attributes, such as This is a photo of leather, which                                          n
+should be brown and without any damage, flaw, defect,                                       Lce = −
+                                                                                                      X
+                                                                                                             yi log(pi ),              (3)
+scratch, hole or broken part. The second part queries the                                              i=1
+presence of anomalies within the object, namely Is there
+any anomaly in the image? The LVLM firstly responds to                  where n is the number of tokens, yi is the true label for
+whether anomalies are present. If anomalies are detected,               token i and pi is the predicted probability for token i.
+the model continues to specify the number and location of               Focal Loss Focal loss [16] is commonly used in object de-
+the anomalous areas, such as Yes, there is an anomaly in                tection and semantic segmentation to address the issue of
+the image, at the bottom left of the image. or No, there                class imbalance, which introduces an adjustable parameter
+are no anomalies in the image. We divide the image into                 γ to modify the weight distribution of cross-entropy loss,
+a grid of 3 × 3 distinct regions to facilitate the LVLM in              emphasizing samples that are difficult to classify. In IAD
+verbally indicating the positions of anomalies, as shown in             task, where most regions in anomaly images are still nor-
+Figure 4. The descriptive content about the image furnishes             mal, employing focal loss can mitigate the problem of class
+the LVLM with foundational knowledge of the input im-                   imbalance. Focal loss can be calculated by Eq. (4):
+age, aiding in the model’s better comprehension of the im-                                            n
+age contents. However, during practical applications, users                                        1X
+                                                                                     Lf ocal = −         (1 − pi )γ log(pi ),          (4)
+may opt to omit this descriptive input, and the model is still                                     n i=1
+
+
+                                                                    5
+                                                         MVTec-AD                                        VisA
+    Setup             Method
+                                         Image-AUC        Pixel-AUC        Accuracy     Image-AUC       Pixel-AUC       Accuracy
+                     SPADE                81.0 ± 2.0       91.2 ± 0.4          -         79.5 ± 4.0     95.6 ± 0.4          -
+                     PaDiM                76.6 ± 3.1       89.3 ± 0.9          -         62.8 ± 5.4     89.9 ± 0.8          -
+   1-shot           PatchCore             83.4 ± 3.0       92.0 ± 1.0          -         79.9 ± 2.9     95.4 ± 0.6          -
+                    WinCLIP               93.1 ± 2.0       95.2 ± 0.5          -         83.8 ± 4.0     96.4 ± 0.4          -
+              AnomalyGPT (ours)           94.1 ± 1.1       95.3 ± 0.1      86.1 ± 1.1    87.4 ± 0.8     96.2 ± 0.1     77.4 ± 1.0
+                     SPADE                82.9 ± 2.6       92.0 ± 0.3          -         80.7 ± 5.0     96.2 ± 0.4          -
+                     PaDiM                78.9 ± 3.1       91.3 ± 0.7          -         67.4 ± 5.1     92.0 ± 0.7          -
+   2-shot           PatchCore             86.3 ± 3.3       93.3 ± 0.6          -         81.6 ± 4.0     96.1 ± 0.5          -
+                    WinCLIP               94.4 ± 1.3       96.0 ± 0.3          -         84.6 ± 2.4     96.8 ± 0.3          -
+              AnomalyGPT (ours)           95.5 ± 0.8       95.6 ± 0.2      84.8 ± 0.8    88.6 ± 0.7     96.4 ± 0.1     77.5 ± 0.3
+                     SPADE                84.8 ± 2.5       92.7 ± 0.3          -         81.7 ± 3.4     96.6 ± 0.3          -
+                     PaDiM                80.4 ± 2.5       92.6 ± 0.7          -         72.8 ± 2.9     93.2 ± 0.5          -
+   4-shot           PatchCore             88.8 ± 2.6       94.3 ± 0.5          -         85.3 ± 2.1     96.8 ± 0.3          -
+                    WinCLIP               95.2 ± 1.3       96.2 ± 0.3          -         87.3 ± 1.8     97.2 ± 0.2          -
+              AnomalyGPT (ours)           96.3 ± 0.3       96.2 ± 0.1      85.0 ± 0.3    90.6 ± 0.7     96.7 ± 0.1     77.7 ± 0.4
+
+Table 2. Few-shot IAD results on MVTec-AD and VisA datasets. Results are listed as the average of 5 runs and the best-performing method
+is in bold. The results for SPADE, PaDiM, PatchCore and WinCLIP are reported from [11].
+
+
+       Method            Image-AUC       Pixel-AUC     Accuracy          4. Experiments
+ PaDiM (Unified)             84.2           89.5           -             Datasets We conduct experiments primarily on the MVTec-
+  JNLD (Unified)             91.3           88.6           -             AD [1] and VisA [37] datasets. The MVTec-AD dataset
+     UniAD                   96.5           96.8           -
+                                                                         comprises 3629 training images and 1725 testing images
+AnomalyGPT (ours)            97.4           93.1          93.3
+                                                                         across 15 different categories, making it one of the most
+                                                                         popular datasets for IAD. The training images only con-
+Table 3. Unsupervised anomaly detection results on MVTec-AD
+dataset. The best-performing method is in bold and the results for
+                                                                         sist of normal images, while the testing images contain
+PaDiM and JNLD are reported from [35].                                   both normal and anomalous images. The image resolu-
+                                                                         tions vary from 700×700 to 1024×1024. VisA, a newly
+                                                                         introduced IAD dataset, contains 9621 normal images and
+where n = H × W represents the total number of pixels,                   1200 anomalous images across 12 categories, with resolu-
+pi is the predicted probability of the positive classes and γ            tions approximately around 1500×1000. Consistent with
+is a tunable parameter for adjusting the weight of hard-to-              previous IAD methods, we only use the normal data from
+classify samples. In our implementation, we set γ to 2.                  these datasets for training.
+Dice Loss Dice loss [18] is a commonly employed loss                     Evaluation Metrics Following existing IAD methods, we
+function in semantic segmentation tasks. It is based on the              employ the Area Under the Receiver Operating Charac-
+dice coefficient and can be calculated by Eq. (5):                       teristic (AUC) as our evaluation metric, with image-level
+                               Pn                                        and pixel-level AUC used to assess anomaly detection and
+                                  i=1 yP
+                                       i ŷi                             anomaly localization performance, respectively. However,
+              Ldice = − Pn        2+       n     2,       (5)
+                           i=1 iy          i=1 ŷi                       our proposed approach uniquely allows for determining the
+                                                                         presence of anomalies without the need for manually-set
+where n = H × W , yi is the output of decoder and ŷi is the
+                                                                         thresholds. Therefore, we also utilize the image-level ac-
+ground truth value.
+                                                                         curacy to evaluate the performance of our method.
+   Finally, the overall loss function is defined as:
+                                                                         Implementation Details We utilize ImageBind-Huge [8]
+               L = αLce + βLf ocal + δLdice ,                 (6)        as the image encoder and Vicuna-7B [3] as the inferential
+                                                                         LLM, connected through a linear layer. We initialize our
+where α, β, δ are coefficients to balance the three loss func-           model using pre-trained parameters from PandaGPT [25].
+tions, which are set to 1 by default in our experiments.                 We set the image resolution at 224×224 and feed the
+
+
+                                                                     6
+                                                            MVTec-AD (unsupervised)                           VisA (1-shot)
+   Decoder      Prompt learner     LLM      LoRA
+                                                      Image-AUC         Pixel-AUC     Accuracy     Image-AUC      Pixel-AUC     Accuracy
+                                     ✓                     -                 -           72.2          -              -           56.5
+                      ✓              ✓                     -                 -           73.4          -              -           56.6
+                                     ✓        ✓            -                 -           79.8          -              -           63.4
+       ✓                             ✓                    97.1              90.9         72.2         85.8           96.2         56.5
+       ✓                             ✓        ✓           97.1              90.9         84.2         85.8           96.2         64.7
+       ✓              ✓              ✓        ✓           96.0              88.1         83.9         85.8           96.5         72.7
+       ✓                                                  97.1              90.9         90.3         85.8           96.2         75.4
+       ✓              ✓              ✓                    97.4              93.1         93.3         87.4           96.2         77.4
+
+Table 4. Results of ablation studies. The ✓ in “Decoder” and “Prompt learner” columns indicate module inclusion. The ✓ in “LLM”
+column denotes whether use LLM for inference and the ✓ in “LoRA” column denotes whether use LoRA to fine-tune LLM. In settings
+without LLM, the maximum anomaly score from normal samples is used as the classification threshold. In settings without decoder, due
+to the sole textual output from the LLM, we cannot compute image-level and pixel-level AUC.
+
+
+
+
+Figure 5. Qualitative example of AnomalyGPT in the unsuper-
+vised setting. AnomalyGPT is capable of detecting anomaly, pin-
+pointing its location, providing pixel-level localization results and
+answering questions about the image.
+                                                                             Figure 6. Qualitative example of AnomalyGPT in the one-
+                                                                             normal-shot setting. The localization performance is slightly
+outputs from the 8th, 16th, 24th, and 32nd layers of                         lower compared to the unsupervised setting due to the absence of
+                                                                             parameter training.
+ImageBind-Huge’s image encoder to the image decoder.
+Training is conducted on two RTX-3090 GPUs over 50
+epochs, with a learning rate of 1e-3 and a batch size of
+16. Linear warm-up and a one-cycle cosine learning rate                      ting of unsupervised training with a large number of nor-
+decay strategy are applied. We perform alternating train-                    mal samples, given that our method trains a single model
+ing using both the pre-training data of PandaGPT [25] and                    on samples from all classes within a dataset, we selected
+our anomaly image-text data. Only the decoder and prompt                     UniAD [32], which is trained under the same setup, as a
+learner undergo parameter updates, while the remaining pa-                   baseline for comparison. Additionally, we compare our
+rameters are all kept frozen.                                                model with PaDiM [6] and JNLD [34] using the same uni-
+                                                                             fied setting. The results on MVTec-AD dataset are pre-
+4.1. Quantitative Results                                                    sented in Table 3.
+
+Few-Shot Industrial Anomaly Detection We compare                             4.2. Qualitative Examples
+our work with prior few-shot IAD methods, selecting
+SPADE [5], PaDiM [6], PatchCore [23], and WinCLIP [11]                       Figure 5 illustrates the performance of our AnomalyGPT
+as the baselines. The results are presented in Table 2.                      in unsupervised anomaly detection, and Figure 6 showcases
+Across both datasets, our method notably outperforms pre-                    the results in the 1-shot in-context learning. Our model is
+vious approaches in terms of image-level AUC and achieves                    capable of indicating the presence of anomalies, pinpoint-
+competitive pixel-level AUC and good accuracy.                               ing their locations, and providing pixel-level localization
+Unsupervised Industrial Anomaly Detection In the set-                        results. Users can engage in multi-turn dialogues related to
+
+
+                                                                        7
+image content. In the 1-shot in-context learning setting, due                Mostafa Dehghani, Siddhartha Brahma, et al. Scaling
+to the absence of training, the model’s localization perfor-                 instruction-finetuned language models.        arXiv preprint
+mance is slightly lower than the unsupervised setting. More                  arXiv:2210.11416, 2022.
+qualitative examples can be found in Appendix D.                         [5] Niv Cohen and Yedid Hoshen. Sub-image anomaly detec-
+                                                                             tion with deep pyramid correspondences. arXiv preprint
+4.3. Ablation Studies                                                        arXiv:2005.02357, 2020.
+                                                                         [6] Thomas Defard, Aleksandr Setkov, Angelique Loesch, and
+To prove the efficacy of each proposed module, extensive
+                                                                             Romaric Audigier. Padim: a patch distribution modeling
+ablation experiments are conducted on both the MVTec-AD                      framework for anomaly detection and localization. In Inter-
+and VisA datasets. We primarily focus on four aspects: the                   national Conference on Pattern Recognition, pages 475–489.
+decoder, prompt learner, the usage of LLM for inference,                     Springer, 2021.
+and the utilization of LoRA to fine-tune the LLM. The prin-              [7] Alexey Dosovitskiy, Lucas Beyer, Alexander Kolesnikov,
+cipal results are presented in Table 4. Unsupervised training                Dirk Weissenborn, Xiaohua Zhai, Thomas Unterthiner,
+and testing are carried out on the MVTec-AD dataset, while                   Mostafa Dehghani, Matthias Minderer, Georg Heigold, Syl-
+the one-shot performance is evaluated on the visa dataset. It                vain Gelly, et al. An image is worth 16x16 words: Trans-
+can be observed that the decoder demonstrates impressive                     formers for image recognition at scale. arXiv preprint
+pixel-level anomaly localization performance. Compared                       arXiv:2010.11929, 2020.
+to manually-set thresholds, the LLM exhibits superior in-                [8] Rohit Girdhar, Alaaeldin El-Nouby, Zhuang Liu, Mannat
+                                                                             Singh, Kalyan Vasudev Alwala, Armand Joulin, and Ishan
+ference accuracy and provides additional functionality. Fur-
+                                                                             Misra. Imagebind: One embedding space to bind them all.
+thermore, prompt tuning outperforms LoRA in terms of ac-                     In Proceedings of the IEEE/CVF Conference on Computer
+curacy and transferability.                                                  Vision and Pattern Recognition, pages 15180–15190, 2023.
+                                                                         [9] Denis Gudovskiy, Shun Ishizaka, and Kazuki Kozuka.
+5. Conclusion                                                                Cflow-ad: Real-time unsupervised anomaly detection with
+We introduce AnomalyGPT, a novel conversational IAD                          localization via conditional normalizing flows. In Proceed-
+                                                                             ings of the IEEE/CVF Winter Conference on Applications of
+vision-language model, leveraging the powerful capabili-
+                                                                             Computer Vision, pages 98–107, 2022.
+ties of LVLM. AnomalyGPT can determine whether an im-
+                                                                        [10] Chaoqin Huang, Haoyan Guan, Aofan Jiang, Ya Zhang,
+age contains anomalies and pinpoint their locations with-                    Michael Spratling, and Yan-Feng Wang. Registration based
+out the need for manually specified thresholds. Further-                     few-shot anomaly detection. In European Conference on
+more, AnomalyGPT enables multi-turn dialogues focused                        Computer Vision, pages 303–319. Springer, 2022.
+on anomaly detection and demonstrates remarkable perfor-                [11] Jongheon Jeong, Yang Zou, Taewan Kim, Dongqing Zhang,
+mance in few-shot in-context learning. The effectiveness of                  Avinash Ravichandran, and Onkar Dabeer. Winclip: Zero-
+AnomalyGPT is validated on two common datasets. Our                          /few-shot anomaly classification and segmentation. In Pro-
+work delves into the potential application of large visual                   ceedings of the IEEE/CVF Conference on Computer Vision
+language models in anomaly detection, offering fresh ideas                   and Pattern Recognition, pages 19606–19616, 2023.
+and possibilities for the field of industrial anomaly detec-            [12] Sungwook Lee, Seunghyun Lee, and Byung Cheol Song.
+tion.                                                                        Cfa: Coupled-hypersphere-based feature adaptation for
+                                                                             target-oriented anomaly localization. IEEE Access, 10:
+                                                                             78446–78454, 2022.
+References
+                                                                        [13] Jiarui Lei, Xiaobo Hu, Yue Wang, and Dong Liu. Pyramid-
+ [1] Paul Bergmann, Michael Fauser, David Sattlegger, and                    flow: High-resolution defect contrastive localization using
+     Carsten Steger. Mvtec ad–a comprehensive real-world                     pyramid normalizing flow. In Proceedings of the IEEE/CVF
+     dataset for unsupervised anomaly detection. In Proceedings              Conference on Computer Vision and Pattern Recognition,
+     of the IEEE/CVF conference on computer vision and pattern               pages 14143–14152, 2023.
+     recognition, pages 9592–9600, 2019.                                [14] Chun-Liang Li, Kihyuk Sohn, Jinsung Yoon, and Tomas
+ [2] Xuhai Chen, Yue Han, and Jiangning Zhang. A zero-/few-                  Pfister. Cutpaste: Self-supervised learning for anomaly de-
+     shot anomaly classification and segmentation method for                 tection and localization. In Proceedings of the IEEE/CVF
+     cvpr 2023 vand workshop challenge tracks 1&2: 1st place                 conference on computer vision and pattern recognition,
+     on zero-shot ad and 4th place on few-shot ad. arXiv preprint            pages 9664–9674, 2021.
+     arXiv:2305.17382, 2023.                                            [15] Junnan Li, Dongxu Li, Silvio Savarese, and Steven Hoi.
+ [3] Wei-Lin Chiang, Zhuohan Li, Zi Lin, Ying Sheng, Zhanghao                Blip-2: Bootstrapping language-image pre-training with
+     Wu, Hao Zhang, Lianmin Zheng, Siyuan Zhuang, Yonghao                    frozen image encoders and large language models. arXiv
+     Zhuang, Joseph E Gonzalez, et al. Vicuna: An open-source                preprint arXiv:2301.12597, 2023.
+     chatbot impressing gpt-4 with 90%* chatgpt quality. See            [16] Tsung-Yi Lin, Priya Goyal, Ross Girshick, Kaiming He, and
+     https://vicuna. lmsys. org (accessed 14 April 2023), 2023.              Piotr Dollár. Focal loss for dense object detection. In Pro-
+ [4] Hyung Won Chung, Le Hou, Shayne Longpre, Barret                         ceedings of the IEEE international conference on computer
+     Zoph, Yi Tay, William Fedus, Eric Li, Xuezhi Wang,                      vision, pages 2980–2988, 2017.
+
+
+                                                                    8
+[17] Haotian Liu, Chunyuan Li, Qingyang Wu, and Yong Jae Lee.            [30] Xudong Yan, Huaidong Zhang, Xuemiao Xu, Xiaowei Hu,
+     Visual instruction tuning. arXiv preprint arXiv:2304.08485,              and Pheng-Ann Heng. Learning semantic context from nor-
+     2023.                                                                    mal samples for unsupervised anomaly detection. In Pro-
+[18] Fausto Milletari, Nassir Navab, and Seyed-Ahmad Ahmadi.                  ceedings of the AAAI conference on artificial intelligence,
+     V-net: Fully convolutional neural networks for volumetric                pages 3110–3118, 2021.
+     medical image segmentation. In 2016 fourth international            [31] Jihun Yi and Sungroh Yoon. Patch svdd: Patch-level svdd
+     conference on 3D vision (3DV), pages 565–571. Ieee, 2016.                for anomaly detection and segmentation. In Proceedings of
+[19] Long Ouyang, Jeffrey Wu, Xu Jiang, Diogo Almeida, Car-                   the Asian conference on computer vision, 2020.
+     roll Wainwright, Pamela Mishkin, Chong Zhang, Sandhini              [32] Zhiyuan You, Lei Cui, Yujun Shen, Kai Yang, Xin Lu,
+     Agarwal, Katarina Slama, Alex Ray, et al. Training lan-                  Yu Zheng, and Xinyi Le. A unified model for multi-class
+     guage models to follow instructions with human feedback.                 anomaly detection. Advances in Neural Information Pro-
+     Advances in Neural Information Processing Systems, 35:                   cessing Systems, 35:4571–4584, 2022.
+     27730–27744, 2022.                                                  [33] Vitjan Zavrtanik, Matej Kristan, and Danijel Skočaj. Recon-
+[20] Patrick Pérez, Michel Gangnet, and Andrew Blake. Poisson                struction by inpainting for visual anomaly detection. Pattern
+     image editing. In ACM SIGGRAPH 2003 Papers, pages 313–                   Recognition, 112:107706, 2021.
+     318. 2003.                                                          [34] Ying Zhao. Just noticeable learning for unsupervised
+                                                                              anomaly localization and detection. In 2022 IEEE Interna-
+[21] Jonathan Pirnay and Keng Chai. Inpainting transformer for
+                                                                              tional Conference on Multimedia and Expo (ICME), pages
+     anomaly detection. In International Conference on Image
+                                                                              01–06. IEEE, 2022.
+     Analysis and Processing, pages 394–406. Springer, 2022.
+                                                                         [35] Ying Zhao. Omnial: A unified cnn framework for unsuper-
+[22] Alec Radford, Jong Wook Kim, Chris Hallacy, Aditya
+                                                                              vised anomaly localization. In Proceedings of the IEEE/CVF
+     Ramesh, Gabriel Goh, Sandhini Agarwal, Girish Sastry,
+                                                                              Conference on Computer Vision and Pattern Recognition,
+     Amanda Askell, Pamela Mishkin, Jack Clark, et al. Learning
+                                                                              pages 3924–3933, 2023.
+     transferable visual models from natural language supervi-
+                                                                         [36] Deyao Zhu, Jun Chen, Xiaoqian Shen, Xiang Li, and Mo-
+     sion. In International conference on machine learning, pages
+                                                                              hamed Elhoseiny. Minigpt-4: Enhancing vision-language
+     8748–8763. PMLR, 2021.
+                                                                              understanding with advanced large language models. arXiv
+[23] Karsten Roth, Latha Pemula, Joaquin Zepeda, Bernhard                     preprint arXiv:2304.10592, 2023.
+     Schölkopf, Thomas Brox, and Peter Gehler. Towards to-
+                                                                         [37] Yang Zou, Jongheon Jeong, Latha Pemula, Dongqing Zhang,
+     tal recall in industrial anomaly detection. In Proceedings of
+                                                                              and Onkar Dabeer. Spot-the-difference self-supervised pre-
+     the IEEE/CVF Conference on Computer Vision and Pattern
+                                                                              training for anomaly detection and segmentation. In Eu-
+     Recognition, pages 14318–14328, 2022.
+                                                                              ropean Conference on Computer Vision, pages 392–408.
+[24] Hannah M Schlüter, Jeremy Tan, Benjamin Hou, and Bern-                  Springer, 2022.
+     hard Kainz. Natural synthetic anomalies for self-supervised
+     anomaly detection and localization. In European Conference
+     on Computer Vision, pages 474–489. Springer, 2022.
+[25] Yixuan Su, Tian Lan, Huayang Li, Jialu Xu, Yan Wang, and
+     Deng Cai. Pandagpt: One model to instruction-follow them
+     all. arXiv preprint arXiv:2305.16355, 2023.
+[26] Hugo Touvron, Thibaut Lavril, Gautier Izacard, Xavier
+     Martinet, Marie-Anne Lachaux, Timothée Lacroix, Baptiste
+     Rozière, Naman Goyal, Eric Hambro, Faisal Azhar, et al.
+     Llama: Open and efficient foundation language models.
+     arXiv preprint arXiv:2302.13971, 2023.
+[27] Wenhai Wang, Zhe Chen, Xiaokang Chen, Jiannan Wu,
+     Xizhou Zhu, Gang Zeng, Ping Luo, Tong Lu, Jie Zhou, Yu
+     Qiao, et al. Visionllm: Large language model is also an
+     open-ended decoder for vision-centric tasks. arXiv preprint
+     arXiv:2305.11175, 2023.
+[28] Julian Wyatt, Adam Leach, Sebastian M Schmon, and
+     Chris G Willcocks. Anoddpm: Anomaly detection with de-
+     noising diffusion probabilistic models using simplex noise.
+     In Proceedings of the IEEE/CVF Conference on Computer
+     Vision and Pattern Recognition, pages 650–656, 2022.
+[29] Guoyang Xie, Jingbao Wang, Jiaqi Liu, Feng Zheng, and
+     Yaochu Jin. Pushing the limits of fewshot anomaly de-
+     tection in industry vision: Graphcore. arXiv preprint
+     arXiv:2301.12082, 2023.
+
+
+                                                                     9
+                                                                             Supplementary Material
+                     AnomalyGPT: Detecting Industrial Anomalies Using Large Vision-Language Models
+
+A. More Experimental Results of Existing IAD Methods
+As described in the paper, existing IAD methods solely provide anomaly scores for test samples. However, anomaly scores
+alone do not allow users to determine the presence of anomalies because they don’t know the threshold to distinguish be-
+tween normal and abnormal samples. The threshold varies considerably for each category of objects. Only by concurrently
+obtaining both normal and anomalous samples for each object category, along with their respective anomaly scores, can users
+identify the optimal classification threshold, which contradicts the original intent of IAD task that only utilize normal data.
+   One potential solution to this problem involves utilizing the maximum anomaly score from the normal samples of each
+category in the training set as the threshold. However, this approach is solely suited for “one-class-one-model” methods,
+which are designed specifically for detecting objects of a certain category within a specific environment. When presented
+with a previously unseen test sample, the model remains uncertain about which threshold to apply for decision-making. Thus,
+a unified threshold applicable across all categories is needed, which is challenging for existing IAD techniques.
+   We conduct experiments on two representative IAD methods, PatchCore [23] and WinCLIP [11]. PatchCore [23] achieves
+an Image-level AUC of 99.3% on the MVTec-AD dataset, while WinCLIP [11] is the state-of-the-art method for few-shot
+IAD. We assess the accuracy of both methods across individual categories at varying thresholds. It can be observed that the
+threshold exerts a significant influence on the performance of these two methods. Furthermore, a singular threshold displays
+markedly different efficacies across disparate categories. Hence, it becomes challenging to ascertain an optimal threshold
+unless experimental trials are conducted on test sets containing anomalous samples for each category. Figures 7 and Figure 8
+delineate the outcomes of PatchCore [23] and WinCLIP [11] on the MVTec-AD [1] dataset across each category under
+different threshold settings.
+                             Bottle                                       Cable                                   Capsule                                   Carpet                                        Grid
+            100                                              95                                                                                90                                           90
+                95                                           90                                       80                                       80                                           80
+                                                             85                                                                                70
+
+  Accuracy(%)                                     Accuracy(%)                               Accuracy(%)                              Accuracy(%)                                 Accuracy(%)
+                90                                                                                                                                                                          70
+                                                             80                                       60                                       60                                           60
+                85                                           75                                                                                50
+                                                             70                                       40                                                                                    50
+                80                                                                                                                             40                                           40
+                                                             65
+                                                                                                      20                                       30                                           30
+                75   0.2   0.4     0.6   0.8                 60   0.2   0.4     0.6   0.8                  0.2   0.4     0.6   0.8                  0.2   0.4     0.6   0.8                      0.2   0.4     0.6   0.8
+                             Threshold                                    Threshold                                Threshold                                Threshold                                    Threshold
+
+            100
+                           Hazelnut                                      Leather                                 Metal_nut                                    Pill                          90
+                                                                                                                                                                                                         Screw
+                                                         100
+                                                                                                      95
+             95                                              90                                                                                80                                           80
+             90                                                                                       90
+                                                             80                                                                                                                             70
+
+  Accuracy(%)                                  Accuracy(%)                                  Accuracy(%)                              Accuracy(%)                                 Accuracy(%)
+             85                                                                                       85                                       60                                           60
+             80                                              70                                       80
+                                                                                                                                                                                            50
+             75                                              60                                       75                                       40
+             70                                                                                                                                                                             40
+                                                             50                                       70
+             65                                                                                                                                20                                           30
+                                                             40                                       65
+                     0.2   0.4     0.6   0.8                      0.2   0.4     0.6   0.8                  0.2   0.4     0.6   0.8                  0.2   0.4     0.6   0.8                      0.2   0.4     0.6   0.8
+                             Threshold                                    Threshold                                Threshold                                Threshold                                    Threshold
+                               Tile                                     Toothbrush                               Transistor                                 Wood                        100              Zipper
+            100
+                                                             85                                       90                                       90                                        90
+                90
+                                                                                                      80                                       80                                        80
+                80                                           80
+
+  Accuracy(%)                                     Accuracy(%)                               Accuracy(%)                              Accuracy(%)                              Accuracy(%)
+                                                                                                                                                                                         70
+                                                             75                                       70                                       70
+                70                                                                                                                                                                       60
+                                                             70                                       60                                       60                                        50
+                60
+                                                                                                      50                                       50                                        40
+                50                                           65
+                                                                                                                                                                                         30
+                                                                                                      40                                       40
+                     0.2   0.4     0.6   0.8                      0.2   0.4     0.6   0.8                  0.2   0.4     0.6   0.8                  0.2   0.4     0.6   0.8                      0.2   0.4     0.6   0.8
+                             Threshold                                    Threshold                                Threshold                                Threshold                                    Threshold
+
+
+Figure 7. Experimental results of PatchCore [23] on the MVTec-AD [1] dataset across each category under different thresholds. The
+optimal threshold varies considerably for each category of objects.
+
+
+
+
+                                                                                                                  10
+                                Bottle                                           Cable       90
+                                                                                                                       Capsule     100                                   Carpet
+                                                                                                                                                                          100
+                                                                                                                                                                                                                           Grid
+                90                                                80
+                                                                                             80                                                                            90
+                80                                                                           70                                     80                                     80
+                                                       70
+                70
+
+     Accuracy(%)                                       Accuracy(%)                                   Accuracy(%)                           Accuracy(%)                                      Accuracy(%)
+                                                                                             60                                                                            70
+                60                                     60                                    50                                     60                                     60
+                50                                                                           40                                                                            50
+                40                                     50                                                                           40
+                                                                                             30                                                                            40
+                30                                                                           20                                                                            30
+                                                       40
+                   0.485 0.490 0.495 0.500 0.505 0.510   0.485 0.490 0.495 0.500 0.505 0.510   0.485 0.490 0.495 0.500 0.505 0.510    0.485 0.490 0.495 0.500 0.505 0.510    0.485 0.490 0.495 0.500 0.505 0.510
+                                Threshold                             Threshold                             Threshold                              Threshold                              Threshold
+                               Hazelnut                                         Leather                               Metal_nut                                            Pill                                           Screw
+                                                              100                           90
+                80                                                                                                                                       80
+                                                                                            80                                                                                                            70
+                                                                                                                                                         70
+                70                                    80                                    70
+                                                                                                                                                         60                                               60
+
+     Accuracy(%)                                    Accuracy(%)                                      Accuracy(%)                              Accuracy(%)                                      Accuracy(%)
+                                                                                            60
+                60                                    60                                                                                                 50                                               50
+                                                                                            50
+                                                                                                                                                         40
+                50                                                                          40                                                                                                            40
+                                                      40                                                                                                 30
+                                                                                            30
+                40                                                                                                                                       20                                               30
+                                                                                            20
+                  0.485 0.490 0.495 0.500 0.505 0.510   0.485 0.490 0.495 0.500 0.505 0.510   0.485 0.490 0.495 0.500 0.505 0.510                          0.485 0.490 0.495 0.500 0.505 0.510               0.485 0.490 0.495 0.500 0.505 0.510
+                               Threshold                             Threshold                             Threshold                                                    Threshold                                         Threshold
+                                  Tile                                        Toothbrush                              Transistor                                         Wood                   90              Zipper
+            100                                                                                                80                                        90
+             90                                                   80                                                                                                                            80
+                                                                                                                                                         80
+             80                                                   70                                           70                                                                               70
+                                                                                                                                                         70
+
+  Accuracy(%)                                          Accuracy(%)                                   Accuracy(%)                              Accuracy(%)                                      Accuracy(%)
+             70                                                   60                                                                                                                            60
+                                                                                                               60                                        60
+             60                                                                                                                                                                                 50
+                                                                  50                                                                                     50
+             50                                                                                                                                                                                 40
+                                                                  40                                           50                                        40
+             40                                                                                                                                                                                 30
+                                                                                                                                                         30
+             30                                                   30                                    40                                                                                      20
+               0.485 0.490 0.495 0.500 0.505 0.510                  0.485 0.490 0.495 0.500 0.505 0.510   0.485 0.490 0.495 0.500 0.505 0.510               0.485 0.490 0.495 0.500 0.505 0.510   0.485 0.490 0.495 0.500 0.505 0.510
+                            Threshold                                            Threshold                             Threshold                                         Threshold                             Threshold
+
+
+Figure 8. Experimental results of WinCLIP [11] on the MVTec-AD [1] dataset across each category under different thresholds. The optimal
+threshold varies considerably for each category of objects.
+
+
+
+B. Normal and Abnormal Texts
+Following WinCLIP [11], we utilize the compositional prompt ensemble to obtain texts presenting normality and abnormality.
+Specifically, we consider two levels of texts: (a) state-level, and (b) template level. The complete text can be composed by
+replacing the token [c] in a template-level text with one of state-level text and replacing the token [o] with the object’s
+name. When the item’s name is unavailable, the term “object” is adopted as the name for the item. Table 5 provides a detailed
+list of the multi-level texts.
+(a) State-level (normal)                                                               (b) Template-level             • "a blurry photo of the [c]."
+• c := "[o]"                                                                           • "a cropped photo of the      • "a blurry photo of a [c]."
+• c := "flawless [o]"                                                                    [c]."                        • "a photo of a [c]."
+• c := "perfect [o]"                                                                   • "a cropped photo of a [c]." • "a photo of the [c]."
+• c := "unblemished [o]"                                                               • "a close-up photo of a [c]." • "a photo of a small [c]."
+• c := "[o] without flaw"                                                              • "a close-up photo of the     • "a photo of the small [c]."
+• c := "[o] without defect"                                                              [c]."                        • "a photo of a large [c]."
+• c := "[o] without damage"                                                            • "a bright photo of a [c]."   • "a photo of the large [c]."
+State-level (anomaly)                                                                  • "a bright photo of the [c]." • "a photo of the [c] for
+                                                                                       • "a dark photo of the [c]."     visual inspection."
+• c := "damaged [o]"                                                                                                  • "a photo of a [c] for visual
+                                                                                       • "a dark photo of a [c]."
+• c := "broken [o]"                                                                                                     inspection."
+                                                                                       • "a jpeg corrupted photo of a
+• c := "[o] with flaw"                                                                                                • "a photo of the [c] for
+                                                                                         [c]."
+• c := "[o] with defect"                                                                                                anomaly detection."
+                                                                                       • "a jpeg corrupted photo of
+• c := "[o] with damage"                                                                                              • "a photo of a [c] for
+                                                                                         the [c]."
+                                                                                                                        anomaly detection."
+
+                                    Table 5. Lists of multi-level texts considered in this paper to present normal and abnormal semantics.
+
+
+
+
+                                                                                                                       11
+C. Detailed Image Description
+As mentioned in the paper, prompts fed to the LLM typically follow the format:
+   ### Human: <Img> Eimg </Img> Eprompt [Image Description] Is there any anomaly in the image? ### Assistant:
+   The [Image Description] part involves a description of the input image, providing information about the objects present
+in the image and their expected attributes. Such description furnishes the LVLM with foundational knowledge of the input
+image, aiding in the model’s better comprehension of the image contents. The detailed description of every category in
+MVTec-AD [1] and VisA [37] datasets can be found in Table 6 and Table 7. Note that users can omit this descriptive input,
+and the model is still capable of performing IAD task based solely on the provided image input.
+
+        Class                                               Image description
+                         This is a photo of a bottle for anomaly detection, which should be round and without any
+        Bottle
+                                              damage, flaw, defect, scratch, hole or broken part.
+                     This is a photo of three cables for anomaly detection, they are green, blue and grey, which cannot
+        Cable
+                    be missed or swapped and should be without any damage, flaw, defect, scratch, hole or broken part.
+                          This is a photo of a capsule for anomaly detection, which should be black and orange,
+       Capsule
+                           with print ‘500’ and without any damage, flaw, defect, scratch, hole or broken part.
+                               This is a photo of carpet for anomaly detection, which should be without any
+       Carpet
+                                             damage, flaw, defect, scratch, hole or broken part.
+                                This is a photo of grid for anomaly detection, which should be without any
+        Grid
+                                             damage, flaw, defect, scratch, hole or broken part.
+                             This is a photo of a hazelnut for anomaly detection, which should be without any
+      Hazelnut
+                                             damage, flaw, defect, scratch, hole or broken part.
+                        This is a photo of leather for anomaly detection, which should be brown with patterns and
+       Leather
+                                      without any damage, flaw, defect, scratch, hole or broken part.
+                            This is a photo of a metal nut for anomaly detection, which should be without any
+      Metal nut
+                                damage, flaw, defect, scratch, hole or broken part, and shouldn’t be fliped.
+                           This is a photo of a pill for anomaly detection, which should be white, with print ‘FF’
+         Pill
+                            and red patterns and without any damage, flaw, defect, scratch, hole or broken part.
+                               This is a photo of a screw for anomaly detection, whose tail should be sharp,
+        Screw
+                                    and without any damage, flaw, defect, scratch, hole or broken part.
+                                 This is a photo of tile for anomaly detection, which should be without any
+         Tile
+                                             damage, flaw, defect, scratch, hole or broken part.
+                            This is a photo of a toothbrush for anomaly detection, which should be without any
+     Toothbrush
+                                             damage, flaw, defect, scratch, hole or broken part.
+                            This is a photo of a transistor for anomaly detection, which should be without any
+      Transistor
+                                            damage, flaw, defect, scratch, hole or broken part.
+                           This is a photo of wood for anomaly detection, which should be brown with patterns
+        Wood
+                                     and without any damage, flaw, defect, scratch, hole or broken part.
+                                This is a photo of a zipper for anomaly detection, which should be without
+       Zipper
+                                           any damage, flaw, defect, scratch, hole or broken part.
+
+Table 6. Detailed image description for every category in MVTec-AD dataset. The description will be added to the prompts of the
+corresponding category during training to provide foundational knowledge of the input image.
+
+
+
+
+                                                              12
+         Class                                                    Image description
+                                This is a photo of 4 candles for anomaly detection, every candle should be round,
+        Candle
+                                          without any damage, flaw, defect, scratch, hole or broken part.
+                      This is a photo of many small capsules for anomaly detection, every capsule is green and should be
+       Capsules
+                                         without any damage, flaw, defect, scratch, hole or broken part.
+                                 This is a photo of a cashew for anomaly detection, which should be without any
+       Cashew
+                                                damage, flaw, defect, scratch, hole or broken part.
+                                 This is a photo of a chewinggum for anomaly detection, which should be white,
+    Chewinggum
+                                          without any damage, flaw, defect, scratch, hole or broken part.
+                             This is a photo of a fryum for anomaly detection on green background, which should be
+        Fryum
+                                          without any damage, flaw, defect, scratch, hole or broken part.
+                               This is a photo of 4 macaronis for anomaly detection, which should be without any
+      Macaroni1
+                                                damage, flaw, defect, scratch, hole or broken part.
+                               This is a photo of 4 macaronis for anomaly detection, which should be without any
+      Macaroni2
+                                                damage, flaw, defect, scratch, hole or broken part.
+                                   This is a photo of PCB for anomaly detection, which should be without any
+        PCB1
+                                                damage, flaw, defect, scratch, hole or broken part.
+                                   This is a photo of PCB for anomaly detection, which should be without any
+        PCB2
+                                                damage, flaw, defect, scratch, hole or broken part.
+                                   This is a photo of PCB for anomaly detection, which should be without any
+        PCB3
+                                                damage, flaw, defect, scratch, hole or broken part.
+                                   This is a photo of PCB for anomaly detection, which should be without any
+        PCB4
+                                                damage, flaw, defect, scratch, hole or broken part.
+                               This is a photo of a pipe fryum for anomaly detection, which should be without any
+      Pipe fryum
+                                                damage, flaw, defect, scratch, hole or broken part.
+
+Table 7. Detailed image description for every category in VisA dataset. The description will be added to the prompts of the corresponding
+category during training to provide foundational knowledge of the input image.
+
+
+
+
+                                                                   13
+D. More Qualitative Examples
+We compare our approach with several existing LVLMs, specifically selecting PandaGPT [25], MiniGPT-4 [36], and
+LLaVA [17] for comparative analysis. We conduct experiments across various categories of both normal and anomalous
+samples. The results are presented in Figure 9, Figure 10, Figure 11, Figure 12, Figure 13 and Figure 14. It can be observed
+that only our method exhibits proficiency in both accurately answering questions related to anomaly detection and those about
+image content. In contrast, the other models demonstrate suboptimal performance in discerning the presence of anomalies
+and pinpointing their precise locations. Notably, PandaGPT and LLaVA show a marked tendency to misclassify all samples
+as anomalous. Conversely, MiniGPT-4 tends to err on the side of caution, predominantly labeling samples as normal.
+
+
+
+
+Figure 9. Comparison between AnomalyGPT, PandaGPT, LLaVA and MiniGPT-4. The input image is a top-view photo of a normal bottle.
+AnomalyGPT is capable of detecting anomaly, pinpointing its location, providing pixel-level localization results and answering questions
+about the image.
+
+
+
+
+                                                                  14
+Figure 10. Comparison between AnomalyGPT, PandaGPT, LLaVA and MiniGPT-4. The input image is a photo of a cutting wood.
+AnomalyGPT is capable of detecting anomaly, pinpointing its location, providing pixel-level localization results and answering questions
+about the image.
+
+                                                                  15
+Figure 11. Comparison between AnomalyGPT, PandaGPT, LLaVA and MiniGPT-4. The input image is a photo of a normal pill. Anoma-
+lyGPT is capable of detecting anomaly, pinpointing its location, providing pixel-level localization results and answering questions about
+the image.
+
+
+
+
+                                                                   16
+Figure 12. Comparison between AnomalyGPT, PandaGPT, LLaVA and MiniGPT-4. The input image is a photo of a piece of farbic with
+hole. AnomalyGPT is capable of detecting anomaly, pinpointing its location, providing pixel-level localization results and answering
+questions about the image.
+
+
+
+                                                                17
+Figure 13. Comparison between AnomalyGPT, PandaGPT, LLaVA and MiniGPT-4. The input image is a photo of normal metal grid.
+AnomalyGPT is capable of detecting anomaly, pinpointing its location, providing pixel-level localization results and answering questions
+about the image.
+
+
+
+
+                                                                  18
+Figure 14. Comparison between AnomalyGPT, PandaGPT, LLaVA and MiniGPT-4. The input image is a photo of a cable with defect.
+AnomalyGPT is capable of detecting anomaly, pinpointing its location, providing pixel-level localization results and answering questions
+about the image.
+
+
+
+
+                                                                  19
+

@@ -1,0 +1,611 @@
+                                    Searching for Actions on the Hyperbole
+
+                       Teng Long1∗, Pascal Mettes2 , Heng Tao Shen1†, Cees Snoek2
+          University of Electronic Science and Technology of China1 , University of Amsterdam2
+
+
+                            Abstract
+
+   In this paper, we introduce hierarchical action search.                          Sports
+
+Starting from the observation that hierarchies are mostly                                                                     Martial
+                                                                        Leisure                House
+ignored in the action literature, we retrieve not only indi-                                    hold
+
+vidual actions but also relevant and related actions, given                        Action
+an action name or video example as input. We propose                              Hierarchy
+a hyperbolic action network, which is centered around a                   Eat
+                                                                                               Arts
+                                                                         Drink                           Taichi   Capoeira
+hyperbolic space shared by action hierarchies and videos.                                                                    Karate
+Our discriminative hyperbolic embedding projects actions                            Personal
+                                                                                      Care
+                                                                                                                                      Kickbox
+on the shared space while jointly optimizing hypernym-
+                                                                                                                   Martial
+hyponym relations between action pairs and a large mar-
+gin separation between all actions. The projected actions
+                                                                   Figure 1: Hyperboles for action search. We propose hier-
+serve as hyperbolic prototypes that we match with projected
+                                                                   archical search of actions in videos by matching actions and
+video representations. The result is a learned space where
+                                                                   videos in a shared hyperbolic space. In this way, we can
+videos are positioned in entailment cones formed by dif-
+                                                                   search actions by their name or by video examples while
+ferent subtrees. To perform search in this space, we start
+                                                                   abiding to the hierarchical structure of actions.
+from a query and increasingly enlarge its entailment cone
+to retrieve hierarchically relevant action videos. Experi-
+ments on three action datasets with new hierarchy annota-
+tions show the effectiveness of our approach for hierarchi-        takes can be arbitrarily bad as each action is deemed equally
+cal action search by name and by video example, regard-            dissimilar. To overcome such limitations, we add hierarchi-
+less of whether queried actions have been seen or not dur-         cal relations to the action search.
+ing training. Our implementation is available at https:                We are inspired by recent advances in hyperbolic em-
+//github.com/Tenglon/hyperbolic_action                             beddings for hierarchies [16, 29]. The hyperbole provides
+                                                                   a natural space for tree hierarchies, as the disc area and
+                                                                   circle length grow exponentially with the radius of the
+1. Introduction                                                    space [10, 29]. Hyperbolic spaces such as the Poincaré
+                                                                   disk can in fact embed tree hierarchies with arbitrarily low
+   This paper strives to search an action by its name or by        distortion [10]. We seek to obtain a hyperbolic space that
+an example video. A typical approach in the literature is to       is shared by action hierarchies and videos, such that we
+frame the retrieval as a recognition problem. Deep networks        can perform hierarchical search, see Figure 1. We extend
+are trained to match videos to one-hot vectors of action           hyperbolic embeddings with a large margin separation to
+classes [6, 18, 37], which can be used to rank videos using        project actions discriminatively on the hyperbole. We use
+class scores. Others investigate action search by matching         the projected actions as hyperbolic prototypes and intro-
+videos directly with embedded action names [20, 24, 27, 40]        duce a matching with projected video representations. Once
+or by matching with a query video [31, 41]. While effective        trained, we show how to retrieve actions by increasingly en-
+for searching individual actions, common amongst all these         larging the entailment cone of a query in the shared space.
+works is that hierarchical relations between actions are ig-           We make three contributions in this work. First, we in-
+nored. Implying the search is optimized for a single action        troduce discriminative hyperbolic embeddings to position
+rather than groups of related actions. Hence, search mis-          action hierarchies on a hyperbole suitable for search. Sec-
+  ∗ Work done while at University of Amsterdam.                    ond, we propose a matching function between projected ac-
+  † Corresponding author.                                          tions and videos in the shared hyperbolic space. The pro-
+
+
+                                                               4321
+                                                                 1141
+jected action locations are used as prototypes and we mini-         of classes, followed by a softmax optimization for all three
+mize the hyperbolic distance between videos and their cor-          levels. Such a setup performs hierarchical recognition, but
+responding action prototypes. Third, we demonstrate how             this setup is limited to fixed hierarchies. Our approach is
+to perform hierarchical action search by name and video ex-         suitable for hierarchies of any depth and for trees with vary-
+ample in the learned hyperbolic space. Experimentally, we           ing depth levels. Barz and Denzler [4] embed the hierarchi-
+find that our hyperbolic approach results in a hierarchically       cal relations of classes on the hypersphere for hierarchical
+coherent action search, outperforming non-hierarchical ap-          retrieval. While such a setup improves over a retrieval that
+proaches from video literature and hierarchical approaches          ignores hierarchies, we show in this work experimentally
+from image literature.                                              that the hyperbole provides a more suitable space for the
+                                                                    problem of hierarchical action search.
+2. Related work                                                         A number of works have investigated recognition and
+                                                                    search using prototypes with pair-wise semantic class simi-
+2.1. Action search                                                  larities. For example, Mettes et al. [25] employ hyperspher-
+    In action search, there are in general two ways to pro-         ical prototypes that are positioned based on uniform sep-
+vide queries, either by action name or by video example.            aration and word embedding similarities between classes.
+For query by action name, a common direction is to match            Similar approaches have been proposed in the Euclidean
+the names to detected objects [23, 34, 20, 24]. The match           space [8, 21] or on learned manifolds [15]. In this work,
+between action names and object detections is typically per-        we also treat classes as prototypes, but do so in a hyper-
+formed using word embeddings or by matching actions to              bolic space, where we can incorporate hierarchical relations
+object hierarchies. Recently, query by action name has also         amongst all actions.
+been investigated for searching video moments [3, 27] or
+video clips [26, 40]. Such a setup provides an effective for-       3. Hyperbolic action network
+mulation to retrieve videos from a textual query. The search            For the problem of hierarchical action search, we are
+is however focused on individual actions; it is not possible        given a set of action classes A = {1, 2, · · · , |A|} and their
+to search for groups of relevant actions, while mistakes in         generic hypernym classes H = {|A|+1, |A|+2, · · · , |A|+
+the search can be arbitrarily bad, because the hierarchical         |H|} connected in a hierarchy. The hierarchy forms a tree of
+relation to other actions is ignored.                               all the hypernym (parent) and hyponym (child) classes. Our
+    For query by video example, a core focus is on effi-            goal is to search for actions, while abiding to the hierarchy
+ciently searching in video collections with a nearest neigh-        when ranking the videos. To that end, we propose a hy-
+bour search from an input video. Ciptadi et al. [9] pro-            perbolic action network, which projects actions and videos
+pose movement-based histogram representations for video             into a shared space Hnc , a n-dimensional hyperbolic space
+retrieval. Douze et al. [12] model movement with circulant          with curvature c, see Figure 2. In this paper, we specifically
+temporal encoding and product quantization to enable a fast         use the Poincaré disk Dnc = {x ∈ Rn | c||x|| < 1} for the
+video search. Several works have also investigated hashing          shared space, in line with [29, 36]. We first detail how to
+techniques for query by video example [31, 35, 41]. Com-            position action hierarchies on the shared hyperbolic space
+mon amongst these works is that the semantics of the search         in a discriminative manner. Second, we show how to map
+is focused on the action of the query video itself. We focus        videos to the same space and how to perform the matching
+on hierarchical action search in videos, where we retrieve          between action hierarchies and videos. Third, we propose
+both individual actions, as well as relevant related actions.       hierarchical action search using the trained network.
+2.2. Hierarchical image search                                      3.1. Hyperbolic action embedding
+    Within the vision literature, class hierarchies have been          The first step in our model is to embed A ∪ H into the
+investigated for image recognition [7, 32] and image re-            shared space Dnc . The main idea is to project the hier-
+trieval [11]. Beyond supervised recognition, several works          archy onto the hyperbole and use the positions of the ac-
+have also shown the potential of hierarchies for recognizing        tions in the hyperbolic space as class prototypes. More for-
+unseen image categories [1, 2]. In these works however, hi-         mally, we learn P = {p1 , p2 , · · · , p|A|+|H| } to represent
+erarchies are either flattened to binary representations [1],       A∪H. Where current works focus on preserving hypernym-
+used as a structured cost for standard losses [7], or the hi-       hyponym relations in hyperbolic embeddings [36, 29, 16],
+erarchical scope is limited to classes from the same parent         we use the action positions in the hyperbolic space for the
+class [32]. Here, we seek to maintaining the full action hi-        downstream task of search. Therefore, we propose a dis-
+erarchy when searching for action videos.                           criminative hyperbolic embedding for hierarchies, which
+    Recently, Li et al. [22] proposed to perform hierarchical       balances hierarchical relations and large margin separation
+image recognition by first generating a three-level hierarchy       amongst classes.
+
+
+                                                                4322
+                                                                  1142
+     Hyperbolic action embedding                                                                       Hyperbolic video embedding
+
+
+
+
+                         Discriminative
+Action hierarchy     hyperbolic embedding           Hyperbolic matching              Exponential mapping        Video representation   Action videos
+
+
+Figure 2: Overview of the hyperbolic action network. The actions in a hierarchy are projected on the shared hyperbolic
+space through a discriminative embedding to obtain action prototypes. Action videos are projected on the same space by
+feeding them to a 3D ConvNet, followed by an exponential map. We propose a matching function to align the hyperbolic
+action prototypes with the projected video representations, enabling hierarchical action search.
+
+
+   Let P = {(u, v)|u = h(v)}, with h(v) the hyper-                              tree. Therefore, following [16], we further update P with
+nym of v, denote the positive hypernym pairs and N =                            the following loss:
+{(u′ , v′ )|u′ 6= h(v′ )} the negative pairs. We propose the                             X                   X
+following loss function to obtain a discriminative hyper-                       L2 =            E(u, v)+             max (0, γ − E (u′ , v′ )) ,
+bolic embedding:                                                                         h(u)=h(v)              h(u′ )6=h(v′ )
+                                                                                                                                           (6)
+          L1 (P, N , P) = LH (P, N ) + λ · LS (P).                    (1)       where E(u, v) measures the angle between u and v. The
+                                                                                first term of Equation (6) encourages u and v to point in
+The loss function consists of two parts. The first part is a                    a similar direction when they share a hypernym ((h(u) =
+hypernym-hyponym relation loss akin to [29]:                                    h(v)). The second term pushes u′ and v′ away angularly
+                                                                                if they don’t share a hypernym (h(u′ ) 6= h(v′ )). Variable
+                     X             
+                                             e−dc (u,v)
+                                                                               γ denotes a margin factor that pushes u′ , v′ to be at least γ
+ LH (P, N ) =                log       P             −dc (u,v′ )
+                                                                   . (2)        away. For full details of Equation (6), we refer to [16].
+                   (u,v)∈P               (u,v′ )∈N e
+                                                                                    We first optimize our shared hyperbolic space using the
+                                                                                loss in Equation (1). Afterwards, we refine the space using
+The second part separate all non-hypernym classes:                              Equation (6). Since P resides in hyperbolic space, we opti-
+                                                                                mize both losses using Riemannian gradient descent [5]:
+                   LS (P) = 1T (P̂P̂T − I)1,                          (3)
+                                                                                                    Pt+1 = Pt − ηt ∇R L (Pt ) ,                   (7)
+where P̂ denotes the vector-wise ℓ2 -normalization of P̄,
+                                                                                with ∇R the Riemannian gradient and ηt the learning rate.
+with P̄ = {p1 , p2 , · · · , p|A| } the prototypes for the non-
+hypernym actions. In the loss formulation above, dc (·, ·)                      3.2. Matching actions and videos
+denotes the hyperbolic distance:
+                                                                                   Hyperbolic video embedding. Second, we need to
+                      2        √                                               match videos to actions in the shared hyperbolic space. Let
+         dc (a, b) := √ arctanh c k−b ⊕c ak ,                         (4)       v ∈ RW ×H×T ×3 denote a video consisting of T frames.
+                       c
+                                                                                We first feed v to a 3D ConvNet v = Ψ(v; θ) ∈ RD to
+where ⊕c indicates the Möbius addition [38] in Dnc , i.e.:                     obtain a D-dimensional video representation using network
+                                                                                parameters θ. This function is in Euclidean space and can
+               1 + 2cha, bi + ckbk2 a + 1 − ckak2 b
+                                                       
+                                                                                therefore not directly be matched with the hyperbolic action
+  a ⊕c b :=                                                 .                   prototypes. We therefore project the video representation to
+                      1 + 2cha, bi + c2 kak2 kbk2
+                                                           (5)                  hyperbolic space through the exponential map [17]:
+The proposed loss formulation extends standard hyperbolic                                                   
+                                                                                                               √ λcx kvk
+                                                                                                                                  
+                                                                                                                               v
+embeddings with a discriminative loss that targets large                           expcx (v) = x ⊕c tanh        c           √        , (8)
+margin separation. The main reason for this is that in search,                                                       2        ckvk
+we aim to be discriminative for the actions we are searching.                   where x states the tangent point that connects tangent space
+A large margin separation enables this goal.                                    Tx Dnc to Dnc . Different values for x leads to different tan-
+   While our discriminative hyperbolic embedding results                        gent spaces Tx Dnc . To eliminate ambiguities, we always set
+in tree-shaped regions on Dnc , there are no guarantees of                      x = 0. The exponential map allows us to project the Eu-
+entailment, i.e. of a partial order relationship that requires                  clidean video representation onto the hyperbole in a differ-
+the region of each subtree to be fully covered by their parent                  entiable network, which we will use for the final matching.
+
+
+                                                                            4323
+                                                                              1143
+    Hyperbolic prototype matching. In our model, the goal
+is to train 3D ConvNet Ψ to best match videos to hyperbolic                                  wrestle
+
+action prototypes P. Different from softmax cross-entropy
+on one-hot vectors, the de facto standard in action recogni-                                  Sports
+tion networks, our optimization is supervised by P ∈ Dnc .                                                               Sumo
+                                                                                   Search
+    We are given a training set of N samples, {(vi , yi )}N
+                                                          i=1 ,                    Sumo
+where vi ∈ RW ×H×T ×3 denotes the ith video sample, yi ∈
+A denotes the action label. We optimize the network by
+minimizing the negative log-likelihood:
+                                                                                                        Target cone   Sibling cone   Cousin cone
+                 J(θ) = − log pθ (y = k|v).                (9)
+                                                                      Figure 3: Hierarchical action search. For an action query,
+In this paper, we propose to define the likelihood itself as          we start our search from the projection in the hyperbolic
+the softmax over the negative hyperbolic distance between             space and expand the entailment cone of the query in all
+the action and video embeddings in the shared hyperbolic              directions. Upon enlarging the entailment cone, we first ab-
+space:                                                                sorb videos from sibling action cones, then cousin cones.
+                     exp (−dc (Ψe (v; θ), φc (k)))                    Only afterwards, we retrieve actions from other cones.
+  pθ (y = k|v) = P                                ′
+                                                       , (10)
+                     k′ exp (−dc (Ψe (v; θ), φc (k )))
+                                                                      from a query to each candidate in a test set and rank based
+with
+                                                                      on the distances to obtain a search that abides to hierarchical
+                 Ψe (v; θ) = expcx (Ψ(v; θ)).             (11)
+                                                                      action relations. We investigate two search settings.
+The proposed loss brings representations of a video close                Search by action name. In the first search setting, we
+to the hyperbolic positions of the action prototypes in hy-           perform a hierarchical search by starting from an action a
+perbolic space. Similar in spirit to [25], we keep the action         in the hierarchy. Our setup allows for both a search for
+prototypes fixed after projection into the shared space.              seen and unseen actions, where for the seen actions, labeled
+                                                                      videos for action a have been used during hyperbolic align-
+3.3. Hierarchical action search                                       ment, in the latter not. Let S denote a set of videos in a can-
+   The hyperbolic action network aligns videos and ac-                didate set. We perform a nearest neighbour search between
+tion labels in a hierarchical manner on a shared hyperbolic           the hyperbolic action embedding φc (a) and the hyperbolic
+space. In turn, this enables a hierarchical search for seen           video embedding Ψe (s; θ) ∀ s ∈ S. All videos in S are
+and unseen actions, along with their hierarchical siblings.           ranked based on their cosine distance.
+The intuition behind this possibility is shown in Figure 3.              Search by video example. Given our general setup, it is
+By design of the hyperbolic space, the siblings of an action          also possible to hierarchically search for actions by provid-
+class fall under the same entailment cone. We propose two             ing query video q. We perform a nearest neighbour search
+ways to perform hierarchical action search as a function of           in S akin to the hierarchical search by action name.
+their entailment cones. These are search by action name and
+search by video example. For query q ∈ Dnc , we calculate             4. Experimental setup
+the distance to candidate sample xi as:
+                                                                      4.1. Hierarchical retrieval datasets
+                 dq (xi ) = 1 − cos(q, xi ).              (12)           To enable hierarchical action search, we have revised
+                                                                      three well-known action datasets: Activity-Net1.3 [13], Ki-
+Search is performed by computing the above distance func-
+                                                                      netics [6], and Moments-in-Time [28]. We include action
+tion to all videos in a test set. By design of the network, the
+                                                                      hierarchies and action splits for unseen action search ex-
+search starts from q and the search region grows angularly
+                                                                      periments. For the hierarchy revision, we follow the proto-
+in all directions. This growing region can be interpreted as
+                                                                      col of ActivityNet [13] and use the ATUS taxonomy1 . The
+a cone expanding around q.
+                                                                      seen/unseen split follows the setup of [19] The statistics are
+    Despite the simplicity of Equation (12), the use of the co-
+                                                                      shown in Table 1. All revised hierarchies and seen/unseen
+sine distance for search directly matches with the construc-
+                                                                      partitions are available in our implementation.
+tion of the action hierarchy in the hyperbolic space. Because
+                                                                         Hierarchical-ActivityNet. In ActivityNet [13], each
+action trees form entailment cones, the angle in hyperbolic
+                                                                      untrimmed video consists of one or more action segments.
+space from an action to its sibling (action with same parent)
+is smaller than the angle from an action to an unrelated ac-            1 U.S. Department of Labor. American time use survey. https://
+
+tion. Hence, we only need to compute the cosine distance              www.bls.gov/news.release/pdf/atus.pdf
+
+
+                                                                  4324
+                                                                    1144
+Table 1: Hierarchical action search datasets, building on existing datasets. The actions in Hierarchical-ActivityNet and
+Hierarchical-Kinetics are at the third level of their respective hierarchy, while Hierarchical-Moments has actions at all levels.
+
+                               Source                       Number of videos              Actions per level      Seen/unseen split
+                                                           training validation        1       2     3       4    seen    unseen
+  Hierarchical-ActivityNet     ActivityNet [13]            15,290          7,569     6       38     200      -   160       40
+  Hierarchical-Kinetics        mini-Kinetics [39]           77,117          4,897     5       33    200      -    -         -
+  Hierarchical-Moments         Moments-in-Time [28]        800,575         33,899    45      224    191     27   300       39
+
+
+We trim the videos into clips based on the provided tempo-
+ral annotations. The trimming yields ∼23K trimmed videos
+from 200 classes,∼15K for training and ∼8K for valida-
+tion. We report our result on the validation set. ActivityNet
+comes with an action hierarchy, which we have slightly
+modified to make a more balanced tree and to remove a
+number of redundant hypernyms. Hierarchy annotations
+are performed at the action-level instead of the video-level,
+which makes the annotation burden light. For search ex-
+periments on unseen actions, we use 160 seen actions for
+training and 40 unseen actions for evaluation.
+    Hierarchical-Kinetics. Mini-Kinetics [39] contains                                                                  Numerical
+∼83K videos from 200 classes, ∼78K for training and ∼5K                        ℝ!                     𝔻!"                collapse
+for validation. The official hierarchy has two layers, re-
+sulting in 33 parent nodes. We further add a hierarchical             Figure 4: Effect of hyperbolic curvature on the hierarchi-
+layer containing six grandparent nodes, along with slight             cal action search performance of Hierarchical-ActivityNet.
+modifications in the parent hierarchy akin to Hierarchical-           We report sibling- and cousin-mAP, as well as standard
+ActivityNet. We do not perform zero-shot learning exper-              mAP. For c = 0, the space collapses to a Euclidean space,
+iments for this dataset to avoid potential overlap with the           which hurts the scores. For large curvatures, results drop
+pre-training of the 3D ConvNet on Kinetics [6].                       due to numerical instabilities. We recommend a hyperbolic
+    Hierarchical-Moments. Moments-in-time [28] con-                   space with 0 < c ≤ 1.
+tains ∼1M clips from 339 classes. ∼800K for training
+and ∼34K for validation. Moments-in-time does not come
+with a hierarchy, but the class names are a subset of Verb-           query. For search by name, the pool set is the entire valida-
+Net [33]. We use VerbNet to provide an action hierarchy for           tion set. For hierarchical search, we not only aim to retrieve
+this dataset, resulting in a tree with different depths for ac-       the target class, we are also interested in videos from sim-
+tions, ranging from two to four layers. For this dataset, we          ilar classes. These are sibling classes (shared parents, akin
+use 300 seen actions and 39 unseen actions for evaluation.            to Hascoet et al. [19].) and cousin classes (shared grandpar-
+                                                                      ents). For sibling retrieval and classification, we consider
+4.2. Implementation details                                           predictions that require at most two graph hops in the tree
+   The action embedding is trained with Riemannian                    hierarchy as correct. For cousins, this expands to four hops.
+Adam [5] using a learning rate of 10−4 on a Nvidia GTX                For retrieval, we report the (mean) Average Precision @ 50,
+1080TI. The video embedding network Ψ is a ResNeXt-                   for classification, we report the multi-class accuracy. The
+C3D [18] pre-trained on Kinetics [6]. We obtain video                 correct/incorrect labels depend on whether 0-hops (mAP),
+representations through average pooling of groups of 16               2-hops (sibling-mAP), 4-hops (cousin-mAP) are included.
+frames. We use geoopt2 for Riemannian optimization and
+PyTorch [30] for implementation.                                      5. Experiments
+4.3. Evaluation metrics                                               5.1. Ablation studies
+
+   We split the data as follows: for search by video query,              Effect of hyperbolic curvature. The curvature c deter-
+the pool set for each query is the validation set excluding the       mines to what extent hyperbolic space Dnc is distorted. The
+                                                                      curvature can be any real number. For c > 0, we have
+  2 https://github.com/geoopt/geoopt                                  a hyperbole, while for c = 0, we recover the Euclidean
+
+
+                                                                  4325
+                                                                    1145
+                                                                            Low                                                   High
+Table 2: Effect of hyperbolic dimensionality on hierar-
+chical action search accuracy. Our approach obtains high
+scores in low-dimensional space, outperforming standard
+softmax cross-entropy optimization using the same base
+network. Further improvements are obtained when enlarg-
+ing the shared hyperbolic space.
+
+                            Dimensionality
+                  5        10    20      50        100     200
+ mAP                                                                               (a) One-hot.          (b) Hyperbolic (ours).
+ ResNeXt-C3D      -         -        -       -       -     0.728
+ This paper     0.671     0.760    0.774   0.785   0.787   0.789       Figure 5: Visualizing action similarities. We show the av-
+ sibling-mAP                                                           erage similarity of videos from a subset of actions in Ac-
+ ResNeXt-C3D      -         -        -       -       -     0.889       tivityNet. Our hyperbolic approach learns similarities that
+ This paper     0.712     0.924    0.947   0.949   0.950   0.948
+                                                                       adhere to the provided hierarchy. The one-hot baseline does
+ cousin-mAP                                                            not, resulting in lower scores for hierarchical action search.
+ ResNeXt-C3D      -         -        -       -       -     0.945
+ This paper     0.783     0.955    0.969   0.971   0.971   0.970
+
+                                                                       max cross-entropy on the one-hot vectors, as is common in
+Table 3: Effect of the discriminative loss in the hyper-
+                                                                       action recognition [39]. For the baseline, the dimensionality
+bolic embedding on Hierarchical-ActivityNet. Ignoring dis-
+                                                                       is always equal to the number of classes. Our high scores
+crimination (λ = 0) hurts mAP, while ignoring hierarchies
+                                                                       at low dimensionality highlight the potential of action hier-
+(λ = ∞) hurts sibling-mAP and cousin-mAP. Weighting
+                                                                       archies and encoding them on hyperboles. Throughout our
+both losses equally performs best.
+                                                                       experiments, we focus on action search quality, hence we
+                                                                       use 200 dimensions in further experiments.
+                        Hierarchical-ActivityNet
+                        mAP S-mAP C-mAP                                    Effect of the discriminative loss. To embed action hier-
+                                                                       archies on the hyperbolic space, our loss optimizes for both
+            λ=0         0.777     0.950    0.971
+                                                                       hypernym-hyponym relations and separation across action
+            λ = 0.1     0.779     0.949    0.969
+            λ=1         0.789     0.948    0.970                       prototypes. In Table 3, we evaluate the effect of the discrim-
+            λ = 10      0.793     0.940    0.966                       inative embedding. When λ = 0, our embedding is equal to
+            λ=∞         0.801     0.891    0.936                       the Poincaré embeddings of Ganea et al. [16]. This embed-
+                                                                       ding obtains high sibling- and cousin-mAP, since their ap-
+                                                                       proach targets the hierarchical relations only. When adding
+space. We demonstrate the effect of different choices for c            our discriminative component, the sibling-mAP and cousin-
+for query by video in Figure 4. We report sibling-mAP and              mAP scores are maintained, while standard mAP increases.
+cousin-mAP, as well as standard mAP.                                   This is a direct result of moving actions that are leaf nodes
+   We observe that suboptimal results are obtained for the             away from each other. When using only the discrimina-
+Euclidean space, exemplified by the lower scores at c = 0.             tive loss (λ = ∞), we obtain the highest mAP, but at the
+For positive values of 0 < c ≤ 1, scores increase; hyper-              expense of low sibling-mAP and cousin-mAP. Overall, bal-
+boles matter for hierarchical action search. For higher val-           ancing both losses equally is preferred.
+ues of c, the results drop again, which is due to numerical                Visualizing action similarities. To evaluate whether we
+instabilities in the hyperbolic embedding. Overall, we find            are actually learning hierarchical relations, we show the
+that hyperbolic spaces are beneficial for hierarchical search          average video similarities for a subset of the actions on
+and any value of 0 < c ≤ 0.1 results in a stable result                Hierarchical-ActivityNet in Figure 5. We show the pair-
+across all three metrics. We therefore employ a fixed value            wise action similarities for our model and compare it to one
+of c = 0.1 throughout further experiments.                             trained with softmax cross-entropy on one-hot vectors. The
+   Effect of hyperbolic dimensionality. We again experi-               confusion matrices show that for our approach, clear sub-
+ment on Hierarchical-ActivityNet and report all three mAP              structures emerge which align with the provided action hi-
+metrics. The results are shown in Table 2 for query by                 erarchy. The one-hot baseline discovers a small portion of
+video. We find that across the metrics, a higher dimen-                these hierarchical relations, but also shows a high similarity
+sionality results in higher scores. High scores can also be            to many other actions, even though these actions are seman-
+obtained using spaces with much fewer dimensions than                  tically not related. As a result, the baseline is less likely to
+classes. For comparison, we perform the search using soft-             obtain high hierarchical action search scores.
+
+
+                                                                   4326
+                                                                     1146
+Table 4: Search by action name comparison on three datasets. We outperform the baselines across datasets and metrics.
+Barz and Denzler [4] outperform other baselines, while our hyperbolic action network performs best overall.
+
+                                        Hierarchical-ActivityNet         Hierarchical-Kinetics        Hierarchical-Moments
+                                space   mAP S-mAP C-mAP                mAP S-mAP C-mAP               mAP S-mAP C-mAP
+        ResNextC3D [18]          ∆n     0.728   0.889     0.945        0.712   0.879     0.918       0.208   0.258   0.438
+        DeViSE [14]              Rn     0.689   0.870     0.935        0.672   0.859     0.906       0.170   0.216   0.406
+        Li et al. [22]           ∆n     0.709   0.882     0.942        0.710   0.876     0.916         -       -       -
+        Mettes et al. [25]      Sn−1    0.757   0.889     0.940        0.712   0.852     0.897       0.311   0.363   0.517
+        Barz and Denzler [4]    Sn−1    0.718   0.907     0.956        0.695   0.898     0.935       0.302   0.364   0.533
+        This Paper               Dnc    0.789   0.948     0.970        0.720   0.938     0.957       0.311   0.414   0.564
+
+
+                                                                             Query                      Top search results
+5.2. Hierarchical action search applications
+5.2.1   Search by action name                                           Air drumming
+
+
+Setup. For search by action name, we start from action pro-
+totypes in the hyperbolic space. We compare to five base-
+lines with different spaces for matching actions and videos.                Laughing
+The first uses standard one-hot vectors on the simplex ∆n
+with softmax cross-entropy [18]. We use the representations                                                           Crying          Crying
+from the last fully-connected layer for retrieval, akin to our
+approach. We also compare to two baselines that position               Passing football
+actions based on word embedding similarities in Euclidean               (not in game)
+
+space [14] and on the hypersphere [25]. Lastly, we com-                                         Passing (in game) Passing (in game)
+pare to the recent hierarchical classification of Li et al. [22]
+and the hierarchical retrieval of Barz and Denzler [4]. All            Figure 6: Search by action name results on Hierarchical-
+baselines use the same video network and settings as our               Kinetics. Green denotes the same action, lime sibling ac-
+approach. What separates them is their embedding space                 tion. As we start from the action prototype, top results are
+and how they position action classes in this space.                    likely to include the action of interest, as well as sibling ac-
+   Results. The results in Table 4 show that across the three          tions that are visually similar.
+datasets, our approach is preferred. Softmax, DeViSE and
+Mettes et al. [25] ignore hierarchical relations amongst ac-
+tions, resulting in sub-optimal scores. The hierarchical ap-           5.2.3      Hierarchical action recognition
+proach of Barz and Denzler [4] outperforms the other base-             While optimized for hierarchical action search, our ap-
+lines, showing that hierarchies are beneficial. The approach           proach is also competitive for hierarchical action recog-
+of Li et al. [22] is restricted to Hierarchical-ActivityNet and        nition. To show this, we provide accuracy and sibling-
+Hierarchical-Kinetics, since the hierarchy of Hierarchical-            accuracy results on the ActivityNet and Mini-Kinetics
+Moments is unbalanced, which can not be handled in their               datasets in Table 6. On both datasets, we obtain a consistent
+approach. Our action network outperforms both, indicating              improvement over the baselines.
+the importance of hyperboles for action search. We provide
+qualitative results for three action queries in Figure 6.
+                                                                       5.2.4      Zero-shot action search
+
+5.2.2   Search by video example                                        Finally, we investigate the potential of our hierarchical ap-
+                                                                       proach for zero-shot action search. Since, actions are al-
+Setup. This experiment employs the same datasets, met-                 ready positioned on the hyperbole, it becomes possible to
+rics, and baselines as search by action name. Here we also             search by any action, regardless of whether training exam-
+include an internal baseline, using the Euclidean distance             ples have been shown. To evaluate the effectiveness in the
+instead of the hyperbolic distance in our loss function.               zero-shot setting, we perform a search by name, compared
+   Results. Results in Table 5 demonstrate our approach                to three baselines. The first is the zero-shot approach of
+is preferred across datasets and metrics. With a Euclidean             Zhang et al. [42], which transforms both videos and action
+space in the loss we are on par with the baselines, switching          word embeddings into a shared Euclidean space for match-
+to a hyperbolic geometry and loss results in the best overall          ing. We also compare to the baselines of the supervised
+scores. We provide qualitative results in Figure 7.                    action search experiments [4, 22, 25].
+
+                                                                   4327
+                                                                     1147
+Table 5: Search by video example comparison on all three datasets. For all datasets and metrics, our approach obtains
+favourable scores. This holds especially for the sibling-mAP and cousin-mAP, which benefit from hierarchical relations.
+
+                                                               Hierarchical-ActivityNet                         Hierarchical-Kinetics                 Hierarchical-Moments
+                                                   space       mAP S-mAP C-mAP                                mAP S-mAP C-mAP                        mAP S-mAP C-mAP
+               ResNextC3D [18]                      ∆n         0.592   0.761     0.864                        0.532   0.733     0.820                0.145   0.173   0.359
+               DeViSE [14]                          Rn         0.609   0.761     0.860                        0.553   0.715     0.803                0.134   0.161   0.348
+               Li et al. [22]                       ∆n         0.583   0.760     0.865                        0.552   0.753     0.833                  -       -       -
+               Mettes et al. [25]                  Sn−1        0.587   0.760     0.864                        0.551   0.754     0.835                0.142   0.172   0.358
+               Barz and Denzler [4]                Sn−1        0.583   0.747     0.853                        0.547   0.725     0.812                0.143   0.172   0.358
+               This Paper                           Rn         0.610   0.767     0.868                        0.565   0.738     0.820                0.143   0.172   0.360
+               This Paper                           Dnc        0.678   0.843     0.908                        0.593   0.824     0.880                0.163   0.201   0.381
+
+
+    Query                                           Top search results
+                                                                                                              Table 6: Hierarchical action recognition comparison.
+                                                                                                              While designed for hierarchical search, we also find moder-
+                                                                                                              ate but consistent improvements for action recognition.
+   Marching                                   Cheerleading
+
+                                                                                                                                                        ActivityNet   Mini-Kinectics
+                                                                                                                                              space     acc S-acc     acc    S-acc
+
+    Highkick                                  Cheerleading                              Sidekick
+                                                                                                                   ResNext-C3D [18]            ∆n       74.0   84.0   77.0        86.5
+                                                                                                                   DeViSE [14]                 Rn       72.4   83.9   74.4        85.6
+                                                                                                                   Li et al. [22]              ∆n       74.1   85.3   77.0        86.5
+                                                                                                                   Mettes et al. [25]         Sn−1      73.8   83.7   76.0        86.2
+    Archery             Spray painting        Bungee jump         Slack lining      Sharpen pencil                 Barz and Denzler [4]       Sn−1      72.3   84.0   76.0        86.1
+                                                                                                                   This Paper                  Dnc      75.1   85.8   77.7        87.5
+                                       (a) Search results.
+    Query                                           Top search results
+
+                                                                                                              Table 7: Zero-shot action search comparison. On both
+                                                                                                              datasets, we obtain the highest scores, especially for stan-
+ Belly dancing          Hula hooping             Singing         Tap dancing           High kick              dard mAP and sibling-mAP.
+
+                                                                                                                                      Hierarchical-ActivityNet    Hierarchical-Moments
+                                                                                                                                      mAP S-mAP C-mAP             mAP S-mAP C-mAP
+ Playing cricket    Pass American football    Hammer throw        Flying kite    Pass American football
+                         (not in game)                                                (not in game)
+                                                                                                               Zhang et al. [42]      0.397     0.449     0.803   0.026   0.027      0.072
+                                                                                                               Li et al. [22]         0.389     0.461     0.821     -       -          -
+                                         (b) Failure cases.                                                    Mettes et al. [25]     0.235     0.281     0.728   0.169   0.171      0.258
+                                                                                                               Barz and Denzler [4]   0.453     0.527     0.854   0.216   0.219      0.300
+                                                                                                               This Paper             0.543     0.627     0.855   0.222   0.225      0.301
+Figure 7: Search by video example results on Hierarchical-
+Kinetics. Green denotes the same action, lime sibling ac-
+tion, orange a cousin action, and red an irrelevant action. In
+(a), we show a success case, an ambiguous case where we                                                       6. Conclusion
+still retrieve relevant actions, and a difficult case where the
+                                                                                                                 In this work, we introduce hierarchical action search,
+video content is different from its common setting. In (b),
+                                                                                                              where we seek not only the action of interest, but also ac-
+we highlight failures due to ambiguity in the query videos.
+                                                                                                              tions that are related in a hierarchical manner. To that end,
+                                                                                                              we propose a hyperbolic action network. Central in this
+                                                                                                              network is a hyperbolic space that is shared by action hier-
+                                                                                                              archies and videos. We project action hierarchies through
+   The zero-shot action search results are shown in Table 7.                                                  a discriminative embedding that extends current embed-
+Compared to the zero-shot baseline of Zhang et al. [42],                                                      dings with a large margin action separation. The obtained
+we perform better, especially in standard mAP and sibling                                                     action embeddings form hyperbolic prototypes, which our
+mAP. Closest to our scores are the ones by Barz and Den-                                                      loss function matches to projected video representations.
+zler [4]. On Hierarchical-ActivityNet, we outperform all                                                      Experiments on three video datasets, with added hierarchi-
+baselines, while on Hierarchical-Moments, we are slightly                                                     cal annotations, show that our approach enables an effective
+preferred for mAP and sibling-mAP. We can conclude that                                                       hierarchical search by action name and by video example,
+our hyperbolic approach is effective for searching unseen                                                     outperforming alternative search approaches from the video
+actions, highlighting its generalization capabilities.                                                        and image literature.
+
+
+                                                                                                          4328
+                                                                                                            1148
+References                                                               [20] Mihir Jain, Jan C van Gemert, Thomas Mensink, and Cees
+                                                                              G M Snoek. Objects2action: Classifying and localizing ac-
+ [1] Zeynep Akata, Florent Perronnin, Zaid Harchaoui, and                     tions without any video example. In ICCV, 2015.
+     Cordelia Schmid. Label-embedding for image classification.
+                                                                         [21] Elyor Kodirov, Tao Xiang, and Shaogang Gong. Semantic
+     IEEE TPAMI, 2015.
+                                                                              autoencoder for zero-shot learning. In CVPR, 2017.
+ [2] Zeynep Akata, Scott Reed, Daniel Walter, Honglak Lee, and
+                                                                         [22] Aoxue Li, Tiange Luo, Zhiwu Lu, Tao Xiang, and Liwei
+     Bernt Schiele. Evaluation of output embeddings for fine-
+                                                                              Wang. Large-scale few-shot learning: Knowledge transfer
+     grained image classification. In CVPR, 2015.
+                                                                              with class hierarchy. In CVPR, 2019.
+ [3] Lisa Anne Hendricks, Oliver Wang, Eli Shechtman, Josef              [23] Xirong Li, Dong Wang, Jianmin Li, and Bo Zhang. Video
+     Sivic, Trevor Darrell, and Bryan Russell. Localizing mo-                 search in concept subspace: a text-like paradigm. In CIVR,
+     ments in video with natural language. In ICCV, 2017.                     2007.
+ [4] Björn Barz and Joachim Denzler. Hierarchy-based image              [24] Pascal Mettes and Cees GM Snoek. Spatial-aware object
+     embeddings for semantic image retrieval. In WACV, 2019.                  embeddings for zero-shot localization and classification of
+ [5] Gary Becigneul and Octavian-Eugen Ganea. Riemannian                      actions. In ICCV, 2017.
+     adaptive optimization methods. In ICLR, 2019.                       [25] Pascal Mettes, Elise van der Pol, and Cees G M Snoek. Hy-
+ [6] Joao Carreira and Andrew Zisserman. Quo vadis, action                    perspherical prototype networks. In NeurIPS, 2019.
+     recognition? a new model and the kinetics dataset. In CVPR,         [26] Antoine Miech, Dimitri Zhukov, Jean-Baptiste Alayrac,
+     2017.                                                                    Makarand Tapaswi, Ivan Laptev, and Josef Sivic.
+ [7] Ju Yong Chang and Kyoung Mu Lee. Large margin learning                   Howto100m: Learning a text-video embedding by watching
+     of hierarchical semantic similarity for image classification.            hundred million narrated video clips. In ICCV, 2019.
+     CVIU, 132:3–11, 2015.                                               [27] Niluthpol Chowdhury Mithun, Sujoy Paul, and Amit K Roy-
+ [8] Long Chen, Hanwang Zhang, Jun Xiao, Wei Liu, and Shih-                   Chowdhury. Weakly supervised video moment retrieval from
+     Fu Chang. Zero-shot visual recognition using semantics-                  text queries. In CVPR, 2019.
+     preserving adversarial embedding networks. In CVPR, 2018.           [28] Mathew Monfort, Alex Andonian, Bolei Zhou, Kandan Ra-
+ [9] Arridhana Ciptadi, Matthew S Goodwin, and James M Rehg.                  makrishnan, Sarah Adel Bargal, Yan Yan, Lisa Brown,
+     Movement pattern histogram for action recognition and re-                Quanfu Fan, Dan Gutfreund, and Carl Vondrick. Moments
+     trieval. In ECCV, 2014.                                                  in time dataset: one million videos for event understanding.
+[10] Christopher De Sa, Albert Gu, Christopher Ré, and Frederic              IEEE TPAMI, 2019.
+     Sala. Representation tradeoffs for hyperbolic embeddings.           [29] Maximilian Nickel and Douwe Kiela. Poincaré Embeddings
+     In ICML, 2018.                                                           for Learning Hierarchical Representations. In NeurIPS,
+[11] Jia Deng, Alexander C Berg, and Li Fei-Fei. Hierarchical                 2017.
+     semantic indexing for large scale image retrieval. In CVPR,         [30] Adam Paszke et al. PyTorch: An Imperative Style, High-
+     2011.                                                                    Performance Deep Learning Library. In NeurIPS. 2019.
+[12] Matthijs Douze, Jérôme Revaud, Jakob Verbeek, Hervé              [31] Jie Qin, Li Liu, Mengyang Yu, Yunhong Wang, and Ling
+     Jégou, and Cordelia Schmid. Circulant temporal encod-                   Shao. Fast action retrieval from videos via feature disaggre-
+     ing for video retrieval and temporal alignment. IJCV,                    gation. CVIU, 156, 2017.
+     119(3):291–306, 2016.                                               [32] Marcus Rohrbach, Michael Stark, and Bernt Schiele. Eval-
+[13] Bernard Ghanem Fabian Caba Heilbron, Victor Escorcia and                 uating knowledge transfer and zero-shot learning in a large-
+     Juan Carlos Niebles. Activitynet: A large-scale video bench-             scale setting. In CVPR, 2011.
+     mark for human activity understanding. In CVPR, 2015.               [33] Karin Kipper Schuler. Verbnet: a broad-coverage, compre-
+[14] Andrea Frome, Greg S Corrado, Jon Shlens, Samy Bengio,                   hensive verb lexicon. PhD thesis, University of Pennsylva-
+     Jeff Dean, Marc’Aurelio Ranzato, and Tomas Mikolov. De-                  nia, 2005.
+     vise: A deep visual-semantic embedding model. In NeurIPS,           [34] Cees G M Snoek and Marcel Worring. Concept-based video
+     2013.                                                                    retrieval. Foundations and Trends in Information Retrieval,
+[15] Zhenyong Fu, Tao Xiang, Elyor Kodirov, and Shaogang                      2(4):215–322, 2009.
+     Gong. Zero-shot learning on semantic class prototype graph.         [35] Jingkuan Song, Hanwang Zhang, Xiangpeng Li, Lianli Gao,
+     IEEE TPAMI, 40(8):2009–2022, 2017.                                       Meng Wang, and Richang Hong. Self-supervised video
+[16] Octavian-Eugen Ganea, Gary Bécigneul, and Thomas Hof-                   hashing with hierarchical binary auto-encoder. IEEE TIP,
+     mann. Hyperbolic entailment cones for learning hierarchical              27(7):3210–3221, 2018.
+     embeddings. In ICML, 2018.                                          [36] Alexandru Tifrea, Gary Becigneul, and Octavian-Eugen
+[17] Octavian-Eugen Ganea, Gary Bécigneul, and Thomas Hof-                   Ganea. Poincare glove: Hyperbolic word embeddings. In
+     mann. Hyperbolic neural networks. In NeurIPS, 2018.                      ICLR, 2019.
+[18] Kensho Hara, Hirokatsu Kataoka, and Yutaka Satoh. Can               [37] Du Tran, Heng Wang, Lorenzo Torresani, Jamie Ray, Yann
+     spatiotemporal 3d cnns retrace the history of 2d cnns and                LeCun, and Manohar Paluri. A closer look at spatiotemporal
+     imagenet? In CVPR, 2018.                                                 convolutions for action recognition. In CVPR, 2018.
+[19] Tristan Hascoet, Yasuo Ariki, and Tetsuya Takiguchi. On             [38] Abraham A Ungar. The hyperbolic square and mobius trans-
+     zero-shot recognition of generic objects. In CVPR, 2019.                 formations. Banach Journal of Mathematical Analysis, 2007.
+
+
+                                                                     4329
+                                                                       1149
+[39] Saining Xie, Chen Sun, Jonathan Huang, Zhuowen Tu, and
+     Kevin Murphy. Rethinking spatiotemporal feature learning:
+     Speed-accuracy trade-offs in video classification. In ECCV,
+     2018.
+[40] Huijuan Xu, Kun He, Bryan A Plummer, Leonid Sigal, Stan
+     Sclaroff, and Kate Saenko. Multilevel language and vision
+     integration for text-to-clip retrieval. In AAAI, 2019.
+[41] Guangnan Ye, Dong Liu, Jun Wang, and Shih-Fu Chang.
+     Large-scale video hashing via structure learning. In ICCV,
+     2013.
+[42] Li Zhang, Tao Xiang, and Shaogang Gong. Learning a deep
+     embedding model for zero-shot learning. In CVPR, 2017.
+
+
+
+
+                                                                   4330
+                                                                     1150
+

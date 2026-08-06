@@ -1,0 +1,916 @@
+                                                                                                    www.nature.com/scientificreports
+
+
+
+
+                OPEN             Hyperbolic geometry enhanced
+                                 feature filtering network for
+                                 industrial anomaly detection
+                                 Yanjun Feng1, Jun Liu2 & Yonggang Gai2
+                                 In recent years, Cutting-edge machine learning algorithms and systems in Industry 4.0 enhance quality
+                                 control and increase production efficiency. The visual perception algorithms have become extensively
+                                 utilized in surface defect detection, progressively replacing manual inspection methods. As a crucial
+                                 component of the Industrial Internet of Things (IIoT), this technology is pivotal for ensuring industrial
+                                 production quality and has garnered significant attention from the military and aerospace sectors.
+                                 Nonetheless, most existing methods rely on Euclidean space, which constrains their effectiveness in
+                                 handling non-Euclidean space data. Additionally, challenges such as addressing pre-trained feature
+                                 redundancy and bias in the pre-training process persist. This paper presents HADNet, a hyperbolic
+                                 space-based anomaly detection method. Specifically, we begin by mapping the extracted features
+                                 to hyperbolic space, a non-Euclidean geometric space. This mapping leverages the unique geometric
+                                 properties of hyperbolic space, particularly the hyperbolic distance metric, to represent the distances
+                                 between features more effectively. Next, the most relevant features for anomaly detection are
+                                 selected through the anomaly-aware feature subset selection module, enhancing anomaly detection
+                                 performance. Finally, we introduce adaptive residuals discrimination, an adaptive analysis technique
+                                 that discards residuals lacking anomaly information, thereby isolating the most effective regions for
+                                 anomaly detection. Extensive experiments on four benchmark datasets NEU-Seg, MT-Defect, FSSD-
+                                 12, and UCF-EL demonstrate the efficacy of HADNet, achieving mIoU scores of 87%, 81.46%, 77.04%,
+                                 and 59.41% respectively, significantly surpassing the current state-of-the-art methods.
+
+                                 Keywords Hyperbolic space, Anomaly detection, Deep learning
+
+                                 Image anomaly detection plays a crucial role in intelligent industrial production and is extensively utilized in
+                                 quality control and safety monitoring. In recent years, State-of-the-art machine learning algorithms and systems
+                                 in Industry 4.0 contribute to the advancement of quality control and boost production efficiency1.The vision-
+                                 based metal defect detection has become increasingly prevalent across industries such as construction, aerospace,
+                                 military, and energy. Surface and internal defects, including cracks and pores, can pose significant safety risks2.
+                                 Traditional methods of detecting these defects, such as visual inspection, are often inefficient and prone to
+                                 inaccuracies due to variability in the operator’s skill. As industrial automation and intelligent manufacturing
+                                 advance, the demand for more precise and faster defect detection technologies has increased3. Consequently,
+                                 there is a pressing need to develop advanced detection technologies to meet the modern industry’s standards for
+                                 high-quality and safe metal products (Fig. 1).
+                                     The detection process is complicated by the diverse types and characteristics of metal surface defects4.
+                                 Traditional methods often struggle with these defects, particularly when identifying small or deep flaws,
+                                 and typically lack the required accuracy. Additionally, environmental factors such as changes in lighting,
+                                 temperature fluctuations, and noise can disrupt the detection process, leading to inaccurate results. Complex
+                                 surfaces and internal structures of metallic materials often exhibit similar surface characteristics and potential
+                                 defects. Leveraging this similarity, analyzing metal surface scratch data can enhance our understanding of defect
+                                 detection methods and aid in the development of more accurate algorithms. The complex geometries of these
+                                 components pose challenges in capturing hierarchical relationships within the data. As shown in Fig. 2a, metal
+                                 surface defect images exhibit a natural hierarchical structure, transitioning from global semantic nodes to local
+                                 feature nodes, and finally to base nodes that encompass more refined attributes, resembling the hierarchical
+                                 structure of a tree.Traditional methods, often based on the assumption of flat Euclidean space, may fail to model
+
+
+                                 1School of Information Science and Engineering, Shenyang Ligong University, Shenyang 110159, China. 2School
+
+                                 of Automation and Electrical Engineering, Shenyang Ligong University, Shenyang 110159, China. email:
+                                 lj_mail_sut@163.com
+
+
+Scientific Reports |   (2025) 15:25668               | https://doi.org/10.1038/s41598-025-07550-0                                                 1
+www.nature.com/scientificreports/
+
+
+
+
+                                 Fig. 1. Comparisons between conventional Euclidean space (a) and hyperbolic space (b). Mean intersection
+                                 over union of anomaly detection methods on NEU-Seg, MT-Defect and FSSD-12 datasets (c).
+
+
+
+
+                                 Fig. 2. Illustrates the hierarchical relationships of metal surface defect images. (a) The entire image serves as
+                                 the root node, with local regions acting as branch nodes and detailed areas representing deeper branch nodes.
+                                 (b) The positions of these nodes in hyperbolic space are depicted accordingly.
+
+
+
+                                 the intricate relationships in data with complex structures effectively, thereby compromising defect detection
+                                 accuracy. Therefore, we advocate representing data in hyperbolic space. The unique geometric properties of
+                                 hyperbolic space enable it to more effectively characterize the subtle differences in metal defects. Specifically,
+                                 hyperbolic space resembles the branching structure of tree roots, with its volume expanding exponentially in the
+                                 radial direction. This characteristic can naturally represent the hierarchical structures commonly found in metal
+                                 defects, while also geometrically amplifying minor deformation differences, as shown in Fig. 2b. Metal defect
+                                 data typically exhibit non-uniform distribution and self-similar fractal features, which are highly compatible
+                                 with the exponential expansion properties of hyperbolic space. By representing data in hyperbolic space, we
+                                 can more accurately model complex component structures and defect modes, thereby improving the accuracy
+                                 of data analysis.
+                                     A variety of detection methods have been developed to identify different types of defects. For instance,
+                                 ultrasonic testing employs high-frequency sound waves to detect internal micro inclusions within materials5.
+                                 Eddy current testing, a non-destructive method based on electromagnetic induction, can detect surface or
+                                 near-surface defects6. Faster-R-CNN utilizes a Region Proposal Network (RPN) to generate candidate regions,
+                                 enabling accurate detection of anomalies in engine components, such as cracks, pores, or wear7. Additionally,
+                                 You Only Look Once(YOLO) is a real-time object detection technology that efficiently detects defects by dividing
+                                 images into grids and predicting object bounding boxes and categories within each grid8. Despite significant
+                                 advancements in manufacturing, maintenance, and repair processes, several challenges persist. These include
+                                 difficulties in detecting complex geometric shapes, the impact of material non-uniformity on detection accuracy,
+                                 and the challenge of identifying deep defects.
+                                     In this paper, we propose an anomaly detection method based on hyperbolic space to address the
+                                 aforementioned challenges. We convert the feature map from Euclidean space to hyperbolic space to better capture
+                                 subtle features and hierarchical relationships of defects. As shown in Fig. 1, Euclidean space is characterized by
+                                 a flat structure, where parallel lines never intersect, and area and volume grow according to polynomial laws.
+                                 In contrast, hyperbolic space, a non-Euclidean geometry with negative curvature, exhibits a curved structure.
+                                 Additionally, in hyperbolic space, the exponential increase in area and volume with the radius offers superior
+
+
+Scientific Reports |   (2025) 15:25668               | https://doi.org/10.1038/s41598-025-07550-0                                                    2
+www.nature.com/scientificreports/
+
+
+                                 capacity to encapsulate the hierarchical structures inherent in complex datasets, thereby conferring a natural
+                                 advantage for the embedding of such hierarchically structured data. In the anomaly perception feature selection
+                                 module, we effectively reduce redundant information by refining the feature representation within the layer,
+                                 which mitigates bias introduced by the pre-trained model. Additionally, the feature reconstruction module,
+                                 ARD, is used to obtain the anomaly score for detecting abnormal areas. We validated our approach on three
+                                 datasets, and the results demonstrate that our model outperforms the previously best-performing method.
+                                    Our contributions are summarized as follows:
+
+                                 • We propose a curvature-sensing network, HADNet, which uses AnomalySelect adaptive screening for highly
+                                   discriminative features to efficiently integrate multi-scale pre-trained features for anomaly detection.
+                                 • We introduce hyperbolic Space Transformation, a method that utilizes hyperbolic geometry to exploit latent
+                                   hierarchical information, achieving results that are not attainable in Euclidean space.
+                                 • We conduct extensive experiments on three real datasets, demonstrating the effectiveness and superiority of
+                                   HADNet for anomaly detection in metal surface.
+
+                                 Related work
+                                 Industrial anomaly detection
+                                 Anomaly detection involves identifying a small number of outliers in the data that deviate from the majority.
+                                 These outliers may indicate potential problems or abnormal events. This technique is widely applied across
+                                 various fields, including manufacturing and aerospace, to enhance system security and reliability9,10. Anomaly
+                                 detection methods can be categorized into supervised and unsupervised11–13. Supervised methods depend on
+                                 labeled data for model training, unsupervised methods utilize the intrinsic structure of the data to identify
+                                 anomalies.
+                                     Recent advancements in anomaly detection methods have been substantial, with traditional statistical
+                                 methods being among the simplest. These methods define the distribution of normal data based on statistical
+                                 characteristics such as mean and standard deviation, and identify data points that deviate from these distributions
+                                 as anomalies14. For instance, the Z-score method relies on Gaussian distribution . However, statistical methods
+                                 may struggle to capture the complex structure and nonlinear characteristics of high-dimensional data. To
+                                 address this, non-parametric statistical methods, such as those based on kernel density estimation, have been
+                                 introduced to reduce reliance on data distribution assumptions . Despite this, non-parametric methods can
+                                 become unstable and computationally expensive in high-dimensional spaces.
+                                     To address these challenges, machine learning and deep learning methods have recently been integrated into
+                                 the field of anomaly detection. Zhang et al. improved the capability of pulsed infrared thermography (PIT) for
+                                 detecting subsurface defects as small as 101 µm in high-strength stainless steel 316 by employing an advanced
+                                 unsupervised learning-based algorithm, which enhances both defect visibility and segmentation15. Thorsten
+                                 Joachims et al. employed a small amount of labeled data along with a large volume of unlabeled data for training,
+                                 developing a semi-supervised method well-suited for scenarios in the aerospace field where data annotation is
+                                 challenging16 . zhou et al. incorporated multi-scale feature fusion and efficient convolution operations to achieve
+                                 precise detection and segmentation of targets across various scales17. Su et al. proposed a deep learning method
+                                 based on complementary attention networks adaptively suppresses background noise features and highlights
+                                 defect features to ensure accurate detection of small and complex defects18.
+                                     The aforementioned methods can autonomously learn and extract key features from data, thereby reducing
+                                 the need for manual feature engineering. However, challenges persist when handling large-scale or high-
+                                 dimensional datasets, such as resource consumption, model complexity, and the ability to effectively extract
+                                 and process features in high-dimensional spaces. Tang et al .proposed a detection network that integrates
+                                 Transformer and convolutional neural network (CNN) architectures19. By optimizing the network structure, this
+                                 approach achieves efficient extraction and fusion of multi-scale features. Wu et al. implemented a lightweight
+                                 module design to strike a balance between speed and accuracy20. munkhdalai et al. introduce a new attention
+                                 mechanism, Infini-attention, with transformer capable of handling infinitely long inputs with fixed memory21.
+                                 these methods excel in Euclidean space, they face limitations when applied to image data in non-Euclidean
+                                 spaces. To address this issue, we explore extending anomaly detection methods to hyperbolic space to better
+                                 leverage the intrinsic geometric features of the data.
+
+                                  Hyperbolic embeddings
+                                 In hyperbolic space, the volume grows exponentially with increasing distance from the origin, whereas in
+                                 Euclidean space, the volume increases polynomially. Consequently, as the distance from the origin increases
+                                 in hyperbolic space, the volume available for accommodation expands rapidly. This characteristic allows
+                                 hyperbolic space to represent larger data structures within a more compact space, making it particularly effective
+                                 for processing data with inherent hierarchical structures, such as tree structures or hierarchical relationships22.
+                                 For instance, in hyperbolic space, shallower tree nodes are positioned closer to the origin, while deeper nodes
+                                 are situated further away, reflecting the natural hierarchical organization of the tree structure. Additionally, the
+                                 geodesic distance between points in hyperbolic space mirrors the path length between nodes in a tree, enhancing
+                                 the ability to model hierarchical data. Hyperbolic space embedding methods include Poincaré Embeddings and
+                                 Hyperbolic Neural Networks. Poincaré Embeddings leverage the geometric properties of hyperbolic space to
+                                 minimize the
+                                     distance between data points by optimizing their positions in the embedding space, thereby better capturing
+                                 hierarchical structures23. Hyperbolic neural networks integrate hyperbolic geometry with neural networks,
+                                 allowing the networks to more effectively process data with hierarchical structures through training in hyperbolic
+                                 space.
+
+Scientific Reports |   (2025) 15:25668               | https://doi.org/10.1038/s41598-025-07550-0                                                  3
+www.nature.com/scientificreports/
+
+
+                                      Previous research has demonstrated that mapping embeddings generated by deep neural networks into
+                                 hyperbolic space can significantly enhance classifier performance. For instance, Kyriakis et al. proposed a
+                                 method to learn hyperbolic representations of persistence diagrams, which leverages the Poincaré ball to preserve
+                                 the relative importance of topological features, especially those with infinite persistence, by mapping them
+                                 infinitesimally close to the boundary of the ball24. Liu et al. introduced a hyperbolic visual embedding learning
+                                 network designed for zero-shot recognition25. This network, by learning image embeddings in hyperbolic space,
+                                 not only preserves the hierarchical structure of semantic categories in a low-dimensional space but also leverages
+                                 the exponential growth properties of hyperbolic space, thus improving its ability to capture subtle image
+                                 differences. Similarly, Ermolov et al. integrated hyperbolic space with the visual transformer (ViT) architecture to
+                                 develop an advanced target detection model26. Incorporating hyperbolic embeddings into the ViT model allows
+                                 it to better handle subtle differences and complex backgrounds in images, thereby enhancing detection accuracy
+                                 and effectively managing hierarchical structure information, such as objects and backgrounds at various scales.
+                                 Teng et al. proposed embedding the hierarchical relationships between videos and categories into a hyperbolic
+                                 shared space to address the challenges of video retrieval with hierarchical structures27. This approach maintains
+                                 the relationships between videos and categories within hyperbolic space, ensuring that during retrieval, similar
+                                 videos are prioritized, followed by those with hierarchical similarities.kim et al. introduced a self-supervised
+                                 regularization technique is proposed for supervised metric learning, aimed at enhancing the supervisory signal.
+                                 By leveraging hierarchical agents in hyperbolic space to capture the underlying hierarchical structure of data, the
+                                 method constructs loss functions using triplets and hierarchical agents. This approach encourages the sample
+                                 embeddings to form a tree-like structure, where agents represent class levels, thereby improving the performance
+                                 of metric learning methods based on hyperspheres or hyperbolic space28.
+
+                                 Methods
+                                 Overall architecture
+                                 In this section, we provide a detailed introduction to our proposed anomaly detection method, HADNet.
+                                 HADNet is a sophisticated detection technology that operates in hyperbolic space and is specifically designed for
+                                 identifying anomalies in data. By mapping data from traditional Euclidean space to hyperbolic space, HADNet
+                                 enhances the ability to capture hierarchical relationships and geometric structures within the data.
+                                     HADNet comprises three key components: hyperbolic space transformation, anomaly-aware feature subset
+                                 selection, and adaptive residuals discrimination. The hyperbolic space transformation component converts
+                                 the original data into hyperbolic space, enhancing the expressiveness of data features by leveraging the unique
+                                 properties of hyperbolic geometry. This conversion makes features that may have been less prominent in
+                                 Euclidean space more distinct in hyperbolic space. The anomaly-aware feature subset selection module identifies
+                                 the most relevant features for anomaly detection from the transformed data, ensuring that the model focuses
+                                 on the most discriminative features, thereby improving detection accuracy and reducing redundancy. Adaptive
+                                 residuals discrimination captures subtle deviations in anomalous data and effectively filters out noise in normal
+                                 data by adaptively analyzing the distribution characteristics of residuals. It also generates anomaly scores by
+                                 selecting the reconstructed residuals containing the most significant abnormal information, thus enhancing the
+                                 detection of anomalous regions. The overall process of HADNet is illustrated in Fig. 3.
+
+                                 Hyperbolic space transformation
+                                 As the size and complexity of data continue to grow, traditional Euclidean space exhibits limitations in handling
+                                 highly nonlinear and complex datasets, particularly when dealing with hierarchical structures and nonlinear
+                                 boundaries. To address these challenges, we introduce hyperbolic Space, a geometric structure better suited
+                                 for processing high-dimensional, complex data. Unlike Euclidean space, hyperbolic Space is a Riemannian
+                                 manifold characterized by constant negative curvature, making it more efficient in representing hierarchical
+                                 relationships. Due to its significantly greater capacity than Euclidean space, hyperbolic Space allows for more
+                                 concise parameterization while maintaining equivalent expressive power.There are multiple isometric models
+                                 for representing hyperbolic space. To more intuitively observe the properties of hyperbolic space, we use the
+                                 Poincaré model for modeling and processing. The n-dimensional Poincaré ball, characterized by constant
+                                 negative curvature k, is defined as (Hkn , gxk ), with manifold Hn k = {x ∈ R : k ∥x∥ < 1} and Riemannian
+                                                                                                                n
+
+                                 metric is defined as (1):
+                                                                                                2
+                                                                       gxk = (λkx )2 In =             In (1)
+                                                                                            1 − k∥x∥2
+
+                                 where λkx denotes the conformal factor. The conformal factor defines the inner product as ⟨u, v⟩kx = (λxk )2 ⟨u, v⟩
+                                 and the norm as ∥v∥kx = λkx ∥v∥ for all u, v ∈ Tx Hxk , Tx refers to the tangent space of the manifold at the point.
+                                 Several isometric models exist for hyperbolic space. Gyrovector space is an algebraic structure designed for
+                                 performing vector operations in hyperbolic geometry. Specifically, gyrovector space offers a method for vector
+                                 operations within this context. In the Poincaré sphere model, point addition and distance calculations can be
+                                 executed using operations in gyrovector space, a process known as Möbius addition. Vector addition of two
+                                 points in the Poincaré ball model can be defined as Equation (2), where denotes the inner product.
+
+                                                                      (1 + 2k⟨u, v⟩ + k∥v∥2 )u + (1 − k∥u∥2 )v
+                                                            u⊕k v =                                            (2)
+                                                                            1 + 2k⟨u, v⟩ + k2 ∥u∥2 ∥v∥2
+
+
+
+
+Scientific Reports |   (2025) 15:25668               | https://doi.org/10.1038/s41598-025-07550-0                                                  4
+www.nature.com/scientificreports/
+
+
+
+
+                                 Fig. 3. The overall architecture of HADNet. The architecture consists of three main modules: Hyperbolic
+                                 Space Transformation (HST), Anomaly-aware Feature Subset Selection (AFSS), and Adaptive Residuals
+                                 Discrimination (ARD). The input features are first mapped from Euclidean space to hyperbolic space using
+                                 HST to enhance the representation of hierarchical relationships. The AFSS module then selects the most
+                                 relevant features for anomaly detection, reducing redundancy and improving detection accuracy. Finally, the
+                                 ARD module analyzes the residuals to isolate the most effective regions for anomaly detection and generates
+                                 anomaly scores.
+
+
+
+                                 To achieve the transformation from Euclidean space to Poincaré space, we define an exponential map. This map
+                                 provides a method for mapping vectors from the tangent space to the manifold. Typically, v is set to the origin.
+                                 T﻿he mapping can be expressed as (3):
+                                                                                      √ λk ∥v∥     v
+                                                                expkx (v) = x⊕k (tanh( k x     )√       )(3)
+                                                                                           2      k ∥v∥
+
+                                                2
+                                 where λkx = 1−k∥x∥2 ,x can be set to 0. Correspondingly, the inverse of this mapping is the logarithmic map,
+
+                                 which transforms points from Poincaré space back to Euclidean space. This map can be expressed as (4):
+                                                                           2           √             −x⊕k u
+                                                           logkx (u) = √       tanh−1 ( k ∥−x⊕k u∥)           (4)
+                                                                             k
+                                                                           kλx                      ∥−x⊕ k u∥
+
+
+                                 As we approach the boundary of the Poincaré ball, the hyperbolic distance increases at a much faster rate than
+                                 the Euclidean distance. This phenomenon can be further elucidated by a specific mathematical formula.the
+                                 distance between a, b ∈ Hnk is defined as (5):
+                                                                                            √            2
+                                                                        1                     k∥a − b∥
+                                                          dH (a, b) = √ cosh−1 (1 + 2            2           2 )(5)
+                                                                         k              (1 − ∥a∥ )(1 − ∥b∥ )
+
+                                 When the hyperbolic distance approaches the boundary of the sphere, the denominator in the formula decreases
+                                 rapidly, causing the inverse hyperbolic cosine function to increase sharply. This leads to the hyperbolic distance
+                                 growing significantly faster than the Euclidean distance. In image segmentation tasks, hyperplanes are frequently
+                                 used as decision boundaries. The Poincaré hyperplane represents a low-dimensional plane structure within
+                                 hyperbolic geometry. In the Poincaré model, it partitions hyperbolic space according to the metric rules of
+                                 hyperbolic geometry.For p ∈ Hnk , w ∈ Tx Hnk \{0}, the the Poincaré hyperplane is defined as (6):
+                                                                      c
+                                                                    E = {z ∈ Hnk , < −p⊕k z, w >= 0}(6)
+
+                                 Where w is normal vector Fig. 4 shows the hyperbolic distance of z to the hyperplane is given as (7):
+                                                                                         √
+                                                                    c     1     −1      2 k⟨−p⊕k z, w⟩
+                                                           dk (z, H ) = sinh (                         2      )(7)
+                                                                          k         (1 − k∥−p⊕ z∥ ) ∥w∥
+                                                                                                    k
+
+
+
+Scientific Reports |   (2025) 15:25668               | https://doi.org/10.1038/s41598-025-07550-0                                                5
+www.nature.com/scientificreports/
+
+
+
+
+                                 Fig. 4. Hyperbolic Space Transformation process. The features embedding of Euclidean space is converted
+                                 to hyperbolic space by exponential mapping EXPnk . For Poincare’s ball, given a point z, the distance to the
+                                 hyperplane H c is expressed as dk (z, H c ).
+
+
+
+                                 AnomalySelect
+                                 In this section, we provide a detailed description of the AnomalySelect module, which comprises Anomaly-
+                                 aware Feature Subset Selection (AFSS) and Adaptive Residuals Discrimination (ARD). In practical applications,
+                                 data often includes numerous irrelevant or redundant features. AFSS addresses this issue by selecting the
+                                 most representative and discriminative features from pre-trained data, thereby reducing noise interference,
+                                 dimensionality, and computational cost while enhancing detection performance. ARD focuses on identifying
+                                 residual features that contain the most significant anomaly information, leading to more precise detection
+                                 of anomalous regions. The integration of AFSS and ARD ensures that the model remains both efficient and
+                                 sensitive while managing computational resources effectively.
+                                     In Anomaly-aware Feature Subset Selection, efficient feature selection is achieved through a detailed analysis
+                                 of the extracted feature maps from each layer, with a particular focus on the differences between normal and
+                                 abnormal images. Specifically, consider the j-th feature map from the i-th layer, denoted as ϕ(i, j), i, j = 1, 2 . . . n.
+                                 By comparing the activation values of the normal image In and the abnormal image Gn on this feature map, the
+                                 difference ε(i, j) between the two can be quantified. This quantification of difference aids in identifying the most
+                                 significant features in the feature space, thereby guiding subsequent feature selection and model optimization.
+                                 T﻿he specific calculation process is shown in (8):
+                                                                         ε(i, j) = ϕ(i, j)In − ϕ(i, j)Gn (8)
+
+                                 Next, we calculate the square of the difference, denoted as ε2 (i, j). This value is then normalized and aligned
+                                 with the spatial resolutions of the hyperbolic distance dk (z, H c ) to ensure comparison and analysis on a unified
+                                 scale. The resulting value is the normalized difference after alignment with dk (z, H c ),as shown in (9):
+                                                                                                2
+                                                                               M = R(N (ε (i, j)))(9)
+
+                                 Here,N denotes the normalization operation, and R represents the spatial resolution alignment operation.
+                                 Ideally, M and dk (z, H c ) should be very similar, meaning they should exhibit high consistency in both value
+                                 and distribution. Additionally, we introduce an Anomaly-aware Feature Subset Selection loss function, denoted
+                                 as LAF SS , to evaluate the effectiveness of each layer of the feature map. This loss function adaptively adjusts the
+                                 feature selection strategy and optimizes each layer of the feature map,the process is shown in (10):
+
+                                                                                      1 ∑
+                                                                                           N
+
+                                                                          LAF SS =        ∥M − dH ∥22 (10)
+                                                                                      N
+                                                                                          n=1
+
+
+                                 Finally, we select r feature maps for reconstruction based on the minimum Anomaly-aware Feature Subset Selection
+                                 (AFSS) loss LAF SS obtained at each layer. For instance, for the t-th layer, rt feature maps with the minimum AFSS
+                                 loss LAF SS are chosen for reconstruction, denoted as {ϕ(t, 1)Gn , ϕ(t, 2)Gn , . . . , ϕ(t, r)Gn }. Additionally, by
+                                 performing feature selection at various levels, we obtain multi-scale features, denoted as{ϕ(1), ϕ(2), . . . , ϕ(n)}.
+                                 We use these n multi-scale features for feature reconstruction. The subsequent calculation yields the reconstruction
+                                 residualγ(k), representing the difference between the original and reconstructed features. This process can be
+                                 summarized as γ(k) = ϕ(k) − Φ(k), where Φ(k) denotes the feature generated after reconstruction at the
+                                 k-th layer. The reconstruction residual γ(k) is then used as input for the subsequent Anomaly-aware Residual
+                                 Discrimination process.
+                                     Anomaly-aware Feature Subset Selection identifies the most discriminative subset of features within each
+                                 layer, whereas Adaptive Residuals Discrimination focuses on selecting the optimal layer. Features at various levels
+                                 are suited for detecting anomalies of different scales and semantic meanings. For instance, low-level features are
+                                 effective for detecting small-scale texture anomalies but may overlook or fail to detect large-scale functional
+
+Scientific Reports |   (2025) 15:25668                | https://doi.org/10.1038/s41598-025-07550-0                                                       6
+www.nature.com/scientificreports/
+
+
+                                 anomalies. Conversely, high-level features are less effective for detecting fine-grained texture anomalies. ARD
+                                 addresses the issue of missed anomaly detection by retaining only the partial reconstruction errors that contain
+                                 the most significant abnormal information, thereby improving the accuracy of the final anomaly map.
+                                     Adaptive Residuals Discrimination enhances the recall rate of anomaly detection by selecting a subset of
+                                 reconstructed residuals that contain the most significant anomaly information. Initially, we construct a global
+                                 reconstruction residual to generate a comprehensive feature map. Specifically, we upsample the low-resolution
+                                 reconstruction residuals to a uniform resolution and then concatenate them to form the global reconstruction
+                                 residual Γ. Subsequently, Global Max Pooling (GMP) and Global Average Pooling (GAP) operations are applied
+                                 to Γ, resulting in two feature maps, ΓM and ΓA , which capture the global maximum and average values,
+                                 respectively, after pooling. The specific process is shown in (11) and (12):
+                                                                               ΓM = max(Γ)          (11)
+                                                                               1      ∑H ∑W
+                                                                      ΓA =                                Γ   (12)
+                                                                             H ×W          i−1      j=1
+
+
+                                 Here, H and W denote the height and width of the reconstructed residual, respectively. To identify the most
+                                 significant elements in the global statistical features, we select the largest s elements from ΓM and ΓA and
+                                 determine their corresponding positions in Γ, denoted as ΓM M (s) and ΓAM (s) , respectively. Since Global
+                                 Max Pooling (GMP) is effective at capturing local anomalies, while Global Average Pooling (GAP) is better
+                                 at identifying global anomalies, we combine the outputs of GMP and GAP to enhance the anomaly detection
+                                 capability of Adaptive Residuals Discrimination (ARD). The process is shown in (13):
+                                                                                     ( )            ( )
+                                                                                       s              s
+                                                                         Λ = ΓM M          ⊕ ΓAM        (13)
+                                                                                       2              2
+
+                                 In this process, ⊕ represents the connection operation, while Λ denotes the enhanced reconstruction residual. To
+                                 ensure data consistency, we set 2s as the value for ΓM M (s) and ΓAM (s) . Finally, Λ is input into the discriminator
+                                 to obtain the final anomaly score.
+
+                                 Experiments
+                                 Datasets
+                                 The NEU-Seg dataset is a standardized, high-quality database commonly utilized for defect detection and
+                                 segmentation29. It includes three types of textures: inclusion, patch, and scratch. Each category contains 300
+                                 defect texture images, each with a resolution of 200 × 200 pixels. To support pixel-level surface defect detection
+                                 tasks, the dataset provides pixel-level labels annotated using the open-source annotation tool LabelMe. The
+                                 texture defects in the test images are complex, featuring significant intra-class variation and low contrast between
+                                 defect regions and the background, making NEU-Seg a particularly challenging dataset.
+                                     The MT-Defect dataset is primarily used for research and development in defect detection technology30. It
+                                 encompasses five types of defects under varying lighting conditions: blowhole, crack, fray, break, and unevenness.
+                                 The dataset contains 392 defect images and 952 defect-free images, with resolutions ranging from 105 × 283 to
+                                 388 × 516 pixels. The diversity of defect shapes, the complexity of textures, and the similarity of features between
+                                 classes present significant challenges for detection.
+                                     The FSSD-12 dataset is a newly released, publicly available dataset for small sample segmentation of pure
+                                 strip steel surface defects31. It includes 600 defect images across 12 categories, with 50 images per category.
+                                 The Defect categories encompass abrasion mask, iron-sheet ash, liquid, oxide scale, oil-spot, water-spot, patch,
+                                 punching, red-iron sheet, roll-printing, scratch, and inclusion. Each image has a resolution of 200 × 200 pixels
+                                 and contains pixel-level annotations for the entire defective area.
+                                     The UCF-EL dataset is primarily used for research on defect detection in solar photovoltaic (PV) modules
+                                 and encompasses nine types of faults32. It contains 17,064 electroluminescence images, of which 16,808 were
+                                 captured from 368 crystalline silicon (c-Si) PV modules, with each image having a resolution of 300 × 300 pixels.
+
+                                 Implementation details
+                                 This study utilizes an 11th Gen Intel Core i9-11900F processor in conjunction with a single NVIDIA GeForce
+                                 RTX 4090 GPU for computing. The software environment is configured with Python 3.9 and CUDA 11.2. Data
+                                 preprocessing is vital for preparing datasets for training and evaluation. Images are resized to a consistent 256
+                                 × 256 pixels and normalized with RGB mean values of [0.491, 0.449, 0.410] and standard deviations of [0.231,
+                                 0.219, 0.220]. To enhance robustness, data augmentation techniques are applied, including random adjustments
+                                 to brightness, contrast, and saturation using ColorJitter with a probability of 0.25. This helps simulate variations
+                                 in lighting and color conditions.
+                                     Training HADNet requires careful configuration. The dataset is split into training, validation, and testing
+                                 sets in an 8:1:1 ratio to facilitate hyperparameter tuning and prevent overfitting. The training process uses a
+                                 batch size of 8 and an initial learning rate of 0.001, with a step decay schedule to adjust the learning rate during
+                                 training. The model is trained for 150 epochs to ensure sufficient learning while maintaining generalizability.
+                                 The Anomaly-aware Feature Subset Selection (AFSS) module enhances the model’s ability to focus on relevant
+                                 information by guiding the selection of the most discriminative features for anomaly detection.Additionally, an
+                                 Autoencoder is used to extract global reconstruction features, and teacher-student distillation is employed to
+                                 enhance generalization performance.
+
+
+
+Scientific Reports |   (2025) 15:25668               | https://doi.org/10.1038/s41598-025-07550-0                                                   7
+www.nature.com/scientificreports/
+
+
+                                 Evaluation criterion
+                                 Evaluation criteria are crucial for a fair comparison of model performances. In this paper, we utilize Intersection
+                                 over Union (IoU) for detection and segmentation, a widely used metric in anomaly detection, as defined in (14):
+                                                                                                    A∩B
+                                                                                           IoU =        (14)
+                                                                                                    A∪B
+
+                                 A represents the predicted area, while B represents the true area.
+                                     In multi-category anomaly detection, average Intersection-over-Union (IoU) is preferred as the evaluation
+                                 criterion due to its objectivity and comprehensiveness, as defined by the formula shown in (15):
+
+                                                                                                  1 ∑
+                                                                                                         N
+
+                                                                                      M IoU =         IoUn (15)
+                                                                                                  N
+                                                                                                     n=1
+
+
+                                 Where IoU n represents the detection IoU of category n.
+
+                                 Compare with state-of-the-arts
+                                 Table 1 presents the experimental results of IoU performance for state-of-the-art methods on the NEU-Seg
+                                 dataset. Our method demonstrates significant performance on the NEU-Seg dataset, achieving an average IoU
+                                 of 87%. Compared to DDSNet, our method improves mIoU by 2.21%, with notable gains of 3.34% and 3.55%
+                                 in IoU for the “Inclusion” and “Scratch” categories, respectively. Additionally, the hyperbolic space-embedded
+                                 HADNet exhibits optimal anomaly detection and localization capa-bilities compared to Euclidean space-based
+                                 counterparts. This architecture addresses fundamental representational limitations of conventional Euclidean
+                                 geometry through its hierarchical feature learning mechanism, demonstrating superior performance in feature
+                                 representation for industrial anomaly detection. These results also indicate that our method overcomes the
+                                 limitations of Euclidean space in representing image data. Furthermore, we visualize the original images, ground
+                                 truth, and predicted masks using various methods. Qualitative results of our anomaly localization method
+                                 are shown in Fig. 5. Compared to other methods, our approach significantly enhances pixel-level anomaly
+                                 identification and localization for inclusions, patches, and scratches.In addition, Our approach attains a more
+                                 streamlined model with only 11.352 M parameters and a computational complexity of merely 1.113 G. When
+                                 juxtaposed with the PoolFormer method, HADNet not only delivers superior performance but also significantly
+                                 trims down the parameter count by 4.290 M and slashes the computational load by a substantial 3.761 G.
+
+
+
+                                  Method          Background      Inclusion   Patch    Scratch   mIoU        Parameters   FLOPs
+                                  FCN33           96.89           67.49       82.40    72.55     79.83       9.835M       2.925G
+                                  PSPNet34        97.32           71.93       85.58    75.24     82.52       44.54M       27.302G
+                                  DeepLabV3+35    97.05           71.15       84.94    78.72     82.96       56.49M       26.932G
+                                  EMANet36        97.33           72.14       85.96    72.97     82.25       56.17M       25.868G
+                                  FPN37           97.01           70.72       85.81    78.12     82.91       28.496M      7.237G
+                                  ICNet38         97.07           67.88       85.20    72.01     80.54       24.847M      1.379G
+                                  CGNet39         96.77           66.64       83.38    70.80     79.40       0.496M       0.529G
+                                  STDC240         97.42           69.61       85.38    72.39     81.13       12.306M      1.911G
+                                  STDC140         97.23           71.14       85.98    72.33     81.82       8.275M       1.365G
+                                  BiSeNetV141     97.00           67.24       84.61    73.01     80.46       13.276M      2.384G
+                                  BiSeNetV242     97.27           71.14       85.95    73.55     81.98       3.359M       1.891G
+                                  Fast-SCNN43     97.11           69.12       85.11    71.66     80.75       1.4M         0.155G
+                                  DDRNet44        97.24           68.58       86.41    72.85     81.27       6.023M       0.74G
+                                  FDSNet*45       –               –           –        –         78.80       0.97M        –
+                                  RTFormer46      97.35           67.95       85.32    73.54     81.04       5.21M        0.67G
+                                  Trans4Trans47   97.14           68.51       83.49    72.97     80.52       13.11M       1.52G
+                                  PIDNet48        97.10           71.27       84.70    72.06     81.28       7.721M       0.966G
+                                  SegFormer49     96.96           67.19       83.42    77.04     81.15       3.716M       1.096G
+                                  SeaFormer50     97.26           73.53       84.42    73.4      82.15       1.65M        0.1G
+                                  SCTNet51        97.14           71.79       83.92    73.72     81.65       29.72M       0.58G
+                                  ConvNext52      96.82           65.52       82.71    73.65     79.68       123.91M      43.634G
+                                  SegNext53       97.05           69.44       84.13    73.23     80.96       4.226M       1.001G
+                                  PoolFormer54    96.80           65.93       82.41    75.34     80.12       15.561M      4.874G
+                                  DDSNet55        97.74           76.87       88.91    76.96     85.12       9.747M       0.97G
+                                  Ours            98.10           79.45       90.83    79.69     87.00       11.352M      1.113G
+
+
+                                 Table 1. Performance comparison of our method with the state-of-the-art methods on the NEU-Seg dataset.
+
+
+Scientific Reports |   (2025) 15:25668                    | https://doi.org/10.1038/s41598-025-07550-0                                            8
+www.nature.com/scientificreports/
+
+
+
+
+                                 Fig. 5. Comparative detection results of HADNet on the NEU-Seg dataset.
+
+
+
+                                    Table 2 presents the segmentation performance of our method compared to existing approaches on the
+                                 MT-Defect dataset. Utilizing WideResNet50 as the backbone, our method outperforms other state-of-the-art
+                                 techniques, achieving an average IoU of 81.46%, which is 6.47% higher than the previous best method, DDSNet.
+                                 Additionally, our method delivers improvements of 5.81%, 6%, and 14.53% in the detection of blowholes, breaks,
+                                 and cracks, respectively, compared to other surface defect detection methods. Qualitative results of our method
+                                 on the MT-Defect dataset are shown in Fig. 6, further demonstrating the advantages of the proposed approach.
+                                    For the FSSD-12 dataset, we use other methods to evaluate our method, and the comparison results are
+                                 shown in Table 3. It is worth noting that our method achieves 77.04% mIoU on the FSSD-12 dataset. Compared
+
+Scientific Reports |   (2025) 15:25668              | https://doi.org/10.1038/s41598-025-07550-0                                              9
+www.nature.com/scientificreports/
+
+
+                                  Method        Background    Blowhole   Break   Creak   Fray    Uneven   mIoU
+                                  FCN           99.48         20.04      49.92   37.60   85.49   80.36    62.15
+                                  PSPNet        99.30         38.90      61.40   52.80   83.10   70.50    67.66
+                                  DeepLabV3+    98.52         22.26      52.79   37.42   53.23   23.42    47.97
+                                  EMANet        99.57         23.40      71.75   44.49   84.90   81.37    67.40
+                                  FPN           98.94         0.28       5.46    1.32    27.63   63.26    32.82
+                                  ICNet         99.00         1.26       37.14   24.45   82.7    52.52    49.51
+                                  CGNet         98.86         1.08       22.79   0.47    52.09   54.51    38.30
+                                  STDC2         98.94         0.66       30.27   1.12    65.69   55.09    41.96
+                                  STDC1         99.13         1.10       28.10   1.33    66.57   62.97    43.20
+                                  BiSeNetV1     99.38         14.83      65.02   31.11   86.12   74.09    61.08
+                                  BiSeNetV2     99.32         11.28      57.53   37.20   83.28   72.74    60.22
+                                  Fast-SCNN     99.23         1.56       52.97   1.81    80.27   68.07    50.65
+                                  DDRNet        99.47         34.98      63.38   37.29   83.93   77.62    66.11
+                                  FDSNet*       –             –          –       –       –       –        63.9
+                                  RTFormer      99.51         32.42      64.13   36.85   84.21   78.39    65.91
+                                  Trans4Trans   99.28         34.47      63.97   36.11   85.01   76.08    65.82
+                                  PIDNet        98.58         58.77      55.93   38.60   79.10   66.44    66.23
+                                  SegFormer     98.03         54.62      61.21   38.51   81.89   75.69    68.32
+                                  SeaFormer     99.51         57.68      62.53   37.96   81.21   74.15    68.84
+                                  SCTNet        99.41         58.81      60.78   39.81   80.8    75.91    69.25
+                                  ConvNext      99.57         58.26      74.84   40.69   89.40   83.69    74.41
+                                  SegNext       99.44         54.24      69.32   48.60   87.70   74.89    72.36
+                                  PoolFormer    99.44         57.80      73.20   46.96   88.67   75.39    73.58
+                                  DDSNet        99.56         55.31      71.75   61.86   88.72   81.86    76.51
+                                  Ours          99.67         62.23      79.33   70.85   90.91   85.74    81.45
+
+
+                                 Table 2. Segmentation performance comparison of our method with the state-of-the-art methods on the MT-
+                                 Defect dataset.
+
+
+
+                                 with DDSNet, our method outperforms by 4.35% mIoU. Some qualitative detection results are shown in Fig. 7.
+                                 Compared with other methods, our method has better recognition ability for inclusion, patch and scratch, and
+                                 its segmentation results are closer to the ground truth.
+                                     For the UCF-EL dataset, we evaluated our approach using UNet, Deeplab v3+, PAN, PSPNet, FPN, and
+                                 SegFormer. In addition to the original metrics, we incorporated F1 score, weighted F1 score, and pixel accuracy
+                                 for a more comprehensive assessment. The comparative results are presented in Table 4. It is worth noting that
+                                 our method achieved an mIoU of 59.41% on the UCF-EL dataset, outperforming SegFormer by 2.88% in terms
+                                 of mIoU.
+
+                                 Ablation studies
+                                 To assess the performance impact of AFSS and ARD on our method, we conducted a comprehensive ablation
+                                 study on the NEU-Seg dataset. Instead of dimensionality reduction method AFSS, we employed Random
+                                 Dimensionality Reduction (RDR) and Random Linear Projection Reduction (RLPR). RDR selects features
+                                 randomly from high-dimensional data, while RLPR applies untrained linear transformation layers for projection.
+                                 The HADNet results using RDR and RLPR are presented in Experiment 1 and Experiment 3 of Table 5,
+                                 respectively. To generate anomaly scores, we input the global reconstruction residuals into the discriminator.
+                                 The relevant results are provided in Experiment 1 and Experiment 2 of Table 5. As shown in Experiment 3 of
+                                 Table 5, component ARD significantly influences model performance. When all reconstructed residuals are
+                                 used to generate anomaly scores, residuals lacking anomaly information can lead to the omission of abnormal
+                                 regions, thereby considerably reducing anomaly detection performance. In contrast, AFSS outperforms RDR
+                                 and RLPR in anomaly detection.
+                                     Hyperbolic space can indicate the presence of geometric features in an image but is limited in determining the
+                                 exact location of defects. In this subsection, we examine the impact of the curvature value ρ of hyperbolic space
+                                 on anomaly detection performance. When selecting the curvature for hyperbolic embeddings, the characteristics
+                                 of the data type, such as hierarchical structure, complexity, and dimensionality, are important considerations.
+                                 Lower curvatures are generally preferred for capturing features with rich hierarchical relationships while
+                                 maintaining embedding stability. Therefore, for metal surface defect images with complex backgrounds and
+                                 multi-level features, we set a range of candidate curvature values ρ( 0.001, 0.005, 0.01, 0.05, 0.1, 0.3, and 0.5).
+                                 As shown in Table 6, we present the mIoU scores obtained with our method across different curvature values
+                                 ρ for various hyperbolic spaces on the NEU-Seg, MT-Defect, FSSD-12, and UCF-EL datasets. Table 6 reveals
+                                 that as the curvature ρ increases, it initially improves detection performance up to a certain point, beyond
+                                 which further increases in ρ lead to degradation. When ρ approaches zero, the curvature radius of hyperbolic
+
+
+Scientific Reports |   (2025) 15:25668                  | https://doi.org/10.1038/s41598-025-07550-0                                             10
+www.nature.com/scientificreports/
+
+
+
+
+                                 Fig. 6. Comparative detection results of HADNet on the MT-Defect dataset.
+
+
+
+                                  Method        AM      La      Ld      Op      Os      Pa      Pk      Ri      Rp      Sc      Se      Ws      mIoU
+                                  Fast-SCNN     68.32   63.28   72.65   60.53   52.09   61.96   63.89   50.81   61.26   58.22   47.15   49.93   59.17
+                                  SegNext       73.13   74.62   86.28   71.20   67.36   76.96   75.74   68.15   73.11   69.23   58.74   59.01   71.12
+                                  SCTNet        74.93   71.24   85.41   73.37   65.22   74.40   78.28   64.83   72.69   67.07   59.34   58.21   70.42
+                                  RTFormer      71.94   68.56   79.45   73.11   61.10   70.89   79.57   72.51   74.36   66.27   53.22   54.09   68.76
+                                  SeaFormer     75.33   70.42   83.97   72.51   64.89   74.20   79.23   56.28   74.25   66.29   57.83   59.47   69.56
+                                  Trans4Trans   72.85   69.32   81.28   70.12   63.45   71.24   75.56   62.43   71.8    65.37   54.32   56.11   67.82
+                                  ConvNext      73.97   71.06   84.56   75.18   65.20   73.65   80.37   66.24   74.93   69.05   58.96   57.41   70.88
+                                  DDSNet        75.39   74.27   87.70   76.69   68.08   76.11   83.58   70.65   77.97   72.77   62.01   60.79   73.83
+                                  Ours          81.72   77.80   90.81   81.66   70.72   81.47   76.22   73.85   80.64   77.17   67.53   64.91   77.04
+
+
+                                 Table 3. Performance comparison on the FSSD-12 dataset.
+
+
+
+                                 space approaches infinity, making the space locally similar to Euclidean flatness. Conversely, higher values of ρ
+                                 increase the curvature of hyperbolic space, resulting in a steeper spatial structure. This indicates that the flatness
+                                 of Euclidean space might be insufficient to capture the data’s complexity, thereby constraining its representational
+                                 capacity. Empirical results demonstrate that our method performs optimally when ρ = 0.01; hence, we set ρ to
+                                 0.01 for the experiments.
+
+                                 Discussion
+                                 This work seeks to enhance the representation of anomalous features by addressing the limitations of Euclidean
+                                 space in capturing complex structural information. As interest in hyperbolic space with negative curvature
+                                 within non-Euclidean frameworks grows, HADNet introduces a metric representation based on hyperbolic
+                                 embeddings combined with anomaly-aware selection. Compared to the state-of-the-art DDSNet, HADNet
+                                 demonstrates superior performance on the MT-Defect dataset, achieving an IoU improvement exceeding
+                                 6.92% for Blowhole, Break, and Crack defects. The hyperbolic embedding-based metric representation, which
+                                 involves distance measures transitioning from Euclidean to hyperbolic space, warrants further attention from
+
+
+Scientific Reports |   (2025) 15:25668                  | https://doi.org/10.1038/s41598-025-07550-0                                                    11
+www.nature.com/scientificreports/
+
+
+
+
+                                 Fig. 7. Comparative detection results of HADNet on the FSSD-12 dataset.
+
+
+
+                                  Method           F1      w-F1    Acc      mIoU
+                                  Deeplab v3       0.690   0.950   95.41    57.30
+                                  UNET             0.766   0.957   96.01    52.13
+                                  Deeplab v3+      0.774   0.958   96.02    52.12
+                                  PAN              0.770   0.957   95.90    51.01
+                                  PSPNet           0.762   0.954   95.71    49.44
+                                  FPN              0.773   0.958   95.93    51.02
+                                  SegFormer        0.820   0.962   96.21    56.53
+                                  Ours             0.853   0.971   96.83    59.41
+
+
+                                 Table 4. Performance comparison on the UCF-EL dataset.
+
+
+
+                                      AFSS     ARD      Background       Inclusion   Patch   Scratch   mIoU
+                                  1                     97.31            72.84       85.19   75.26     82.65
+                                  2   ✓                 97.76            74.43       86.92   76.06     83.79
+                                  3            ✓        98.06            79.12       90.57   79.31     86.76
+                                  4   ✓        ✓        98.10            79.45       90.83   79.69     87.00
+
+
+                                 Table 5. Impact of AFSS and ARD on HADNet on the NEU-Seg dataset.
+
+
+
+                                 researchers. By leveraging the distance metrics in hyperbolic space, we can effectively construct a hierarchical
+                                 structure of defect categories and cluster unlabeled defects into hierarchical classes. This approach provides
+                                 potential applications for unsupervised classification and analysis of defects.
+                                     Despite the promising results of HADNet, certain limitations remain. Specifically, the method struggles with
+                                 scenarios where defects significantly overlap with the background or are obscured by noise and artifacts, leading
+
+
+Scientific Reports |   (2025) 15:25668                     | https://doi.org/10.1038/s41598-025-07550-0                                        12
+www.nature.com/scientificreports/
+
+
+                                  Curvature ρ       NEU-seg        MT-defect       FSSD-12       UCF-EL
+                                  0                 85.16          79.32           75.26         57.87
+                                  0.001             85.92          80.12           75.87         58.13
+                                  0.005             86.43          80.93           76.42         58.62
+                                  0.01              87.00          81.45           77.04         59.41
+                                  0.05              86.87          81.29           76.88         59.03
+                                  0.1               86.90          81.35           76.92         58.11
+                                  0.3               86.82          81.34           76.85         57.96
+                                  0.5               86.91          81.39           76.93         58.14
+
+
+                                 Table 6. Anomaly detection performance of different curvature values ρ under different datasets. mIoU is
+                                 used as the performance indicator(%).
+
+
+
+                                 to inaccuracies in defect boundary detection. Addressing these challenges necessitates exploring models that can
+                                 handle hierarchical or scale-free data distributions. Furthermore, the current architecture of HADNet primarily
+                                 focuses on enhancing anomaly detection performance. Although explicit hierarchical classification has not yet
+                                 been implemented, the inherent hierarchical embedding properties of hyperbolic space have already laid the
+                                 groundwork for more refined classification in the existing design, offering the potential for further expansion
+                                 into hierarchical classification. Future work could build on this foundation by introducing a hierarchical feature
+                                 analysis module, leveraging the advantages of hyperbolic space in representing tree-like structures, or exploring
+                                 graph clustering-based methods to identify subcategories within specific defect categories, thereby achieving
+                                 more precise defect classification and analysis. Additionally, a more accurate estimation of hyperbolic parameters
+                                 is crucial for adapting to complex scenarios, as these parameters can be sensitive to initial conditions and data
+                                 noise. Future research should focus on developing robust parameter estimation techniques and integrating
+                                 adaptive methods tailored to diverse data characteristics.
+
+                                 Conclusions
+                                 This paper introduces HADNet, a novel anomaly detection method for metal surface inspection based on
+                                 hyperbolic space. By overcoming the limitations inherent in Euclidean space, HADNet effectively captures
+                                 complex anomaly patterns. The primary advantage of HADNet lies in its use of the non-Euclidean geometric
+                                 properties of hyperbolic space, which enhances anomaly detection accuracy. Additionally, HADNet integrates
+                                 the Anomaly-aware Feature Subset Selection module with the Adaptive Residuals Discrimination module to
+                                 further refine detection performance. The AFSS module selects the most relevant features from a large set,
+                                 optimizing the detection process, while the ARD module adaptively analyzes residuals to improve detection
+                                 accuracy. Extensive experiments conducted on surface defect datasets, including NEU-Seg, MT-Defect, FSSD-
+                                 12, and UCF-EL demonstrate that HADNet significantly outperforms existing state-of-the-art methods.
+
+                                 Data availability
+                                 The data from the current study are available from the corresponding author upon reasonable request. The
+                                 proposed method was evaluated on four publicly available surface defect detection datasets that are widely used
+                                 in the field of object detection: FSSD-12 (​h​t​t​p​s​:​​/​/​p​a​n​.​​b​a​i​d​u​.​​c​o​m​/​s​/​​1​_​B​O​R​​N​J​r​O​4​m​​s​D​0​O​P​E​​c​V​S​c​-​Q​​?​p​w​d​=​9​m​1​
+                                 0), NEU-Seg (https://github.com/donghongwen/NEU_Seg), UCF-EL ​(​​h​t​t​p​s​:​/​/​g​i​t​h​u​b​.​c​o​m​/​u​c​f​-​p​h​o​t​o​v​o​l​t​a​i​c​s​/​U​
+                                 C​F​-​E​L​-​D​e​f​e​c​t​​​​) and MT-Defect (​h​t​t​p​s​:​​​/​​/​g​i​t​h​u​​b​.​c​o​​m​/​a​b​i​n​​​2​4​/​M​a​​g​n​e​t​​i​​c​-​t​​i​l​e​​-​d​e​f​​e​​c​t​-​d​a​t​a​s​e​t​s​.).
+
+                                 Received: 14 September 2024; Accepted: 16 June 2025
+
+
+                                 References
+                                  1. Si, S., Mu, D. & Si, Z. Intelligent tool wear prediction based on deep learning PSD-CVT model. Sci. Rep. 14, 20754 (2024).
+                                  2. Sanaei, N. & Fatemi, A. Defects in additive manufactured metals and their effect on fatigue performance: A state-of-the-art review.
+                                     Prog. Mater Sci. 117, 100724 (2021).
+                                  3. Abdulrahman, Y., Eltoum, M. M., Ayyad, A., Moyo, B. & Zweiri, Y. Aero-engine blade defect detection: A systematic review of deep
+                                     learning models. IEEE Access 11, 53048–53061 (2023).
+                                  4. Luo, Q., Fang, X., Liu, L., Yang, C. & Sun, Y. Automated visual defect detection for flat steel surface: A survey. IEEE Trans. Instrum.
+                                     Meas. 69, 626–644 (2020).
+                                  5. Kim, Y. et al. Detection of micro inclusions in steel sheets using high-frequency ultrasound speckle analysis. Sci. Rep. 11, 20416
+                                     (2021).
+                                  6. Rifai, D., Abdalla, A. N., Razali, R., Ali, K. & Faraj, M. A. An eddy current testing platform system for pipe defect inspection based
+                                     on an optimized eddy current technique probe design. Sensors 17, 579 (2017).
+                                  7. Kaur, R. & Singh, S. A comprehensive review of object detection with deep learning. Digit. Sign. Process. 132, 103812 (2023).
+                                  8. Li, S. et al. Aluminum surface defect detection method based on a lightweight yolov4 network. Sci. Rep. 13, 11077 (2023).
+                                  9. Jiang, W. A machine vision anomaly detection system to industry 4.0 based on variational fuzzy autoencoder. Comput. Intell.
+                                     Neurosci. 2022, 1945507 (2022).
+                                 10. Séguin-Charbonneau, L. et al. Automated defect detection for ultrasonic inspection of CFRP aircraft components. NDT & E Int.
+                                     122, 102478 (2021).
+                                 11. Pang, G., Shen, C., Cao, L. & Hengel, A. V. D. Deep learning for anomaly detection: A review. ACM Comput. Surv. (CSUR) 54, 1–38
+                                     (2021).
+
+
+
+Scientific Reports |   (2025) 15:25668                         | https://doi.org/10.1038/s41598-025-07550-0                                                                                            13
+www.nature.com/scientificreports/
+
+
+                                 12. Villa-Pérez, M. E. et al. Semi-supervised anomaly detection algorithms: A comparative summary and future research directions.
+                                     Knowl.-Based Syst. 218, 106878 (2021).
+                                 13. Guo, Y. et al. Using ISU-GAN for unsupervised small sample defect detection. Sci. Rep. 12, 11604 (2022).
+                                 14. Zheng, X., Zheng, S., Kong, Y. & Chen, J. Recent advances in surface defect inspection of industrial products using deep learning
+                                     techniques. Int. J. Adv. Manuf. Technol. 113, 35–58 (2021).
+                                 15. Zhang, X., Fang, T., Saniie, J., Bakhtiari, S. & Heifetz, A. Unsupervised learning-enabled pulsed infrared thermographic microscopy
+                                     of subsurface defects in stainless steel. Sci. Rep. 14, 1–13 (2024).
+                                 16. Joachims, T. et al. Transductive inference for text classification using support vector machines. in Icml, vol. 99, 200–209 (1999).
+                                 17. Zhou, H. et al. Etdnet: Efficient transformer-based detection network for surface defect detection. IEEE Trans. Instrum. Meas. 72,
+                                     1–14 (2023).
+                                 18. Su, B. et al. Deep learning-based solar-cell manufacturing defect detection with complementary attention network. IEEE Trans.
+                                     Industr. Inf. 17, 4084–4095 (2020).
+                                 19. Tang, Y. et al. A CNN-transformer embedded unfolding network for hyperspectral image super-resolution. IEEE Trans. Geosci.
+                                     Remote Sens. https://doi.org/10.1109/TGRS.2024.3431924 (2024).
+                                 20. Wu, K. et al. Tinyvit: Fast pretraining distillation for small vision transformers. in European Conference on Computer Vision 68–85
+                                     (Springer, 2022).
+                                 21. Munkhdalai, T., Faruqui, M. & Gopal, S. Leave no context behind: Efficient infinite context transformers with infini-attention.
+                                     arXiv preprint arXiv:2404.07143 (2024).
+                                 22. Peng, W., Varanka, T., Mostafa, A., Shi, H. & Zhao, G. Hyperbolic deep neural networks: A survey. IEEE Trans. Patt. Anal. Mach.
+                                     Intell. 44, 10023–10044 (2021).
+                                 23. Guo, Y., Wang, X., Chen, Y. & Yu, S. X. Clipped hyperbolic classifiers are super-hyperbolic classifiers. in Proceedings of the IEEE/
+                                     CVF Conference on Computer Vision and Pattern Recognition 11–20 (2022).
+                                 24. Kiriakis, P., Fostiropoulos, I. & Bogdan, P. Learning hyperbolic representations of topological features. ​h​t​t​p​s​:​/​/​d​o​i​.​o​r​g​/​1​0​.​4​8​5​5​0​/​a​r​
+                                     X​i​v​.​2​1​0​3​.​0​9​2​7​3​​​​ (2021).
+                                 25. Liu, S. et al. Hyperbolic visual embedding learning for zero-shot recognition. in Proceedings of the IEEE/CVF Conference on
+                                     Computer Vision and Pattern Recognition 9273–9281 (2020).
+                                 26. Ermolov, A., Mirvakhabova, L., Khrulkov, V., Sebe, N. & Oseledets, I. Hyperbolic vision transformers: Combining improvements
+                                     in metric learning. in Proceedings of the IEEE/CVF Conference on Computer Vision and Pattern Recognition 7409–7419 (2022).
+                                 27. Long, T., Mettes, P., Shen, H. T. & Snoek, C. G. Searching for actions on the hyperbole. in Proceedings of the IEEE/CVF Conference
+                                     on Computer Vision and Pattern Recognition 1141–1150 (2020).
+                                 28. Kim, S., Jeong, B. & Kwak, S. Hier: Metric learning beyond class labels via hierarchical regularization. in Proceedings of the IEEE/
+                                     CVF Conference on Computer Vision and Pattern Recognition 19903–19912 (2023).
+                                 29. Bao, Y. et al. Triplet-graph reasoning network for few-shot metal generic surface defect segmentation. IEEE Trans. Instrum. Meas.
+                                     70, 1–11 (2021).
+                                 30. Huang, Y., Qiu, C. & Yuan, K. Surface defect saliency of magnetic tile. Vis. Comput. 36, 85–96 (2020).
+                                 31. Feng, H., Song, K., Cui, W., Zhang, Y. & Yan, Y. Cross position aggregation network for few-shot strip steel surface defect
+                                     segmentation. IEEE Trans. Instrum. Meas. 72, 1–10 (2023).
+                                 32. Fioresi, J. et al. Automated defect detection and localization in photovoltaic cells using semantic segmentation of electroluminescence
+                                     images. IEEE J. Photovolt. 12, 53–61. https://doi.org/10.1109/JPHOTOV.2021.3131059 (2022).
+                                 33. Yang, X. et al. A joint ship detection and waterway segmentation method for environment-aware of USVs in canal waterways. IEEE
+                                     Trans. Autom. Sci. Eng. https://doi.org/10.1109/TASE.2024.3375300 (2024).
+                                 34. Zhao, H., Shi, J., Qi, X., Wang, X. & Jia, J. Pyramid scene parsing network. in Proceedings of the IEEE Conference on Computer Vision
+                                     and Pattern Recognition 2881–2890 (2017).
+                                 35. Chen, L.-C., Zhu, Y., Papandreou, G., Schroff, F. & Adam, H. Encoder-decoder with atrous separable convolution for semantic
+                                     image segmentation. in Proceedings of the European Conference on Computer Vision (ECCV) 801–818 (2018).
+                                 36. Li, X. et al. Expectation-maximization attention networks for semantic segmentation. in Proceedings of the IEEE/CVF International
+                                     Conference on Computer Vision 9167–9176 (2019).
+                                 37. Lin, T.-Y. et al. Feature pyramid networks for object detection. in Proceedings of the IEEE Conference on Computer Vision and
+                                     Pattern Recognition 2117–2125 (2017).
+                                 38. Zhao, H., Qi, X., Shen, X., Shi, J. & Jia, J. Icnet for real-time semantic segmentation on high-resolution images. In Proceedings of the
+                                     European Conference on Computer Vision (ECCV) 405–420 (2018).
+                                 39. Wu, T., Tang, S., Zhang, R., Cao, J. & Zhang, Y. Cgnet: A light-weight context guided network for semantic segmentation. IEEE
+                                     Trans. Image Process. 30, 1169–1179 (2020).
+                                 40. Fan, M. et al. Rethinking bisenet for real-time semantic segmentation. in Proceedings of the IEEE/CVF Conference on Computer
+                                     Vision and Pattern Recognition 9716–9725 (2021).
+                                 41. Yu, C. et al. Bisenet: Bilateral segmentation network for real-time semantic segmentation. in Proceedings of the European Conference
+                                     on Computer Vision (ECCV) 325–341 (2018).
+                                 42. Yu, C. et al. Bisenet v2: Bilateral network with guided aggregation for real-time semantic segmentation. Int. J. Comput. Vis. 129,
+                                     3051–3068 (2021).
+                                 43. Poudel, R. P., Liwicki, S. & Cipolla, R. Fast-scnn: Fast semantic segmentation network. arXiv preprint arXiv:1902.04502 (2019).
+                                 44. Hong, Y., Pan, H., Sun, W. & Jia, Y. Deep dual-resolution networks for real-time and accurate semantic segmentation of road
+                                     scenes. arXiv preprint arXiv:2101.06085 (2021).
+                                 45. Zhang, J., Ding, R., Ban, M. & Guo, T. Fdsnet: An accurate real-time surface defect segmentation network. in ICASSP 2022-2022
+                                     IEEE International Conference on Acoustics, Speech and Signal Processing (ICASSP) 3803–3807 (IEEE, 2022).
+                                 46. Wang, J. et al. Rtformer: Efficient design for real-time semantic segmentation with transformer. Adv. Neural. Inf. Process. Syst. 35,
+                                     7423–7436 (2022).
+                                 47. Zhang, J. et al. Trans4trans: Efficient transformer for transparent object segmentation to help visually impaired people navigate in
+                                     the real world. in Proceedings of the IEEE/CVF International Conference on Computer Vision 1760–1770 (2021).
+                                 48. Xu, J., Xiong, Z. & Bhattacharyya, S. P. Pidnet: A real-time semantic segmentation network inspired by pid controllers. in
+                                     Proceedings of the IEEE/CVF Conference on Computer Vision and Pattern Recognition 19529–19539 (2023).
+                                 49. Xie, E. et al. Segformer: Simple and efficient design for semantic segmentation with transformers. Adv. Neural. Inf. Process. Syst. 34,
+                                     12077–12090 (2021).
+                                 50. Wan, Q., Huang, Z., Lu, J., Yu, G. & Zhang, L. Seaformer: Squeeze-enhanced axial transformer for mobile semantic segmentation.
+                                     arXiv preprint arXiv:2301.13156 (2023).
+                                 51. Xu, Z. et al. Sctnet: Single-branch cnn with transformer semantic information for real-time segmentation. inProceedings of the
+                                     AAAI Conference on Artificial Intelligence, vol. 38, 6378–6386 (2024).
+                                 52. Liu, Z. et al. A convnet for the 2020s. in Proceedings of the IEEE/CVF Conference on Computer Vision and Pattern Recognition
+                                     11976–11986 (2022).
+                                 53. Guo, M.-H. et al. Segnext: Rethinking convolutional attention design for semantic segmentation. Adv. Neural. Inf. Process. Syst. 35,
+                                     1140–1156 (2022).
+                                 54. Yu, W. et al. Metaformer is actually what you need for vision. in Proceedings of the IEEE/CVF Conference on Computer Vision and
+                                     Pattern Recognition 10819–10829 (2022).
+
+
+Scientific Reports |   (2025) 15:25668                       | https://doi.org/10.1038/s41598-025-07550-0                                                                                        14
+www.nature.com/scientificreports/
+
+
+                                 55. Yin, Z. et al. Ddsnet: Deep dual-branch networks for surface defect segmentation. IEEE Trans. Instrum. Meas. ​h​t​t​p​s​:​/​/​d​o​i​.​o​r​g​/​1​0​.​1​
+                                     1​0​9​/​T​I​M​.​2​0​2​4​.​3​4​2​7​8​0​6​​​​(2024).
+
+                                 Acknowledgements
+                                 This research was supported by the Liaoning Provincial Science Program Key Project under Grant No. LN202204
+                                 and the General Science Research Project from the Liaoning Provincial Department of Education, Grant No.
+                                 LJKMZ20220610. We gratefully acknowledge their financial support, which made this study possible.
+
+                                 Author contributions
+                                 Conceptualization, F.Y. and L.J.; methodology, F.Y.; software, F.Y.; validation, F.Y. and G.Y.; formal analysis, F.Y.;
+                                 investigation, G.Y.; resources, L.J.; data curation, F.Y.; writing—original draft preparation, F.Y.; writing—review
+                                 and editing, L.J.; visualization, G.Y.; supervision, L.J.; project administration, L.J.; funding acquisition, L.J. All
+                                 authors have read and agreed to the published version of the manuscript.
+
+                                 Declarations
+
+                                 Competing interests
+                                 The authors declare no competing interests.
+
+                                 Additional information
+                                 Correspondence and requests for materials should be addressed to J.L.
+                                 Reprints and permissions information is available at www.nature.com/reprints.
+                                 Publisher’s note Springer Nature remains neutral with regard to jurisdictional claims in published maps and
+                                 institutional affiliations.
+                                 Open Access This article is licensed under a Creative Commons Attribution-NonCommercial-NoDerivatives
+                                 4.0 International License, which permits any non-commercial use, sharing, distribution and reproduction in
+                                 any medium or format, as long as you give appropriate credit to the original author(s) and the source, provide
+                                 a link to the Creative Commons licence, and indicate if you modified the licensed material. You do not have
+                                 permission under this licence to share adapted material derived from this article or parts of it. The images or
+                                 other third party material in this article are included in the article’s Creative Commons licence, unless indicated
+                                 otherwise in a credit line to the material. If material is not included in the article’s Creative Commons licence
+                                 and your intended use is not permitted by statutory regulation or exceeds the permitted use, you will need to
+                                 obtain permission directly from the copyright holder. To view a copy of this licence, visit ​h​t​t​p​:​/​/​c​r​e​a​t​i​v​e​c​o​m​m​o​
+                                 n​s​.​o​r​g​/​l​i​c​e​n​s​e​s​/​b​y​-​n​c​-​n​d​/​4​.​0​/​​​​.​​
+
+                                 © The Author(s) 2025
+
+
+
+
+Scientific Reports |   (2025) 15:25668                     | https://doi.org/10.1038/s41598-025-07550-0                                                                               15
+

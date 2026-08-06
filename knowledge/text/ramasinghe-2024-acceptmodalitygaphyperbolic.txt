@@ -1,0 +1,624 @@
+                         This CVPR paper is the Open Access version, provided by the Computer Vision Foundation.
+                                      Except for this watermark, it is identical to the accepted version;
+                                the final published version of the proceedings is available on IEEE Xplore.
+
+
+
+
+           Accept the Modality Gap: An Exploration in the Hyperbolic Space
+
+    Sameera Ramasinghe               Violetta Shevchenko     Gil Avraham                       Ajanthan Thalaiyasingam
+                                                Amazon, Australia
+
+
+                         Abstract
+
+    Recent advancements in machine learning have spot-
+lighted the potential of hyperbolic spaces as they effectively
+learn hierarchical feature representations. While there has
+been progress in leveraging hyperbolic spaces in single-
+modality contexts, its exploration in multimodal settings re-
+mains under explored. A recent work has sought to trans-
+pose Euclidean multimodal learning techniques to hyper-
+bolic spaces, by adopting a geodesic distance based con-            Figure 1. Comparison between geodesic-based (left) and our
+trastive loss. However, we show both theoretically and em-          angle-based contrastive losses (right) in the hyperbolic space.
+pirically that such spatial proximity based contrastive loss        Only the space component is shown for clarity. In our angle-based
+significantly disrupts hierarchies in the latent space. To          contrastive loss (details in Fig. 3), the images can be placed any-
+remedy this, we advocate that the cross-modal representa-           where along the axis emanating from the text embedding (high-
+tions should accept the inherent modality gap between text          lighted in yellow), which allows hierarchy among images.
+and images, and introduce a novel approach to measure
+cross-modal similarity that does not enforce spatial prox-          embeddings through spatial proximity in the underlying
+imity. Our approach shows remarkable capabilities in pre-           shared embedding space. Such spatial proximity based con-
+serving unimodal hierarchies while aligning the two modal-          trastive loss clusters matching concepts across modalities
+ities. Our experiments on a series of downstream tasks              together, while pushing apart non-matching ones. Despite
+demonstrate that a better latent structure emerges with our         wide-spread usage, the alignment between image and text
+objective function while being superior in text-to-image and        modalities is an ill-posed problem, and these learned repre-
+image-to-text retrieval tasks.                                      sentations are shown to have misalignment between modal-
+                                                                    ities, defined as the modality-gap [23].
+                                                                        We argue that modality gap is rooted in the intrinsic dif-
+1. Introduction                                                     ferences in the representational nature and information con-
+                                                                    tent of visual and linguistic data. Text, with its structured
+Hierarchical structures are a fundamental component of the          syntax and semantically rich lexicon, conveys abstract con-
+natural world. Multimodal foundational models that try to           cepts and relationships explicitly. Images, in contrast, cap-
+learn a holistic view of the world with a shared image and          ture concrete instances of the world, expressing complex
+text representation, e.g., CLIP [28], have primarily lever-         scenes and hierarchical relationships implicitly through vi-
+aged Euclidean and spherical geometries. However, the in-           sual cues. Thus, models that seek to minimize distance met-
+trinsic geometric constraints of these spaces often fall short      rics between modalities may struggle to capture the nuanced
+in capturing the complexity and granularity of hierarchical         associations between text and images. This often results in
+information. This limitation sparks a compelling case for           an oversimplified alignment that glosses over the rich, one-
+hyperbolic spaces as they offer continuous approximation            to-many correspondences from text to image.
+for tree-like hierarchical structures [6, 9, 12, 18, 34].               A recent work [6] attempts to leverage this cross-modal
+    Although hierarchical embeddings in the hyperbolic              hierarchy that text descriptions are more generic than im-
+space have been previously explored in unimodal set-                ages using an entailment loss, to learn a unified image-text
+tings [11, 12, 18], learning shared representations of differ-      representation in the hyperbolic space. Nevertheless, it still
+ent types of modalities – such as text and images – while           heavily relies on the spatial proximity based contrastive loss
+preserving hierarchies remains under explored. Current              between image and text modalities, and suffers the same
+multimodal models measure the similarity of cross-modal             pitfalls as the Euclidean and spherical counterparts. In this
+
+
+
+                                                                 27263
+                                                                       2.1. Hyperbolic Spaces
+                                                                       Hyperbolic spaces are Riemannian manifolds with constant
+                                                                       negative curvature and are fundamentally different to the
+                                                                       Euclidean or spherical space which has zero or constant
+                                                                       positive curvature, respectively. This enables unique prop-
+                                                                       erties such as the divergence of parallel lines and the expo-
+                                                                       nential volume growth towards the boundary [1]. This vol-
+                                                                       ume growth property makes the hyperbolic space an ideal
+                                                                       candidate for embedding hierarchical and graph structured
+                                                                       data, and has found many machine learning applications.
+
+Figure 2. Image hierarchy. In visual domain, the hierarchy may         2.1.1   Lorentz Model
+arise from whole-to-fragment relations or by ambiguity of objects
+or identities in images.                                               The Lorentz model, also known as the Minkowski model,
+                                                                       is a way to represent a hyperbolic space. It frames the d-
+work, we present theoretical and empirical evidence that the
+                                                                       dimensional hyperbolic space Hd with curvature c within
+strategy of minimizing spatial proximity between modal-
+                                                                       an (d + 1)-dimensional Euclidean space Rd+1 as follows:
+ities detrimentally impacts the hierarchical representation
+within both text and (specially) image embeddings.
+                                                                            Hd = x ∈ Rd+1 | ⟨x, x⟩H = −1/c, x0 > 0 ,
+                                                                                 
+                                                                                                                              (1)
+    Thus, we introduce a novel loss function that accepts
+the modality gap between image and text embeddings. We                 where the Lorentzian inner product is defined as,
+pivot from striving for spatial proximity in the latent space
+to leveraging a hyperbolic angle-based metric for assessing                                                d
+                                                                                                           X
+pairwise similarity. Our loss function not only allows em-                            ⟨x, y⟩H = −x0 y0 +          x i yi .       (2)
+beddings to demonstrate better hierarchy, but also allows                                                   i=1
+them to extend and better utilize the expanse of the hyper-
+                                                                       Here, the 0-th dimension of the vector is treated as the time
+bolic space. Our idea is illustrated in Fig. 1 and a sample
+                                                                       component and the rest as the space component. From the
+image hierarchy is shown in Fig. 2. Our contributions are
+                                                                       definition of Hd , the time component can be obtained from
+as follows:
+                                                                       the space component as follows:
+• We show that spatial proximity based contrastive loss for
+   aligning image and text in the hyperbolic space is detri-                                       q
+   mental for preserving hierarchies. We show the existing                           xtime = x0 = 1/c + ∥xspace ∥2 ,              (3)
+   work [6] that combines contrastive and entailment losses,
+   face a fundamental mismatch in its objectives.                      where ∥ · ∥ is the Euclidean norm and xspace = x1:d .
+• We introduce a novel objective function that remedies the
+   above issues by accepting the modality gap. Our ob-                 Geodesics. Geodesics in the hyperbolic space are the
+   jective preserves hierarchies in both language and visual           shortest paths between points, analogous to straight lines
+   concepts and utilize the expanse of the hyperbolic space            in Euclidean geometry. In the Lorentz model, geodesics are
+   better while aligning these two modalities.                         the intersections of planes through the origin with the hy-
+• We show that the current extension of CLIP to hyperbolic             perboloid. The geodesic distance between two points x, y
+   space only performs well in near-Euclidean geometries               is,
+                                                                                 dH (x, y) = 1/c cosh−1 (−c⟨x, y⟩H ) .
+                                                                                             p
+   with a low curvature, while ours is well suited for high                                                                    (4)
+   curvature spaces.
+• We perform extensive experiments on a series of down-                Tangent Spaces. The tangent space at a point x ∈ Hd in
+   stream tasks to demonstrate that a better latent structure          the hyperbolic space, is a Euclidean space that locally ap-
+   emerges with our objective function while being superior            proximates the hyperbolic space around x. Exponential and
+   in text-to-image and image-to-text retrieval tasks.                 logarithmic maps are used to project a point from a tangent
+                                                                       space to the hyperbolic space and vice versa. We defer the
+2. Preliminaries                                                       formulas for brevity and refer the reader to [26].
+We briefly review essential concepts in hyperbolic geometry
+and the spatial proximity based contrastive loss below. We             Centroid of Points. Obtaining the centroid of a set of
+refer the reader to the textbook [29] and the CLIP paper [28]          points in the hyperbolic space is not as straightforward as
+for more details on the respective topics.                             the Euclidean setting. This is called the Einstein midpoint,
+
+
+
+                                                                    27264
+and it is easier to obtain via converting to Klein coordi-                     closer while non-matching ones should be pushed apart, re-
+nates [32]. Let x = (x0 , x1:d ) ∈ Hd be a point on the                        gardless of the modality. Therefore, to encourage cross-
+hyperboloid model, then it can be converted to Klein coor-                     modal hierarchy, Desai et al. [6] employ an entailment loss
+dinates k ∈ Kd and back via the following projections:                         to enforce a partial hierarchy between image and text em-
+                                                                               beddings, which was originally proposed in [10]. The pur-
+                   x1:d                             (1, k)                     pose is to enforce the prior that a text embedding is a more
+  ΠH→K (x) =            ,    ΠK→H (k) = p                         . (5)
+                    x0                           c(1 − ∥k∥2 )                  abstract concept compared to corresponding image embed-
+                                                                               dings. To this end, the entailment loss forces all the image
+Then the centroid takes the following form:                                    embeddings matching with a text embedding inside a cone
+                          P                    PN                            that emanates from the the text embedding.
+                            N
+CentroidH {xj }N
+               j=1 = ΠK→H    j=1 γj ΠH→K (xj )/  j=1 γj   ,                       Formally, the entailment loss between a text (x) and im-
+                                                                     (6)       age (y) embedding is written as:
+                         1
+where γj = √                        2
+                                      are the Lorentz factors.
+                  1−c∥ΠH→K (xj )∥                                                    Lentail (x, y) = max (0, ext(x, y) − aper(x)) .    (8)
+2.2. Spatial Proximity based Contrastive Loss                                  Here, ext(·, ·) denotes the exterior angle between the text
+The main idea of contrastive loss is to minimize the distance                  and the image embedding (α in Fig. 3), written as:
+between matching datapoints (i.e., positive pairs) while                                                                         
+maximizing the distance between non-matching datapoints                                                   ytime + xtime c⟨x, y⟩H 
+                                                                                ext(x, y) = cos−1              q                    , (9)
+(i.e., negative pairs). Formally, let B be a batch of N image-                                                                2
+                                                                                                       ∥xspace ∥ (c⟨x, y⟩H ) − 1
+text pairs, the text-to-image contrastive loss for these sam-
+ples can be written as:                                                        and aper(·) is the aperture angle of the cone, which de-
+                                                                               creases as the norm of the space component increases, given
+                             N
+                      1 X            exp(κ(xi , yi )/τ )                       by,
+  LT →I (B, κ) = −           log PN                         ,                                                               
+                      N i=1                                                                                         2K
+                                    j=1 exp(κ(xi , yj )/τ )                                 aper(x) = sin−1 √                  .      (10)
+                                                            (7)                                                   c∥xspace ∥
+where xi , yi ∈ Rd denote the text and image embeddings                        Here K is a constant hyperparameter chosen to mitigate the
+corresponding to data sample i, κ : Rd×d → R is the simi-                      discontinuity of cones near the origin.
+larity function, and τ > 0 is the temperature parameter.                           Theoretically, contrastive loss pushes all image embed-
+    In CLIP [28], a symmetric contrastive loss is used, i.e.,                  dings closer to the matching text embedding, reducing di-
+Lcontr (B, κ) = LI→T (B, κ) + LT →I (B, κ). Here, the em-                      versity of image embeddings, and hence discouraging hi-
+beddings are normalized to be unit norm and κ is the cosine                    erarchies. Entailment loss does not prevent this collapse,
+similarity. It is easy to see that CLIP embeddings are in                      therefore contrastive and entailment loss combination dis-
+the (d − 1)-dimensional hypersphere. Since cosine simi-                        courages hierarchies, especially in the image domain.
+larity is inversely proportional to the geodesic distance in                       On the other hand, in practice, due to natural variations
+the hypersphere, we can conclude that CLIP measures the                        of text and images, and stochasticity, there exists some di-
+cross-modal similarity using spatial proximity.                                versity in the latent space when trained using contrastive
+    Analogously, the above contrastive loss can be extended                    loss [28]. Nevertheless, we show that if there exists diver-
+to the hyperbolic space by ensuring that the image and text                    sity across image embeddings, then it is highly likely that
+embeddings are in Hd and using geodesic distance to mea-                       the entailment objective will be violated. We state this for-
+sure proximity, i.e., by setting κ = −dH . This loss is used                   mally for a 2-dimensional case below.
+in the recent work [6]1 together with an entailment loss to
+impose a hierarchy that text entails images. We discuss the                    Proposition 1. Consider a set of points {yi }ni=1 ∈ H2
+interplay between these two losses in the next section.                        and a point x ∈ H2 . Assume that the hyperbolic distance
+                                                                               dH (x, yiP
+                                                                                        ) = rPfor all i. Then, for n > 1, to maximize
+                                                                                          n      n
+                                                                               the sum i=1 j=1 dH (yi , yj ) at least one yi must reside
+3. Interplay between Losses
+                                                                               outside the entailment cone originating from x.
+As previously discussed, contrastive loss in spherical or hy-
+                                                                                  (Proof in supplementary material). Intuitively, consider
+perbolic spaces try to bridge the modality gap between text
+                                                                               an example of a text embedding of a cat and a set of visually
+and image embeddings with respect to the spatial proxim-
+                                                                               distinct images of cats. Because of the contrastive loss, the
+ity. Consequently, the objective is to pull matching concepts
+                                                                               image embeddings are required to maintain a consistent dis-
+   1 To our knowledge, this is the only instance of extending CLIP to the      tance to the text embedding, as all images depict cats. How-
+hyperbolic space.                                                              ever, due to the visual diversity of images, it is imperative
+
+
+
+                                                                            27265
+                                                                        4. Our Approach: Accept the Modality Gap
+                                                                        The discussion thus far highlighted the limitations inherent
+                                                                        in applying geodesic-based contrastive losses, including the
+                                                                        entailment cone loss, within hyperbolic spaces. A key in-
+                                                                        sight emerges from these limitations is that they stem from
+                                                                        striving to spatially bridge the gap between two fundamen-
+                                                                        tally distinct modalities. To remedy this, we present a novel
+                                                                        hypothesis: these challenges can be effectively addressed
+                                                                        by adopting an objective function that acknowledges the
+                                                                        modality gap, employing an alternative approach to mea-
+Figure 3. A graphical illustration of our loss: only the space          sure cross-modal concept similarity.
+component is shown for clarity. Our angle-based contrastive loss            Based on this hypothesis, we introduce a unique con-
+will maximize β and minimize α, encouraging the images and              straint where all matching concepts (whether unimodal or
+texts to be aligned, without forcing spatial proximity. The uni-
+                                                                        cross-modal) are aligned along a specific geodesic emanat-
+modal hierarchies are implicitly achieved by the model bias origi-
+                                                                        ing from the origin of the hyperbolic space. Within this
+nating from the hyperbolic space.
+                                                                        framework, image embeddings are positioned further from
+                                                                        their textual counterparts, reflecting their greater specificity
+to consider these image embeddings are maximally sepa-                  compared to text. Consequently, the deviation angle be-
+rated (if they are not separated, the model is forced to only           tween two concepts along this geodesic becomes a new met-
+learn abstract features that glosses over visual cues crucial           ric for evaluating their conceptual distance.
+for preserving hierarchy). This proposition indicates that                  Figure 3 graphically illustrates our approach. To exem-
+in such scenarios, at least one image embedding will in-                plify, consider aligning the image embedding for a “cat”
+evitably fall outside the entailment cone, highlighting a fun-          with its corresponding textual descriptor. Our objective is to
+damental discrepancy between the objectives of contrastive              minimize the angle α while simultaneously maximizing the
+loss and entailment losses. This discrepancy between the                angle β, thereby achieving an optimal alignment between
+losses is observed empirically in the original paper [6] as             the two modalities. Similarly, for non-matching concepts,
+well as in our experiments.                                             α will be maximized and β will be minimized. The angle
+    In the subsequent analysis, we demonstrate that the si-             α in the hyperbolic space is computed using Eq. (9), i.e.,
+multaneous minimization of both losses necessitates a rapid             α(x, y) = ext(x, y) and β(x, y) = π − α(x, y). Note that
+decrease in the area occupied by image embeddings (i.e.,                the sum of angles on a geodesic passing through the origin
+collapse) within the hyperbolic space. This constraint sig-             adds up to π. Then our angle-based contrastive loss can be
+nificantly limits the ability to utilize the full extent of the         written as:
+hyperbolic space, thereby impeding the establishment of a
+hierarchical structure. We state this formally below.                         Langle (B) = LT →I (B, −α) + LT →I (B, β) ,                 (11)
+                                                                        where LT →I denotes the text-to-image contrastive loss in
+Proposition 2. Consider a set of points {yi }ni=1 ∈ H2 and              Eq. (7). The similarity function κ is replaced in the above
+a point x ∈ H2 . Let dmax = maxi (dH (x, yi )). Further, let            equation with angles α and β such that the contrastive loss
+{yi }ni=1 be contained within the entailment cone originat-             minimizes the angle α while maximizing β for matching
+ing from x. Then, as dmax decreases, the total area of the              pairs in the batch B, and vice versa.2 Furthermore, our loss
+spread of the image embeddings decreases exponentially.                 is asymmetric as we impose the entailment relationship that
+                                                                        text is more generic than an image. Therefore, it can be re-
+   (Proof in the supplementary material). To intuitively un-            garded as a smoothed, contrastive version of the entailment
+derstand the implications, let us revisit the earlier “cat” ex-         loss (Eq. (8)), as we are aligning similar concepts along the
+ample. When both losses converge, all image embeddings                  axis of cones. Note that both the terms of Langle are satisfied
+are confined within the entailment cone, and the conver-                mutually, hence, there is no mismatch between their objec-
+gence of the contrastive loss reduces the maximum geodesic              tives. In our experiments, Lentail alone did not yield mean-
+distance from these embeddings to the text embedding.                   ingful results, highlighting the importance of our smooth,
+Consequently, the spatial domain occupied by the image                  contrastive version and the underlying idea behind it.
+embeddings undergoes an exponential contraction. This                       To further encourage better distribution of embeddings
+scenario is detrimental to maintaining any form of image                on the hyperbolic manifold, we apply a soft regularizer at
+hierarchy based on spatial proximity, as it necessitates a                  2 Theoretically, minimizing α maximizes β. Nevertheless, explicitly
+tight clustering of the embeddings within an exponentially              maximizing β imposes a stronger bias, analogous to the symmetric con-
+diminishing area.                                                       trastive loss.
+
+
+
+
+                                                                     27266
+the distribution level. Specifically, we impose that centroid        is constructing pretraining tasks that result in a structured
+of text embeddings should be closer to the origin than the           embedding space that is useful for downstream tasks. Ex-
+centroid of the image embeddings. Formally, let xe , ye be           tending above to multimodal settings assumes an extra weak
+the Einstein midpoint (i.e., centroid, see Eq. (6)) of a set of      supervision signal with paired images and text. The task in
+text and image embeddings, respectively. Then, our regu-             multimodal learning then comprises pretraining tasks using
+larization takes the following form:                                 paired information [20, 36]. Most notably, CLIP [28] and
+                                                                     ALIGN [15] train a contrastive objective which aligns text
+Lcentroid = xe − √1c cosh−1 (cq) + ye − √1c cosh−1 (cp) ,            and image embeddings. Rapid progress has been made in
+                                                        (12)         the recent years to extend these encoder only multi-modal
+where ∥ · ∥ is the Euclidean norm and p > q to ensure that           models to include a text decoder [21] or integrate with a
+the centroid of images are further from the origin than text.        large language model [22, 24].
+Then, our final loss is,
+
+                Lfinal = Langle + λ Lcentroid ,           (13)
+                                                                     6. Experiments
+                                                                     In this section, we first highlight the superior performance
+where λ > 0 is the trade-off hyperparameter.
+                                                                     of our model in zero-shot classification and retrieval tasks,
+   We follow the parametrization of [6], in that we encode
+                                                                     outperforming both MERU [6] and CLIP [28]. Subse-
+only the space component of the Lorentz model in the tan-
+                                                                     quently, we delve into a comparative analysis, illustrating
+gent space using the neural network. The exponential map
+                                                                     the enhanced visual-text hierarchy achieved by our model.
+to project to the hyperboloid takes the following form:
+                                                                     Then, we expose a critical examination of MERU’s loss
+                                 √
+                           sinh ( c∥v∥)                              function, emphasizing its limitations in handling curved
+                  xspace =    √          v,             (14)         spaces. Finally, we demonstrate the more efficient utiliza-
+                                 c∥v∥
+                                                                     tion of embedding space by our model.
+where v ∈ Rd and ∥ · ∥ is the Euclidean norm. The cor-                  For a fair comparison, we ensured identical architectures
+responding time component is obtained via Eq. (3), and               across our model, MERU, and CLIP, with both ours and
+x = (xtime , xspace ) ∈ Hd is used to compute the loss.              MERU incorporating the same additional projection layer
+                                                                     into the hyperbolic space. As the image encoder, we em-
+5. Related Work                                                      ployed ViT-S [4], and for the text encoder, we used the
+Embeddings in Hyperbolic Spaces. Hyperbolic geom-                    model from [33]. In line with MERU, we trained all the
+etry enables exponential volume expansion towards the                models from scratch utilizing the Redcaps dataset [5]. How-
+boundary [1], enabling embedding hierarchical structures             ever, we noted that some image links were removed from
+more efficiently. This feature has produced a surge of works         the original dataset, which led us to use an ∼ 8M subset of
+that exhibit such hierarchical relationships including molec-        the original dataset (∼ 12M). For detailed information on
+ular structures [38], action recognition [9], 3D data [2, 34],       hyperparameters, and training, please refer to the supple-
+text data [11, 31, 40] and images [13, 18]. Hyperbolic em-           mentary material.
+beddings can be learned using standard deep learning lay-
+ers [14, 17] and performing hyperbolic projection [25] or            6.1. Zero-shot Image Classification
+via hyperbolic neural networks [11]. To further incorpo-             The learned correspondences between images and text en-
+rate a tree-like inductive bias, Ganea et al. [10] introduce         able zero-shot image classification by embedding class la-
+an entailment loss which forces child nodes to be contained          bels as text prompts [6, 8, 28]. We first embed a set of
+within the cone emanating from the parent node embedding.            prompts for each class label, projecting them into the hy-
+Further, two recent works [12, 39] utilize contrastive learn-        perbolic space, and then computing the average of the α
+ing [3] but with minimising the geodesic distance objective          values (exterior angle as in Fig. 3) against the image em-
+in the hyperbolic space. Recently, hyperbolic embeddings             bedding. The class corresponding to the minimum aver-
+have been adopted for the cross-modality setting [6] and a           age α is subsequently selected as the predicted class. For
+combination of contrastive and entailment loss is used. In           MERU, we used the maximum average Lorentzian inner
+this work, we discuss the interplay between these losses,            product to select the predicted class as proposed in the orig-
+their drawbacks, and introduce a new loss to mitigate them.          inal work. A comparison of Top-1 accuracy across various
+                                                                     datasets is presented in Table 1. Note that some datasets,
+Joint Multimodal Learning. Joint multimodal learning                 which contain classes that are underrepresented by Redcaps
+comprises a vast literature [35]. Early pretraining works in         cause poor performance across all the models. As also dis-
+large multimodal models emerged from unimodal pretrain-              cussed in [6], this can be alleviated by using a large scale
+ing [3, 7, 37]. The underlying principle for these approaches        dataset for training. As indicated, our model achieves better
+
+
+
+                                                                  27267
+               ImageNet      Food-101    CIFAR-10    CIFAR-100             SUN397   Aircraft                  Caltech-101   Flowers   STL-10    EuroSAT    RESISC45    Country211    MNIST     CLEVR    PCAM
+                                                                  CUB                          DTD   Pets                                                                                                      SST2
+
+ CLIP          28.5 70.1 55.8 24.2 29.7 21.9 1.5 13.0 64.3 56.3 50.7 86.3 22.0 19.6 3.7                                                                                              9.2       14.2 50.7 50.0
+ MERU          28.6 71.6 53.7 25.0 30.3 21.8 1.3 11.1 66.5 57.5 50.3 87.1 29.6 23.3 3.7 10.2 12.4 55.2 50.0
+ Ours          29.7 71.7 61.8 27.1 32.3 22.5 0.8 14.0 65.0 57.6 46.9 88.0 34.7 24.8 4.1 10.5 13.7 50.0 50.0
+
+   Table 1. Zero-shot image classification. Our model demonstrates overall better performance compared to both MERU and CLIP.
+
+
+                          text → image                                  image → text                                                                                                   Curvatures
+
+               COCO                      Flickr                  COCO                 Flickr                                                                     0.1           0.2       0.5      1.0    2.0   3.0
+                                                                                                                                               MERU            19.2 5.9   -    -    -    -
+              R5           R10          R5          R10          R5      R10        R5         R10                           depth-1
+                                                                                                             Car                               Ours            94.0 96.8 96.8 92.7 93.3 96.2
+ CLIP        22.7 31.4 30.8 41.9 24.8 33.6 30.2 39.5                                                         Parts
+                                                                                                                                               MERU             0.6 0.0   -    -    -    -
+                                                                                                                             depth-2
+ MERU        23.4 32.1 33.1 42.3 26.5 35.3 31.4 42.3                                                                                           Ours            31.7 37.9 35.4 38.5 40.4 37.9
+ Ours        23.7 32.7 33.2 42.7 32.6 42.5 30.7 39.7
+                                                                                                                                               MERU            31.1 30.3 -     -    -    -
+                                                                                                                             depth-1
+                                                                                                             Open                              Ours            69.1 69.8 69.8 70.4 71.4 70.6
+Table 2. Zero-shot image and text retrieval. We show overall                                                Images
+better performance over both MERU and CLIP.                                                                                                    MERU            10.5 11.0 -     -    -    -
+                                                                                                                             depth-2
+                                                                                                                                               Ours            33.2 35.0 33.4 35.3 36.8 35.2
+results in 13 out of 19 datasets, demonstrating that the rep-
+resentations produced by our approach are superior overall.                                                 Table 3. Image hierarchy accuracy (%). Our method signifi-
+                                                                                                            cantly outperforms MERU on both datasets.
+6.2. Zero-shot Retrieval
+We assess the retrieval performance of our model against                                                                                                                             Curvatures
+CLIP and MERU using two well-known benchmarks:                                                                                                            0.1          0.2           0.5       1.0      2.0    3.0
+COCO and Flickr30K, which contain 5000 and 1000 im-
+ages, respectively, each paired with five captions. Our test                                                                          MERU                88.1 84.6  -    -    -
+                                                                                                             depth-1
+                                                                                                                                      Ours                93.4 92.0 91.5 93.6 90.3 92.6
+splits are identical to Desai et al. [6]. During inference,
+we order a set of candidate image/text embeddings based                                                                               MERU                58.1 55.3  -    -    -    -
+                                                                                                             depth-2
+on their exterior angle relative to a given text/image query                                                                          Ours                73.5 70.0 69.0 69.0 69.5 70.5
+embedding. Table 2 reports recall@5,10 of our model and
+the reproduced CLIP and MERU baselines on these bench-                                                      Table 4. Text hierarchy accuracy (%). Our method further im-
+marks. Hyperbolic representations of our model perform                                                      proves text hierarchies.
+best on 3 out of 4 tasks.
+                                                                                                               To evaluate the first type of hierarchies, we create visual
+6.3. Vision and Language Hierarchies
+                                                                                                            hierarchy chains using two datasets: Car Parts Segmenta-
+The primary advantage of embedding features in the hy-                                                      tion [27] and OpenImages [19]. In Car Parts, we extracted
+perbolic space is to capture the implicit hierarchies within                                                images of parts using segmentation masks in a hierarchical
+each data modality. As discussed in Sec. 4, geodesic based                                                  order, e.g., “car → hood → headlights”, to create hierar-
+contrastive losses can severely impede these hierarchies, in                                                chical chains. Similarly, for Open Images, we created hier-
+contrast to the proposed method. To demonstrate this, we                                                    archical chains by extracting objects using bounding boxes
+conduct a series of experiments next.                                                                       (see supplementary). For Car Parts, we created 161 depth-2
+Visual hierarchy. Visual hierarchies can emerge in two                                                      chains and 811 depth-1 chains. For Open Images, we cre-
+ways: 1) either through the relationship between a composi-                                                 ated 188, 261 depth-2 chains and 166, 143 depth-1 chains.
+tion of objects and the objects therein, or 2) through deteri-                                              For evaluating the models, we arranged these objects/parts
+orated/abstract images that may be associated with multiple                                                 by their embedding proximity to the origin, and assessed
+identities or classes [18] (see Fig. 2). Below, we demon-                                                   the accuracy of this ordering against the known hierarchical
+strate our method’s superior ability to capture both types of                                               structure (objects deeper in the hierarchy should be embed-
+hierarchies.                                                                                                ded further away from ROOT, i.e., origin). Our approach
+
+
+
+                                                                                                     27268
+Figure 4. An illustration of the superior text hierarchy of our model. We retrieve multiple text descriptions while traversing from an
+image embedding to [ROOT]. Our model is able to retrieve richer hierarchical text descriptions compared to MERU.
+
+
+
+
+Figure 5. Visual hierarchy as a measure of uncertainty in image retrieval. As evident, when the distance to the [ROOT] increases (left
+→ right), our model retrieves similar images with an increasing hierarchical order where the text prompt is better described. In contrast,
+retrieval results from MERU does not preserve the hierarchy or the visual similarity.
+
+
+significantly surpasses MERU in preserving image hierar-                Image hierarchy as an uncertainty measure. Preserving
+chies, as evidenced in Table 3.                                         hierarchies results positioning more abstract/ambiguous ob-
+   To evaluate the second type of hierarchies, we first com-            jects nearer to the [ROOT], and more specific objects closer
+pute the 1000 most prominent eigenfaces from the Celeb-                 to the boundary. Thus, the distance from the origin serves
+HQ dataset [16]. Then, we randomly sampled 1000 exam-                   as a natural indicator of uncertainty. This attribute can be
+ples from Celeb-HQ and plotted histograms of the geodesic               particularly advantageous for retrieval tasks, as we shall
+distance to the [ROOT] for these two distributions (see                 demonstrate next. For text embeddings, e.g., cat, playing
+Fig. 6). The results illustrate that our model accurately               guitar, we find the 40 closest image embeddings per each
+positions the eigenfaces in close proximity to [ROOT], in               text by utilizing the Lorentzian inner product for MERU
+contrast to MERU, which tends to place both distributions               and the angle α for ours. We then sort image embeddings
+around a common mean value.                                             according to their distances to the [ROOT] and pick top five
+
+
+
+                                                                    27269
+                                                                       → nouns → captions” and measure the predicted hierarchy
+                                                                       similar to the image chain experiments above. As Table 4
+                                                                       depicts, we achieve better results compared to MERU.
+
+
+                                                                                                        Curvatures
+                                                                                            0.1   0.2    0.5   1.0    2.0   3.0
+                                                                              MERU         28.4 20.9  -    -    -    -
+Figure 6. The distribution of distances to the origin of eigen                Ours         29.6 29.4 28.9 29.7 28.5 29.1
+faces and face images. In MERU (left), the distributions are
+centered around an approximately common mean, whereas ours             Table 5. Accuracy (%) on ImageNet zero-shot classification.
+(right) shows a clear distinction between the distributions.           Note the significant drop of MERU when the curvature increases.
+
+
+
+                                                                       6.4. Effect of Curvature
+                                                                       As discussed, there exists a fundamental mismatch in em-
+                                                                       ploying a geodesic contrastive loss in hyperbolic space.
+                                                                       Further solidifying this insight, we empirically observed
+                                                                       that geodesic contrastive loss compels MERU towards a
+                                                                       lower (trainable) curvature, eventually being clipped at 0.1.
+Figure 7. Curves of the log scaled eigenvalues of image and text       In contrast, our loss function increases the curvature, sug-
+embeddings. Note the order 2 magnitude difference for the largest      gesting its suitability for curved spaces (see supplementary
+eigenvalues for MERU. This phenomenon points to high density           for loss curves). To substantiate this further, we trained
+concentration along a small number of dimensions.                      models using fixed curvatures. As detailed in Table 5,
+                                                                       MERU failed to converge for curvatures ≥ 0.5, whereas
+                                                                       our model demonstrated almost constant accuracy. This
+embeddings. We apply deduplication based on the distance
+                                                                       behaviour is consistent across unimodal hierarchy experi-
+to the [ROOT]. Two examples are in Fig. 5. As shown,
+                                                                       ments as well.
+our model consistently presents images that not only re-
+semble each other more closely but also exhibit a progres-
+sive hierarchical relationship as one moves further from the           6.5. Better Space Utilization
+[ROOT] (from left to right). Importantly, note that the text
+prompt is better described as the image gets further away              We observed that the embeddings of MERU tend to con-
+from the [ROOT], demonstrating reduced uncertainty. In                 centrate within narrow cones, leading to under-utilization of
+comparison, MERU’s retrieval outcomes fail to uphold ei-               the embedding space. This phenomenon has also been ob-
+ther the hierarchical progression or visual coherency. See             served in CLIP [23]. We found that our loss function facili-
+supplementary for more examples.                                       tates better spatial utilization, likely due to the dispersion of
+Text hierarchy. MERU showed that it can preserve satis-                embeddings resulting from the angle-based contrastive loss.
+factory text hierarchy. We show that this effect is further            To illustrate this, we plot the eigenvalue distributions of the
+improved by our objective function. Our first experiment               embeddings and noted that MERU exhibits orders of mag-
+follows Desai et al. [6]’s image traversal. We traverse from           niture higher energy in the first few eigenvectors (Fig. 7),
+image embeddings, extracted from GettyImages3 , interpo-               suggesting a greater concentration within a narrow space.
+lating 50 equally spaced steps along the geodesic connect-
+ing their embedding vectors to ROOT. We use every inter-
+polated step embedding as a query to retrieve the nearest
+                                                                       7. Conclusion
+neighbor from a set of text embeddings that are extracted              We showed that while hyperbolic spaces are useful at pre-
+from pexels.com and YFCC dataset [30]. We use an ex-                   serving hierarchies in single-modality settings, their poten-
+panded set of texts compared to the version used in [6] to             tial in multimodal settings entails unique challenges. We
+facilitate a broader range of images for both models. As               introduced a novel loss function that accepts the modal-
+shown in Fig. 4, our model has learned richer hierarchies.             ity gap and enables hierarchical structure in both image
+In the next experiment, we created a set of text hierarchy             and text embeddings while better aligning these modal-
+chains using the above collected text captions as “adjectives          ities. The presented insights promise to enhance the
+                                                                       adoption of hierarchical representations in multimodal set-
+  3 https://www.gettyimages.com                                        tings.
+
+
+
+                                                                    27270
+References                                                                   ings of the IEEE conference on computer vision and pattern
+                                                                             recognition, pages 770–778, 2016. 5
+ [1] Martin R Bridson and André Haefliger. Metric spaces of
+                                                                        [15] Chao Jia, Yinfei Yang, Ye Xia, Yi-Ting Chen, Zarana Parekh,
+     non-positive curvature. Springer Science & Business Media,
+                                                                             Hieu Pham, Quoc Le, Yun-Hsuan Sung, Zhen Li, and Tom
+     2013. 2, 5
+                                                                             Duerig. Scaling up visual and vision-language representa-
+ [2] Jiaxin Chen, Jie Qin, Yuming Shen, Li Liu, Fan Zhu, and
+                                                                             tion learning with noisy text supervision. In International
+     Ling Shao. Learning attentive and hierarchical representa-
+                                                                             conference on machine learning, pages 4904–4916. PMLR,
+     tions for 3d shape recognition. In Computer Vision–ECCV
+                                                                             2021. 5
+     2020: 16th European Conference, Glasgow, UK, August 23–
+                                                                        [16] Tero Karras, Timo Aila, Samuli Laine, and Jaakko Lehtinen.
+     28, 2020, Proceedings, Part XV 16, pages 105–122. Springer,
+                                                                             Progressive growing of gans for improved quality, stability,
+     2020. 5
+                                                                             and variation. arXiv preprint arXiv:1710.10196, 2017. 7
+ [3] Ting Chen, Simon Kornblith, Mohammad Norouzi, and Ge-
+                                                                        [17] Salman Khan, Muzammal Naseer, Munawar Hayat,
+     offrey Hinton. A simple framework for contrastive learning
+                                                                             Syed Waqas Zamir, Fahad Shahbaz Khan, and Mubarak
+     of visual representations. In International conference on ma-
+                                                                             Shah. Transformers in vision: A survey. ACM computing
+     chine learning, pages 1597–1607. PMLR, 2020. 5
+                                                                             surveys (CSUR), 54(10s):1–41, 2022. 5
+ [4] X Chen, S Xie, and K He. An empirical study of training
+     self-supervised vision transformers. in 2021 ieee. In CVF          [18] Valentin Khrulkov, Leyla Mirvakhabova, Evgeniya Usti-
+     International Conference on Computer Vision (ICCV), pages               nova, Ivan Oseledets, and Victor Lempitsky. Hyperbolic
+     9620–9629. 5                                                            image embeddings. In Proceedings of the IEEE/CVF Con-
+                                                                             ference on Computer Vision and Pattern Recognition, pages
+ [5] Karan Desai, Gaurav Kaul, Zubin Aysola, and Justin John-
+                                                                             6418–6428, 2020. 1, 5, 6
+     son. Redcaps: Web-curated image-text data created by the
+     people, for the people. arXiv preprint arXiv:2111.11431,           [19] Alina Kuznetsova, Hassan Rom, Neil Alldrin, Jasper Ui-
+     2021. 5                                                                 jlings, Ivan Krasin, Jordi Pont-Tuset, Shahab Kamali, Stefan
+ [6] Karan Desai, Maximilian Nickel, Tanmay Rajpurohit, Justin               Popov, Matteo Malloci, Alexander Kolesnikov, Tom Duerig,
+     Johnson, and Shanmukha Ramakrishna Vedantam. Hyper-                     and Vittorio Ferrari. The open images dataset v4: Unified
+     bolic image-text representations. In International Confer-              image classification, object detection, and visual relationship
+     ence on Machine Learning, pages 7694–7731. PMLR, 2023.                  detection at scale. IJCV, 2020. 6
+     1, 2, 3, 4, 5, 6, 8                                                [20] Gen Li, Nan Duan, Yuejian Fang, Ming Gong, and Daxin
+ [7] Jacob Devlin, Ming-Wei Chang, Kenton Lee, and Kristina                  Jiang. Unicoder-vl: A universal encoder for vision and
+     Toutanova.        Bert: Pre-training of deep bidirectional              language by cross-modal pre-training. In Proceedings of
+     transformers for language understanding. arXiv preprint                 the AAAI conference on artificial intelligence, pages 11336–
+     arXiv:1810.04805, 2018. 5                                               11344, 2020. 5
+ [8] Mohamed Elhoseiny, Babak Saleh, and Ahmed Elgammal.                [21] Junnan Li, Dongxu Li, Caiming Xiong, and Steven Hoi.
+     Write a classifier: Zero-shot learning using purely textual             Blip: Bootstrapping language-image pre-training for uni-
+     descriptions. In Proceedings of the IEEE International Con-             fied vision-language understanding and generation. In In-
+     ference on Computer Vision, pages 2584–2591, 2013. 5                    ternational Conference on Machine Learning, pages 12888–
+ [9] Luca Franco, Paolo Mandica, Bharti Munjal, and Fabio                    12900. PMLR, 2022. 5
+     Galasso. Hyperbolic self-paced learning for self-supervised        [22] Junnan Li, Dongxu Li, Silvio Savarese, and Steven Hoi.
+     skeleton-based action representations.        arXiv preprint            Blip-2: Bootstrapping language-image pre-training with
+     arXiv:2303.06242, 2023. 1, 5                                            frozen image encoders and large language models. arXiv
+[10] Octavian Ganea, Gary Bécigneul, and Thomas Hofmann.                    preprint arXiv:2301.12597, 2023. 5
+     Hyperbolic entailment cones for learning hierarchical em-          [23] Victor Weixin Liang, Yuhui Zhang, Yongchan Kwon, Ser-
+     beddings. In International Conference on Machine Learn-                 ena Yeung, and James Y Zou. Mind the gap: Understanding
+     ing, pages 1646–1655. PMLR, 2018. 3, 5                                  the modality gap in multi-modal contrastive representation
+[11] Octavian Ganea, Gary Bécigneul, and Thomas Hofmann.                    learning. Advances in Neural Information Processing Sys-
+     Hyperbolic neural networks. Advances in neural informa-                 tems, 35:17612–17625, 2022. 1, 8
+     tion processing systems, 31, 2018. 1, 5, 11                        [24] Haotian Liu, Chunyuan Li, Qingyang Wu, and Yong Jae Lee.
+[12] Songwei Ge, Shlok Mishra, Simon Kornblith, Chun-Liang                   Visual instruction tuning. arXiv preprint arXiv:2304.08485,
+     Li, and David Jacobs. Hyperbolic contrastive learning for               2023. 5
+     visual representations beyond objects. In Proceedings of           [25] Maximillian Nickel and Douwe Kiela. Poincaré embeddings
+     the IEEE/CVF Conference on Computer Vision and Pattern                  for learning hierarchical representations. Advances in neural
+     Recognition, pages 6840–6849, 2023. 1, 5                                information processing systems, 30, 2017. 5
+[13] Yunhui Guo, Xudong Wang, Yubei Chen, and Stella X Yu.              [26] Maximillian Nickel and Douwe Kiela. Learning continuous
+     Clipped hyperbolic classifiers are super-hyperbolic classi-             hierarchies in the lorentz model of hyperbolic geometry. In
+     fiers. In Proceedings of the IEEE/CVF Conference on Com-                International conference on machine learning, pages 3779–
+     puter Vision and Pattern Recognition, pages 11–20, 2022. 5              3788. PMLR, 2018. 2
+[14] Kaiming He, Xiangyu Zhang, Shaoqing Ren, and Jian Sun.             [27] Kitsuchart Pasupa, Phongsathorn Kittiworapanya, Napasin
+     Deep residual learning for image recognition. In Proceed-               Hongngern, and Kuntpong Woraratpanya. Evaluation of
+
+
+
+
+                                                                     27271
+     deep learning algorithms for semantic segmentation of car
+     parts. Complex & Intelligent Systems, pages 1–13, 2021. 6
+[28] Alec Radford, Jong Wook Kim, Chris Hallacy, Aditya
+     Ramesh, Gabriel Goh, Sandhini Agarwal, Girish Sastry,
+     Amanda Askell, Pamela Mishkin, Jack Clark, et al. Learning
+     transferable visual models from natural language supervi-
+     sion. In International conference on machine learning, pages
+     8748–8763. PMLR, 2021. 1, 2, 3, 5
+[29] John G Ratcliffe, S Axler, and KA Ribet. Foundations of
+     hyperbolic manifolds. Springer, 1994. 2
+[30] Bart Thomee, David A Shamma, Gerald Friedland, Ben-
+     jamin Elizalde, Karl Ni, Douglas Poland, Damian Borth, and
+     Li-Jia Li. Yfcc100m: The new data in multimedia research.
+     Communications of the ACM, 59(2):64–73, 2016. 8
+[31] Alexandru Tifrea, Gary Bécigneul, and Octavian-Eugen
+     Ganea. Poincar\’e glove: Hyperbolic word embeddings.
+     arXiv preprint arXiv:1810.06546, 2018. 5
+[32] Abraham A Ungar. Analytic hyperbolic geometry: Math-
+     ematical foundations and applications. World Scientific,
+     2005. 3
+[33] Ashish Vaswani, Noam Shazeer, Niki Parmar, Jakob Uszko-
+     reit, Llion Jones, Aidan N Gomez, Łukasz Kaiser, and Illia
+     Polosukhin. Attention is all you need. Advances in neural
+     information processing systems, 30, 2017. 5
+[34] Sijie Wang, Qiyu Kang, Rui She, Wei Wang, Kai Zhao, Yang
+     Song, and Wee Peng Tay. Hypliloc: Towards effective lidar
+     pose regression with hyperbolic fusion. In Proceedings of
+     the IEEE/CVF Conference on Computer Vision and Pattern
+     Recognition, pages 5176–5185, 2023. 1, 5
+[35] Xiao Wang, Guangyao Chen, Guangwu Qian, Pengcheng
+     Gao, Xiao-Yong Wei, Yaowei Wang, Yonghong Tian, and
+     Wen Gao. Large-scale multi-modal pre-trained models:
+     A comprehensive survey. Machine Intelligence Research,
+     pages 1–36, 2023. 5
+[36] Zirui Wang, Jiahui Yu, Adams Wei Yu, Zihang Dai, Yulia
+     Tsvetkov, and Yuan Cao. Simvlm: Simple visual language
+     model pretraining with weak supervision. arXiv preprint
+     arXiv:2108.10904, 2021. 5
+[37] Gokul Yenduri, Gautam Srivastava, Praveen Kumar Reddy
+     Maddikunta, Rutvij H Jhaveri, Weizheng Wang, Athana-
+     sios V Vasilakos, Thippa Reddy Gadekallu, et al. Gen-
+     erative pre-trained transformer: A comprehensive review
+     on enabling technologies, potential applications, emerg-
+     ing challenges, and future directions.       arXiv preprint
+     arXiv:2305.10435, 2023. 5
+[38] Zhen Yu, Toan Nguyen, Yaniv Gal, Lie Ju, Shekhar S Chan-
+     dra, Lei Zhang, Paul Bonnington, Victoria Mar, Zhiyong
+     Wang, and Zongyuan Ge. Skin lesion recognition with
+     class-hierarchy regularized hyperbolic embeddings. In In-
+     ternational Conference on Medical Image Computing and
+     Computer-Assisted Intervention, pages 594–603. Springer,
+     2022. 5
+[39] Yun Yue, Fangzhou Lin, Kazunori D Yamada, and Zim-
+     ing Zhang. Hyperbolic contrastive learning. arXiv preprint
+     arXiv:2302.01409, 2023. 5
+[40] Yudong Zhu, Di Zhou, Jinghui Xiao, Xin Jiang, Xiao Chen,
+     and Qun Liu. Hypertext: Endowing fasttext with hyperbolic
+     geometry. arXiv preprint arXiv:2010.16143, 2020. 5
+
+
+
+
+                                                                    27272
+

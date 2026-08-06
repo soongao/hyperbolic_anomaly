@@ -1,0 +1,773 @@
+                              Multi-level Wavelet-CNN for Image Restoration
+
+
+                Pengju Liu1 , Hongzhi Zhang ∗1 , Kai Zhang1 , Liang Lin2 , and Wangmeng Zuo1
+                      1
+                          School of Computer Science and Technology, Harbin Institute of Technology, China
+                       2
+                          School of Data and Computer Science, Sun Yat-Sen University, Guangzhou, China
+    lpj008@126.com, zhanghz0451@gmail.com, linliang@ieee.org, cskaizhang@gmail.com, cswmzuo@gmail.com
+
+
+
+                                                                                                                 MWCNN(226×226)
+                                                                        High        32
+                             Abstract
+                                                                                   31.8                                         MemNet(161×161)
+                                                                                                                     DRRN(105×105)
+                                                                                   31.6
+    The tradeoff between receptive field size and efficiency is                                                LapSRN(137×137)   RED30(61×61)
+                                                                                   31.4                        DnCNN(41×41)
+a crucial issue in low level vision. Plain convolutional net-                                    VDSR(41×41)
+
+
+                                                                        PSNR(dB)
+works (CNNs) generally enlarge the receptive field at the                          31.2
+
+expense of computational cost. Recently, dilated filtering                          31
+                                                                                          ESPCN(36×36)
+has been adopted to address this issue. But it suffers from                        30.8
+                                                                                           FSRCNN(61×61)
+gridding effect, and the resulting receptive field is only a s-                    30.6
+
+parse sampling of input image with checkerboard patterns.                          30.4
+
+In this paper, we present a novel multi-level wavelet CN-                          30.2
+                                                                        Low                             SRCNN(17×17)
+N (MWCNN) model for better tradeoff between receptive                               30
+field size and computational efficiency. With the modified                                10-3          10-2      10-1        100    101
+                                                                                                 Fast           Run Time(s)          Slow
+U-Net architecture, wavelet transform is introduced to re-
+                                                                    Figure 1. The run time vs. PSNR value of representative CNN
+duce the size of feature maps in the contracting subnetwork.
+                                                                    models, including SRCNN [16], FSRCNN [14], ESPCN [45], VD-
+Furthermore, another convolutional layer is further used to         SR [29], DnCNN [57], RED30 [37], LapSRN [31], DRRN [47],
+decrease the channels of feature maps. In the expanding             MemNet [47] and our MWCNN. The receptive field of each model
+subnetwork, inverse wavelet transform is then deployed to           are also provided. The PSNR and time are evaluated on Set5 with
+reconstruct the high resolution feature maps. Our MWCNN             the scale factor ×4 running on a GTX1080 GPU.
+can also be explained as the generalization of dilated fil-
+tering and subsampling, and can be applied to many image            popularity of CNN in image restoration can be explained
+restoration tasks. The experimental results clearly show the        from two aspects. On the one hand, existing CNN-based
+effectiveness of MWCNN for image denoising, single image            solutions have outperformed the other methods with a large
+super-resolution, and JPEG image artifacts removal.                 margin for several simple tasks such as image denoising and
+                                                                    SISR [16, 29, 32, 57]. On the other hand, recent studies
+                                                                    have revealed that one can plug CNN-based denoisers into
+1. Introduction                                                     model-based optimization methods for solving more com-
+                                                                    plex image restoration tasks [40, 58], which also promotes
+   Image restoration, which aims to recover the latent clean        the widespread use of CNNs.
+image x from its degraded observation y, is a fundamental
+                                                                        For image restoration, CNN actually represents a map-
+and long-standing problem in low level vision. For decades,
+                                                                    ping from degraded observation to latent clean image. Due
+varieties of methods have been proposed for image restora-
+                                                                    to the input and output images usually should be of the same
+tion from both prior modeling and discriminative learning
+                                                                    size, one representative strategy is to use the fully convolu-
+perspectives [6, 27, 10, 11, 17, 44, 52]. Recently, convolu-
+                                                                    tional network (FCN) by removing the pooling layers. In
+tional neural networks (CNNs) have also been extensively
+                                                                    general, larger receptive field is helpful to restoration per-
+studied and achieved state-of-the-art performance in several
+                                                                    formance by taking more spatial context into account. How-
+representative image restoration tasks, such as single image
+                                                                    ever, for FCN without pooling, the receptive field size can
+super-resolution (SISR) [16, 29, 32], image denoising [57],
+                                                                    be enlarged by either increasing the network depth or us-
+image deblurring [58], and compressed imaging [34]. The
+                                                                    ing filters with larger size, which unexceptionally results
+  ∗ Corresponding author.                                           in higher computational cost. In [58], dilated filtering [55]
+
+
+
+
+                                                                  886
+is adopted to enlarge receptive field without the sacrifice         2.1. Image denoising
+of computational cost. Dilated filtering, however, inher-
+                                                                        Since 2009, CNNs have been applied for image denois-
+ently suffers from gridding effect [50], where the receptive
+                                                                    ing [25]. These early methods generally cannot achieve
+field only considers a sparse sampling of input image with
+                                                                    state-of-the-art denoising performance [2, 25, 53]. Recent-
+checkerboard patterns. Thus, one should be careful to en-
+                                                                    ly, multi-layer perception (MLP) has been adopted to learn
+large receptive field while avoiding the increase of compu-
+                                                                    the mapping from noise patch to clean pixel, and achieve
+tational burden and the potential sacrifice of performance
+                                                                    comparable performance with BM3D [8]. By incorporat-
+improvement. Taking SISR as an example, Figure 1 illus-
+                                                                    ing residual learning with batch normalization [24], the D-
+trates the receptive field, run times, and PSNR values of
+                                                                    nCNN model by Zhang et al. [57] can outperform tradi-
+several representative CNN models. It can be seen that FS-
+                                                                    tional non-CNN based methods. Mao et al. [37] suggest to
+RCNN [14] has relatively larger receptive field but achieves
+                                                                    add symmetric skip connections to FCN for improving de-
+lower PSNR value than VDSR [29] and DnCNN [57].
+                                                                    noising performance. For better tradeoff between speed and
+    In this paper, we present a multi-level wavelet CNN
+                                                                    performance, Zhang et al. [58] present a 7-layer FCN with
+(MWCNN) model to enlarge receptive field for better trade-
+                                                                    dilated filtering. Santhanam et al. [43] introduce a recur-
+off between performance and efficiency. Our MWCNN is
+                                                                    sively branched deconvolutional network (RBDN), where
+based on the U-Net [41] architecture consisting of a con-
+                                                                    pooling/unpooling is adopted to obtain and aggregate multi-
+tracting subnetwork and an expanding subnetwork. In the
+                                                                    context representation.
+contracting subnetwork, discrete wavelet transform (DWT)
+is introduced to replace each pooling operation. Since DWT          2.2. Single image super-resolution
+is invertible, it is guaranteed that all the information can
+                                                                       The application of CNN in SISR begins with SRCN-
+be kept by such downsampling scheme. Moreover, DWT
+                                                                    N [16], which adopts a 3-layer FCN without pooling and
+can capture both frequency and location information of fea-
+                                                                    has a small receptive field. Subsequently, very deep net-
+ture maps [12, 13], which may be helpful in preserving de-
+                                                                    work [29], residual units [32], Laplacian pyramid [31], and
+tailed texture. In the expanding subnetwork, inverse wavelet
+                                                                    recursive architecture [28, 47] have also been suggested to
+transform (IWT) is utilized for upsampling low resolution
+                                                                    enlarge receptive field. These methods, however, enlarge
+feature maps to high resolution ones. To enrich feature
+                                                                    the receptive field at the cost of either increasing computa-
+representation and reduce computational burden, element-
+                                                                    tional cost or loss of information. Due to the speciality of
+wise summation is adopted for combining the feature maps
+                                                                    SISR, one effective approach is to take the low-resolution
+from the contracting and expanding subnetworks. More-
+                                                                    (LR) image as input to CNN [14, 45] for better tradeof-
+over, dilated filtering can also be explained as a special case
+                                                                    f between receptive field size and efficiency. In addition,
+of MWCNN, and ours is more general and effective in en-
+                                                                    generative adversarial networks (GANs) have also been in-
+larging receptive field. Experiments on image denoising,
+                                                                    troduced to improve the visual quality of SISR [26, 32, 42].
+SISR, and JPEG image artifacts removal validate the effec-
+tiveness and efficiency of our MWCNN. As shown in Fig-              2.3. JPEG image artifacts removal
+ure 1, MWCNN is moderately slower than LapSRN [31],
+                                                                       Due to high compression rate, JPEG image usually suf-
+DnCNN [57] and VDSR [29] in terms of run time, but can
+                                                                    fers from blocking effect and results in unpleasant visual
+have a much larger receptive field and higher PSNR value.
+                                                                    quality. In [15], Dong et al. adopt a 4-layer ARCNN for
+To sum up, the contributions of this work include:
+                                                                    JPEG image deblocking. By taking the degradation model
+  • A novel MWCNN model to enlarge receptive field                  of JPEG compression into account [10, 51], Guo et al. [18]
+    with better tradeoff between efficiency and restoration         suggest a dual-domain convolutional network to combine
+    performance.                                                    the priors in both DCT and pixel domains. GAN has also
+  • Promising detail preserving ability due to the good             been introduced to generate more realistic result [19].
+    time-frequency localization of DWT.                             2.4. Other restoration tasks
+  • State-of-the-art performance on image denoising, SIS-              Due to the similarity of image denoising, SISR, and
+    R, and JPEG image deblocking.                                   JPEG artifacts removal, the model suggested for one task
+                                                                    may be easily extended to the other tasks simply by retrain-
+2. Related work
+                                                                    ing. For example, both DnCNN [57] and MemNet [48] have
+    In this section, we present a brief review on the devel-        been evaluated on all the three tasks. Moreover, CNN de-
+opment of CNNs for image denoising, SISR, JPEG image                noisers can also serve as a kind of plug-and-play prior. By
+artifacts removal, and other image restoration tasks. Specif-       incorporating with unrolled inference, any restoration tasks
+ically, more discussions are given to the relevant works on         can be tackled by sequentially applying the CNN denoiser-
+enlarging receptive field and incorporating DWT in CNNs.            s [58]. Romano et al. [40] further propose a regularization
+
+
+
+
+                                                                  887
+by denoising framework, and provide an explicit functional             Input                  DWT
+                                                                                                                             IWT                                   Output
+
+for defining the regularization induced by denoisers. These                     DWT
+                                                                                                    DWT
+
+                                                                                                           DWT
+                                                                                                                                   IWT
+
+                                                                                                                                         IWT
+                                                                                                                                                           IWT
+methods not only promote the application of CNN in low                                                           DWT                           IWT
+
+
+level vision, but also present many solutions to exploit CN-                              (a) Multi-level WPT architecture
+N denoisers for other image restoration tasks.                         Input
+                                                                                                     DWT                           IWT
+                                                                                                                                                                   Output
+    Several studies have also been given to incorporate                        DWT      CNN
+                                                                                                      DWT
+
+
+                                                                                                                       CNN
+                                                                                                                                    IWT
+
+                                                                                                                                                     CNN     IWT
+wavelet transform with CNN. Bae et al. [5] find that learn-                                            DWT                           IWT
+
+
+                                                                                                          DWT                            IWT
+
+ing CNN on wavelet subbands benefits CNN learning, and                                (b) Multi-level wavelet-CNN architecture
+suggest a wavelet residual network (WavResNet) for image
+                                                                   Figure 2. From WPT to MWCNN. Intuitively, WPT can be seen
+denoising and SISR. Similarly, Guo et al. [20] propose a
+                                                                   as a special case of our MWCNN without CNN blocks.
+deep wavelet super-resolution (DWSR) method to recover
+missing details on subbands. Subsequently, deep convo-
+                                                                   then adopted as the pooling operator. In the reconstruction
+lutional framelets [21, 54] have been developed to extend
+                                                                   stage, the four subband images are first upsampled and then
+convolutional framelets for low-dose CT. However, both of
+                                                                   convolved with the corresponding filters to produce the re-
+WavResNet and DWSR only consider one level wavelet de-
+                                                                   construction result at the current level. Finally, the original
+composition. Deep convolutional framelets independent-
+                                                                   image x can be accurately reconstructed by inverse WPT.
+ly processes each subband from decomposition perspec-
+                                                                       In image denoising and compression, some operations,
+tive, which ignores the dependency between these subband-
+                                                                   e.g., soft-thresholding and quantization, usually are re-
+s. In contrast, multi-level wavelet transform is considered
+                                                                   quired to process the decomposition result [9, 33]. These
+by our MWCNN to enlarge receptive field without informa-
+                                                                   operations can be treated as some kind of nonlinearity tai-
+tion loss. Taking all the subbands as inputs after each trans-
+                                                                   lored to specific task. In this work, we further extend WPT
+form, our MWCNN can embed DWT to any CNNs with
+                                                                   to multi-level wavelet-CNN (MWCNN) by adding a CN-
+pooling, and owns more power to model both spatial con-
+                                                                   N block between any two levels of DWTs, as illustrated in
+text and inter-subband dependency.
+                                                                   Figure 2(b). After each level of transform, all the subband
+                                                                   images are taken as the inputs to a CNN block to learn a
+3. Method
+                                                                   compact representation as the inputs to the subsequent level
+   In this section, we first introduce the multi-level wavelet     of transform. It is obvious that MWCNN is a generalization
+packet transform (WPT). Then we present our MWCNN                  of multi-level WPT, and degrades to WPT when each CNN
+motivated by multi-level WPT, and describe its network ar-         block becomes the identity mapping. Due to the biorthog-
+chitecture. Finally, discussion is given to analyze the con-       onal property of WPT, our MWCNN can use subsampling
+nection of MWCNN with dilated filtering and subsampling.           operations safely without information loss. Moreover, com-
+                                                                   pared with conventional CNN, the frequency and location
+3.1. From multi-level WPT to MWCNN                                 characteristics of DWT is also expected to benefit the p-
+   In 2D discrete wavelet transform (DWT), four filters, i.e.      reservation of detailed texture.
+fLL , fLH , fHL , and fHH , are used to convolve with an im-
+                                                                   3.2. Network architecture
+age x [36]. The convolution results are then downsampled
+to obtain the four subband images x1 , x2 , x3 , and x4 . For         The key of our MWCNN architecture is to design the C-
+example, x1 is defined as (fLL ⊗ x) ↓2 . Even though the           NN block after each level of DWT. As shown in Figure 3,
+downsampling operation is deployed, due to the biorthogo-          each CNN block is a 4-layer FCN without pooling, and
+nal property of DWT, the original image x can be accurately        takes all the subband images as inputs. In contrast, differen-
+reconstructed by the inverse wavelet transform (IWT), i.e.,        t CNNs are deployed to low-frequency and high-frequency
+x = IW T (x1 , x2 , x3 , x4 ).                                     bands in deep convolutional framelets [21, 54]. We note
+   In multi-level wavelet packet transform (WPT) [4, 13],          that the subband images after DWT are still dependent, and
+the subband images x1 , x2 , x3 , and x4 are further processed     the ignorance of their dependence may be harmful to the
+with DWT to produce the decomposition results. For two-            restoration performance. Each layer of the CNN block is
+level WPT, each subband image xi (i = 1, 2, 3, or 4) is            composed of convolution with 3 × 3 filters (Conv), batch
+decomposed into four subband images xi,1 , xi,2 , xi,3 , and       normalization (BN), and rectified linear unit (ReLU) oper-
+xi,4 . Recursively, the results of three or higher levels WPT      ations. As to the last layer of the last CNN block, Conv
+can be attained. Figure 2(a) illustrates the decomposition         without BN and ReLU is adopted to predict residual image.
+and reconstruction of an image with WPT. Actually, WP-                Figure 3 shows the overall architecture of MWCNN
+T is a special case of FCN without the nonlinearity layer-         which consists of a contracting subnetwork and an expand-
+s. In the decomposition stage, four pre-defined filters are        ing subnetwork. Generally, MWCNN modifies U-Net from
+deployed to each (subband) image, and downsampling is              three aspects. (i) For downsampling and upsampling, max-
+
+
+
+
+                                                                 888
+                       160   160   160    160                                                                                                  160    160   160    160
+
+
+
+
+                                    640   256   256   256    256                                                  256   256   256   256 640
+
+
+
+                                                            1024 256 256 256 256           256 256 256 256 1024
+
+             DWT         Conv+BN+ReLU                                              ...                                              Sum Connection          Conv         IWT
+
+
+Figure 3. Multi-level wavelet-CNN architecture. It consists two parts: the contracting and expanding subnetworks. Each solid box corre-
+sponds to a multi-channel feature map. And the number of channels is annotated on the top of the box. The network depth is 24. Moreover,
+our MWCNN can be further extended to higher level (e.g., ≥ 4) by duplicating the configuration of the 3rd level subnetwork.
+
+pooling and up-convolution are used in conventional U-                                              ered, DWT and IWT will play the roles of pooling and up-
+Net[41], while DWT and IWT are utilized in MWCNN. (ii)                                              convolution in MWCNN, respectively. When all the sub-
+For MWCNN, the downsampling results in the increase of                                              bands are taken into account, MWCNN can avoid the infor-
+feature map channels. Except the first one, the other CN-                                           mation loss caused by conventional subsampling, and may
+N blocks are deployed to reduce the feature map channel-                                            benefit restoration result.
+s for compact representation. In contrast, for convention-                                             To illustrate the connection between MWCNN and dilat-
+al U-Net, the downsampling has no effect on feature map                                             ed filtering with factor 2, we first give the definition of fLH ,
+channels, and the subsequent convolution layers are used to                                         fHL , and fHH ,
+increase feature map channels. (iii) In MWCNN, element-                                                       "        #         "       #          "        #
+wise summation is used to combine the feature maps from                                                         −1 −1              −1 1                1 −1
+                                                                                                     fLH =               , fHL =           ,f    =             . (3)
+the contracting and expanding subnetworks. While in con-                                                        1 1                −1 1 HH            −1 1
+ventional U-Net concatenation is adopted. Then our final
+network contains 24 layers. For more details on the setting                                         Given an image x with size of m × n, the (i, j)-th value of
+of MWCNN, please refer to Figure 3. In our implementa-                                              x1 after 2D Haar transform can be written as x1 (i, j) =
+tion, Haar wavelet is adopted as the default in MWCNN.                                              x(2i − 1, 2j − 1) + x(2i − 1, 2j) + x(2i, 2j − 1) +
+Other wavelets, e.g., Daubechies 2 (DB2), are also consid-                                          x(2i, 2j). And x2 (i, j), x3 (i, j), and x4 (i, j) can be de-
+ered in our experiments.                                                                            fined analogously. We also have x(2i − 1, 2j − 1) =
+    Denote by Θ the network parameters of MWCNN, and                                                (x1 (i, j) − x2 (i, j) − x3 (i, j) + x4 (i, j)) /4. The dilated
+F (y; Θ) be the network output. Let {(yi , xi )}N                                                   filtering with factor 2 on the position (2i − 1, 2j − 1) of
+                                                    i=1 be a
+training set, where yi is the i-th input image, xi is the cor-                                      x can be written as
+responding ground-truth image. The objective function for                                                                                !
+                                                                                                      (x ⊗2 k)(2i − 1, 2j − 1) =                 x(p, q)k(s, t), (4)
+learning MWCNN is then given by
+                                                                                                                                                     p+2s = 2i−1,
+                       N                                                                                                                             q +2t = 2j −1
+                    1 !
+            L(Θ) =        ∥F (yi ; Θ) − xi ∥2F .                                     (1)
+                   2N i=1                                                                           where k is the 3×3 convolution kernel. Actually, it also can
+The ADAM algorithm [30] is adopted to train MWCNN                                                   be obtained by using the 3×3 convolution with the subband
+by minimizing the objective function. Different from VD-                                            images,
+SR [29] and DnCNN [57], we do not adopt the residual
+                                                                                                       (x⊗2 k)(2i−1, 2j−1)=((x1−x2−x3+x4 )⊗k) (i, j)/4. (5)
+learning formulation for the reason that it can be natural-
+ly embedded in MWCNN.                                                                               Analogously, we can analyze the connection between di-
+3.3. Discussion                                                                                     lated filtering and MWCNN for (x ⊗2 k)(2i − 1, 2j),
+                                                                                                    (x ⊗2 k)(2i, 2j − 1), (x ⊗2 k)(2i, 2j). Therefore, the 3 × 3
+   The DWT in MWCNN is closely related with the pooling                                             dilated convolution on x can be treated as a special case of
+operation and dilated filtering. By using the Haar wavelet as                                       4 × 3 × 3 convolution on the subband images.
+an example, we explain the connection between DWT and                                                   Compared with dilated filtering, MWCNN can also
+sum-pooling. In 2D Haar wavelet, the low-pass filter fLL is                                         avoid the gridding effect. After several layers of dilated
+defined as,                    "     #                                                              filtering, it only considers a sparse sampling of locations
+                                 1 1                                                                with the checkerboard pattern, resulting in large portion of
+                      fLL =            .                  (2)
+                                 1 1                                                                information loss (see Figure 4(a)). Another problem with
+One can see that (fLL ⊗ x) ↓2 actually is the sum-pooling                                           dilated filtering is that the two neighbored pixels may be
+operation. When only the low-frequency subband is consid-                                           based on information from totally non-overlapped locations
+
+
+
+
+                                                                                                889
+                                                                         4.1.2 Network training
+
+                                                                         A MWCNN model is learned for each degradation setting.
+                                                                         The network parameters are initialized based on the method
+                                                                         described in [22]. We use the ADAM algorithm [30] with
+                                                                         α = 0.01, β1 = 0.9, β2 = 0.999 and $ = 10−8 for
+                                                                         optimizing and a mini-batch size of 24. As to the other
+         (a)                    (b)                    (c)
+                                                                         hyper-parameters of ADAM, the default setting is adopted.
+Figure 4. Illustration of the gridding effect. Taken 3-layer CNNs
+                                                                         The learning rate is decayed exponentially from 0.001 to
+as an example: (a) the dilated filtering with factor 2 surfers large
+                                                                         0.0001 in the 40 epochs. Rotation or/and flip based da-
+portion of information loss, (b) and the two neighbored pixels are
+based on information from totally non-overlapped locations, (c)          ta augmentation is used during mini-batch learning. We
+while our MWCNN can perfectly avoid underlying drawbacks.                use the MatConvNet package [49] with cuDNN 6.0 to train
+                                                                         our MWCNN. All the experiments are conducted in the
+                                                                         Matlab (R2016b) environment running on a PC with In-
+(see Figure 4(b)), and may cause the inconsistence of local              tel(R) Core(TM) i7-5820K CPU 3.30GHz and an Nvidia
+information. In contrast, Figure 4(c) illustrates the recep-             GTX1080 GPU. The learning algorithm converges very fast
+tive field of MWCNN. One can see that MWCNN is able to                   and it takes about two days to train a MWCNN model.
+well address the sparse sampling and inconsistence of local
+information, and is expected to benefit restoration perfor-              4.2. Quantitative and qualitative evaluation
+mance quantitatively and qualitatively.
+                                                                             In this subsection, all the MWCNN models use the same
+                                                                         network setting described in Sec. 3.2, and 2D Haar wavelet
+4. Experiments                                                           is adopted.
+   Experiments are conducted for performance evaluation
+on three tasks, i.e., image denoising, SISR, and compres-                4.2.1 Image denoising
+sion artifacts removal. Comparison of several MWCNN
+variants is also given to analyze the contribution of each               Except CBM3D [11] and CDnCNN [57], most denois-
+component. The code and pre-trained models will be given                 ing methods are only tested on gray images. Thus, we
+at https://github.com/lpj0/MWCNN.                                        train our MWCNN by using the gray images, and compare
+                                                                         with six competing denoising methods, i.e., BM3D [11], T-
+                                                                         NRD [10], DnCNN [57], IRCNN [58], RED30 [37], and
+4.1. Experimental setting
+                                                                         MemNet [48]. We evaluate the denoising methods on
+4.1.1 Training set                                                       three test datasets, i.e., Set12 [57], BSD68 [38], and Ur-
+                                                                         ban100 [23]. Table 1 lists the average PSNR/SSIM result-
+To train our MWCNN, a large training set is constructed by               s of the competing methods on these three datasets. We
+using images from three dataset, i.e. Berkeley Segmentation              note that our MWCNN only slightly outperforms DnCN-
+Dataset (BSD) [38], DIV2K [3] and Waterloo Exploration                   N by about 0.1 ∼ 0.3dB in terms of PSNR on BSD68.
+Database (WED) [35]. Concretely, we collect 200 images                   As to other datasets, our MWCNN generally achieves fa-
+from BSD, 800 images from DIV2K, and 4, 744 images                       vorable performance when compared with the competing
+from WED. Due to the receptive field of MWCNN is not                     methods. When the noise level is high (e.g., σ = 50), the
+less than 226 × 226, in the training stage N = 24 × 6, 000               average PSNR by our MWCNN can be 0.5dB higher than
+patches with the size of 240 × 240 are cropped from the                  that by DnCNN on Set12, and 1.2dB higher on Urban100.
+training images.                                                         Figure 5 shows the denoising results of the images Test011
+    For image denoising, Gaussian noise with specific noise              from Set68 with the noise level σ = 50. One can see that
+level is added to clean patch, and MWCNN is trained to                   our MWCNN is promising in recovering image details and
+learn a mapping from noisy image to denoising result. Fol-               structures, and can obtain visually more pleasant result than
+lowing [57], we consider three noise levels, i.e., σ = 15, 25            the competing methods. Please refer to the supplementary
+and 50. For SISR, we take the result by bicubic upsampling               materials for more results on Set12 and Urban100.
+as the input to MWCNN, and three specific scale factors,
+i.e., ×2, ×3 and ×4, are considered in our experiments. For              4.2.2 Single image super-resolution
+JPEG image artifacts removal, we follow [15] by consider-
+ing four compression quality settings Q = 10, 20, 30 and 40              Following [29], SISR is only applied to the luminance chan-
+for the JPEG encoder. Both JPEG encoder and JPEG image                   nel, i.e. Y in YCbCr color space. We test MWCNN on
+artifacts removal are only applied on the Y channel [15].                four datasets, i.e., Set5 [7], Set14 [56], BSD100 [38], and
+
+
+
+
+                                                                       890
+Table 1. Average PSNR(dB)/SSIM results of the competing methods for image denoising with noise levels σ = 15, 25 and 50 on datasets
+Set14, BSD68 and Urban100. Red color indicates the best performance.
+   Dataset          σ                BM3D [11]             TNRD [10]             DnCNN [57]                IRCNN [58]           RED30 [37]            MemNet [48]               MWCNN
+                    15              32.37 / 0.8952       32.50 / 0.8962         32.86 / 0.9027         32.77 / 0.9008                 -                      -              33.15 / 0.9088
+    Set12           25              29.97 / 0.8505       30.05 / 0.8515         30.44 / 0.8618         30.38 / 0.8601                 -                      -              30.79 / 0.8711
+                    50              26.72 / 0.7676       26.82 / 0.7677         27.18 / 0.7827         27.14 / 0.7804          27.34 / 0.7897         27.38 / 0.7931        27.74 / 0.8056
+                    15              31.08 / 0.8722       31.42 / 0.8822         31.73 / 0.8906         31.63 / 0.8881                 -                      -              31.86 / 0.8947
+   BSD68            25              28.57 / 0.8017       28.92 / 0.8148         29.23 / 0.8278         29.15 / 0.8249                 -                      -              29.41 / 0.8360
+                    50              25.62 / 0.6869       25.97 / 0.7021         26.23 / 0.7189         26.19 / 0.7171          26.35 / 0.7245         26.35 / 0.7294        26.53 / 0.7366
+                    15              32.34 / 0.9220       31.98 / 0.9187         32.67 / 0.9250         32.49 / 0.9244                 -                      -              33.17 / 0.9357
+  Urban100          25              29.70 / 0.8777       29.29 / 0.8731         29.97 / 0.8792         29.82 / 0.8839                 -                      -              30.66 / 0.9026
+                    50              25.94 / 0.7791       25.71 / 0.7756         26.28 / 0.7869         26.14 / 0.7927          26.48 / 0.7991         26.64 / 0.8024        27.42 / 0.8371
+
+Table 2. Average PSNR(dB) / SSIM results of the competing methods for SISR with scale factors S = 2, 3 and 4 on datasets Set5, Set14,
+BSD100 and Urban100. Red color indicates the best performance.
+  Dataset      S         RCN [46]        VDSR [29]      DnCNN [57]        RED30 [37]      SRResNet [32]      LapSRN [31]      DRRN [47]       MemNet [48]      WaveResNet [5]      MWCNN
+               ×2   37.17 / 0.9583     37.53 / 0.9587   37.58 / 0.9593   37.66 / 0.9599          -          37.52 / 0.9590   37.74 / 0.9591   37.78 / 0.9597   37.57 / 0.9586    37.91 / 0.9600
+   Set5        ×3   33.45 / 0.9175     33.66 / 0.9213   33.75 / 0.9222   33.82 / 0.9230          -                 -         34.03 / 0.9244   34.09 / 0.9248   33.86 / 0.9228    34.18 / 0.9272
+               ×4   31.11 / 0.8736     31.35 / 0.8838   31.40 / 0.8845   31.51 / 0.8869   32.05 / 0.8902    31.54 / 0.8850   31.68 / 0.8888   31.74 / 0.8893   31.52 / 0.8864    32.12 / 0.8941
+               ×2   32.77 / 0.9109     33.03 / 0.9124   33.04 / 0.9118   32.94 / 0.9144          -          33.08 / 0.9130   33.23 / 0.9136   33.28 / 0.9142   33.09 / 0.9129    33.70 / 0.9182
+   Set14       ×3   29.63 / 0.8269     29.77 / 0.8314   29.76 / 0.8349   29.61 / 0.8341          -                 -         29.96 / 0.8349   30.00 / 0.8350   29.88 / 0.8331    30.16 / 0.8414
+               ×4   27.79 / 0.7594     28.01 / 0.7674   28.02 / 0.7670   27.86 / 0.7718   28.49 / 0.7783    28.19 / 0.7720   28.21 / 0.7720   28.26 / 0.7723   28.11 / 0.7699    28.41 / 0.7816
+               ×2          -           31.90 / 0.8960   31.85 / 0.8942   31.98 / 0.8974          -          31.80 / 0.8950   32.05 / 0.8973   32.08 / 0.8978   32.15 / 0.8995    32.23 / 0.8999
+  BSD100       ×3          -           28.82 / 0.7976   28.80 / 0.7963   28.92 / 0.7993          -                 -         28.95 / 0.8004   28.96 / 0.8001   28.86 / 0.7987    29.12 / 0.8060
+               ×4          -           27.29 / 0.7251   27.23 / 0.7233   27.39 / 0.7286   27.56 / 0.7354    27.32 / 0.7280   27.38 / 0.7284   27.40 / 0.7281   27.32 / 0.7266    27.62 / 0.7355
+               ×2          -           30.76 / 0.9140   30.75 / 0.9133   30.91 / 0.9159          -          30.41 / 0.9100   31.23 / 0.9188   31.31 / 0.9195   30.96 / 0.9169    32.30 / 0.9296
+ Urban100      ×3          -           27.14 / 0.8279   27.15 / 0.8276   27.31 / 0.8303          -                 -         27.53 / 0.8378   27.56 / 0.8376   27.28 / 0.8334    28.13 / 0.8514
+               ×4          -           25.18 / 0.7524   25.20 / 0.7521   25.35 / 0.7587   26.07 / 0.7839    25.21 / 0.7560   25.44 / 0.7638   25.50 / 0.7630   25.36 / 0.7614    26.27 / 0.7890
+
+Table 3. Average PSNR(dB) / SSIM results of the competing methods for JPEG image artifacts removal with quality factors Q = 10, 20,
+30 and 40 on datasets Classic5 and LIVE1. Red color indicates the best performance.
+    Dataset               Q                    JPEG                  ARCNN [15]                TNRD [10]                   DnCNN [57]             MemNet [48]                   MWCNN
+                          10              27.82 / 0.7595            29.03 / 0.7929           29.28 / 0.7992              29.40 / 0.8026           29.69 / 0.8107           30.01 / 0.8195
+                          20              30.12 / 0.8344            31.15 / 0.8517           31.47 / 0.8576              31.63 / 0.8610           31.90 / 0.8658           32.16 / 0.8701
+    Classic5
+                          30              31.48 / 0.8744            32.51 / 0.8806           32.78 / 0.8837              32.91 / 0.8861                  -                 33.43 / 0.8930
+                          40              32.43 / 0.8911            33.34 / 0.8953                  -                    33.77 / 0.9003                  -                 34.27 / 0.9061
+                          10              27.77 / 0.7730            28.96 / 0.8076           29.15 / 0.8111              29.19 / 0.8123           29.45 / 0.8193           29.69 / 0.8254
+                          20              30.07 / 0.8512            31.29 / 0.8733           31.46 / 0.8769              31.59 / 0.8802           31.83 / 0.8846           32.04 / 0.8885
+     LIVE1
+                          30              31.41 / 0.9000            32.67 / 0.9043           32.84 / 0.9059              32.98 / 0.9090                  -                 33.45 / 0.9153
+                          40              32.35 / 0.9173            33.63 / 0.9198                  -                    33.96 / 0.9247                  -                 34.45 / 0.9301
+
+
+Urban100 [23], because they are widely adopted to eval-                                            for Track 1 of NTIRE 2018 SR challenge (×8 SR) [1],
+uate SISR performance. Our MWCNN is compared with                                                  our improved MWCNN is lower than the Top-1 method by
+eight CNN-based SISR methods, including RCN [46], VD-                                              0.37dB.
+SR [29], DnCNN [57], RED30 [37], SRResNet [32], Lap-
+SRN [31], DRRN [47], and MemNet [48]. Due to the
+                                                                                                   4.2.3 JPEG image artifacts removal
+source code of SRResNet is not released, its results are
+from [32] and are incomplete.                                                                      In JPEG compression, an image is divided into non-
+   Table 2 lists the average PSNR/SSIM results of the com-                                         overlapped 8 × 8 blocks. Discrete cosine transform (D-
+peting methods on the four datasets. Our MWCNN per-                                                CT) and quantization are then applied to each block, thus
+forms favorably in terms of both PSNR and SSIM index-                                              introducing the blocking artifact. The quantization is deter-
+es. Compared with VDSR, our MWCNN achieves a no-                                                   mined by a quality factor Q to control the compression rate.
+table gain of about 0.4dB by PSNR on Set5 and Set14.                                               Following [15], we consider four settings on quality factor,
+On Urban100, our MWCNN outperforms VDSR by about                                                   e.g., Q = 10, 20, 30 and 40, for the JPEG encoder. Both
+0.9∼1.4dB. Obviously, WaveResNet et al. [5] sightly out-                                           JPEG encoder and JPEG image artifacts removal are only
+perform VDSR, and also is still inferior to MWCNN. We                                              applied to the Y channel. In our experiments, MWCNN is
+note that the network depth of SRResNet is 34, while that                                          compared with four competing methods, i.e., ARCNN [15],
+of MWCNN is 24. Moreover, SRResNet is trained with                                                 TNRD [10], DnCNN [57], and MemNet [48] on the two
+a much larger training set than MWCNN. Even so, when                                               datasets, i.e., Classic5 and LIVE1 [39]. We do not consid-
+the scale factor is 4, MWCNN achieve slightly higher P-                                            er [18, 19] due to their source codes are unavailable.
+SNR values on Set5 and BSD100, and is comparable to S-                                                 Table 3 lists the average PSNR/SSIM results of the com-
+RResNet on Set14. Figure 6 shows the visual comparison-                                            peting methods on Classic5 and LIVE1. For any of the four
+s of the competing methods on the images Barbara from                                              quality factors, our MWCNN performs favorably in terms
+Set14. Thanks to the frequency and location characteristics                                        of quantitative metrics on the two datasets. On Classic5 and
+of DWT, our MWCNN can correctly recover the fine and                                               LIVE1, the PSNR values of MWCNN can be 0.2∼0.3dB
+detailed textures, and produce sharp edges. Furthermore,                                           higher than those of the second best method (i.e., Mem-
+
+
+
+
+                                                                                              891
+                                          Ground Truth (PSNR / SSIM) BM3D [11] (24.98 / 0.7412)                 TNRD [10] (24.98 / 0.7308)        DnCNN [57] (25.56 / 0.7723)
+
+
+
+
+           Ground Truth                   IRCNN [58] (25.56 / 0.7711) RED30 [37] (25.97 / 0.7788) MemNet [48] (25.98 / 0.7957)                      MWCNN (26.33 / 0.8113)
+
+                                 Figure 5. Image denoising results of “T est011” (BSD68) with noise level 50.
+
+
+
+
+                                         Ground Truth (PSNR / SSIM) VDSR [29] (25.79 / 0.7403) DnCNN [57] (25.92 / 0.7417) RED30 [37] (25.99 / 0.7468) SRResNet [32] (25.93 / 0.746)
+
+
+
+
+           Ground Truth          LapSRN [31] (25.77 / 0.7384) DRRN [47] (25.75 / 0.7404) MemNet [48] (25.69 / 0.7414) WaveResNet (25.63 / 0.7372) MWCNN (26.46 / 0.7629)
+
+                  Figure 6. Single image super-resolution results of “barbara” (Set14) with upscaling factor ×4.
+
+
+
+
+                                  Ground Truth (PSNR / SSIM)                         ARCNN [15] (31.81 / 0.8109)                          TNRD [10] (31.70 / 0.8076))
+
+
+
+
+     Ground Truth                 DnCNN [57] (31.79 / 0.8107)                        MemNet [48] (32.08 / 0.8178)                          MWCNN (32.43 / 0.8257)
+                     Figure 7. JPEG image artifacts removal results of “womanhat” (LIVE1) with quality factor 10.
+
+Net [48]) for the quality factor of 10 and 20. Figure 7 shows                               Table 4. Run time (in seconds) of the competing methods for the
+                                                                                            three tasks on images of size 256×256, 512×512 and 1024×1024:
+the results on the image womanhat from LIVE1 with the
+                                                                                            image denosing is tested on noise level 50, SISR is tested on scale
+quality factor 10. One can see that MWCNN is effective in
+                                                                                            ×2, and JPEG image deblocking is tested on quality factor 10.
+restoring detailed textures and sharp salient edges.                                                                              Image Denoising
+                                                                                                 Size         TNRD [10]       DnCNN [57]      RED30 [37]     MemNet [47]     MWCNN
+                                                                                               256×256          0.010           0.0143          1.362          0.8775         0.0586
+4.2.4 Run time                                                                                 512×512          0.032           0.0487          4.702           3.606         0.0907
+                                                                                              1024×1024         0.116           0.1688          15.77           14.69         0.3575
+Table 4 lists the GPU run time of the competing methods                                                                   Single Image Super-Resolution
+for the three tasks. The Nvidia cuDNN-v6.0 deep learn-                                           Size         VDSR [29]       LapSRN [31]     DRRN [47]      MemNet [37]     MWCNN
+                                                                                               256×256         0.0172           0.0229          3.063          0.8774         0.0424
+ing library is adopted to accelerate the GPU computation                                       512×512         0.0575           0.0357          8.050           3.605         0.0780
+under Ubuntu 16.04 system. Specifically, only the CNN-                                        1024×1024        0.2126           0.1411          25.23           14.69         0.3167
+                                                                                                                          JPEG Image Artifacts Removal
+based methods with source codes are considered in the                                            Size         ARCNN [15]      TNRD [10]       DnCNN [57]     MemNet [37]     MWCNN
+comparison. For three tasks, the run time of MWCNN                                             256×256          0.0277          0.009           0.0157         0.8775         0.0531
+                                                                                               512×512          0.0532          0.028           0.0568          3.607         0.0811
+is far less than several state-of-the-art methods, including                                  1024×1024         0.1613          0.095           0.2012          14.69         0.2931
+RED30 [37], MemNet [47] and DRRN [47]. Note that the
+three methods also perform poorer than MWCNN in terms
+of PSNR/SSIM metrics. In comparison to the other method-                                    NN variants, including: (i) MWCNN (Haar): the de-
+s, MWCNN is moderately slower by speed but can achieve                                      fault MWCNN with Haar wavelet, (ii) MWCNN (DB2):
+higher PSNR/SSIM indexes. The result indicates that, in-                                    MWCNN with Daubechies-2 wavelet, and (iii) MWCN-
+stead of the increase of network depth/width, the effective-                                N (HD): MWCNN with Haar in contracting subnetwork
+ness of MWCNN should be attributed to the incorporation                                     and Daubechies-2 in expanding subnetwork. Then, abla-
+of CNN and DWT.                                                                             tion experiments are provided for verifying the effective-
+                                                                                            ness of additionally embedded wavelet: (i) the default U-
+4.3. Comparison of MWCNN variants
+                                                                                            Net with same architecture to MWCNN, (ii) U-Net+S: us-
+  Using image denoising and JPEG image artifacts as ex-                                     ing sum connection instead of concatenation, and (iii) U-
+amples, we compare the PSNR results by three MWC-                                           Net+D: adopting learnable conventional downsamping fil-
+
+
+
+
+                                                                                        892
+Table 5. Performance comparison in terms of average PSNR (dB) and run time (in seconds): image denosing is tested on noise level 50
+and JPEG image deblocking is tested on quality factor 10.
+  Dataset   Dilated [55]     Dilated-2       U-Net [41]       U-Net+S          U-Net+D              DCF [21]     WaveResNet [5]      MWCNN (Haar)       MWCNN (DB2)       MWCNN (HD)
+                                                                              Image Denoising (σ = 50)
+  Set12     27.45 / 0.181   24.81 / 0.185   27.42 / 0.079   27.41 / 0.074     27.46 / 0.080    27.38 / 0.081      27.49 / 0.179       27.74 / 0.078      27.77 / 0.134    27.73 / 0.101
+ BSD68      26.35 / 0.142   24.32 / 0.174   26.30 / 0.076   26.29 / 0.071     26.21 / 0.075    26.30 / 0.075      26.38 / 0.143       26.53 / 0.072      26.54 / 0.122    26.52 / 0.088
+ Urban100   26.56 / 0.764   24.18 / 0.960   26.68 / 0.357   26.72 / 0.341     26.99 / 0.355    26.65 / 0.354          -/-             27.42 / 0.343      27.48 / 0.634    27.35 / 0.447
+                                                                        JPEG Image Artifacts Removal (PC=10)
+ Classic5   29.72 / 0.287   29.49 / 0.302   29.61 / 0.093   29.60 / 0.082     29.68 / 0.097     29.57 / 0.104         -/-             30.01 / 0.088      30.04 / 0.195    29.97 / 0.136
+ LIVE1      29.49 / 0.354   29.26 / 0.376   29.36 / 0.112   29.36 / 0.109     29.43 / 0.120     29.38 / 0.155         -/-             29.69 / 0.112      29.70 / 0.265    29.66 / 0.187
+
+
+
+ters instead of Max pooling. Two 24-layer dilated CNNs                                          Table 6. Average PSNR (dB) and run time (in seconds) of MWC-
+                                                                                                NNs with different levels on Gaussian denoising with the noise
+are also considered: (i) Dilated: the hybrid dilated convolu-
+                                                                                                level of 50.
+tion [50] to suppress the gridding effect, and (ii) Dilated-2:                                         Dataset        MWCNN-1            MWCNN-2          MWCNN-3          MWCNN-4
+the dilate factor of all layers is set to 2. The WaveRes-                                              Set12         27.14 / 0.047      27.62 / 0.068     27.74 / 0.082   27.74 / 0.091
+                                                                                                       BSD68         26.16 / 0.044      26.45 / 0.063     26.53 / 0.074   26.54 / 0.084
+Net method in [5] is provided to be compared. Moreover,                                               Urban100       26.08 / 0.212      27.10 / 0.303     27.42 / 0.338   27.44 / 0.348
+due to its code is unavailable, a self-implementation of deep
+convolutional framelets (DCF) [54] is also considered in the
+experiments.                                                                                    to balance efficiency and performance. Table 6 reports the
+                                                                                                PSNR and run time results of MWCNNs with the levels of
+    Table 4 lists the PSNR and run time results of these                                        1 to 4 (i.e., MWCNN-1 ∼ MWCNN-4). It can be observed
+methods. And we have the following observations. (i) The                                        that MWCNN-3 with 24-layer architecture performs much
+gridding effect with the sparse sampling and inconsistence                                      better than MWCNN-1 and MWCNN-2, while MWCNN-4
+of local information authentically has adverse influence on                                     only performs negligibly better than MWCNN-3 in terms
+restoration performance. (ii) The ablation experiments in-                                      of the PSNR metric. Moreover, the speed of MWCNN-3
+dicate that using sum connection instead of concatenation                                       is also moderate compared with other levels. Taking both
+can improve efficiency without decreasing PNSR. Due to                                          efficiency and performance gain into account, we choose
+the special group of filters with the biorthogonal and time-                                    MWCNN-3 as the default setting.
+frequency localization property in wavelet, our embedded
+wavelet own more puissant ability for image restoration
+than pooling operation and learnable downsamping filters.                                       5. Conclusion
+The worse performance of DCF also indicates that indepen-
+                                                                                                   This paper presents a multi-level wavelet-CNN (MWC-
+dent processing of subbands harms final result. (iii) Com-
+                                                                                                NN) architecture for image restoration, which consists of a
+pared to MWCNN (DB2) and MWCNN (HD), using Haar
+                                                                                                contracting subnetwork and a expanding subnetwork. The
+wavelet for downsampling and upsampling in network is
+                                                                                                contracting subnetwork is composed of multiple levels of
+the best choice in terms of quantitative and qualitative eval-
+                                                                                                DWT and CNN blocks, while the expanding subnetwork
+uation. MWCNN (Haar) has similar run time with dilated
+                                                                                                is composed of multiple levels of IWT and CNN blocks.
+CNN and U-Net but achieves higher PSNR results, which
+                                                                                                Due to the invertibility, frequency and location property of
+demonstrates the effectiveness of MWCNN for tradeoff be-
+                                                                                                DWT, MWCNN is safe to perform subsampling without in-
+tween performance and efficiency.
+                                                                                                formation loss, and is effective in recovering detailed tex-
+    Note that our MWCNN is quite different with DCF [54]:                                       tures and sharp structures from degraded observation. As
+DCF incorporates CNN with DWT in the view of decompo-                                           a result, MWCNN can enlarge receptive field with better
+sition, where different CNNs are deployed to each subband.                                      tradeoff between efficiency and performance. Extensive ex-
+However, the results in Table 5 indicates that independent                                      periments demonstrate the effectiveness and efficiency of
+processing of subbands is not suitable for image restora-                                       MWCNN on three restoration tasks, i.e., image denoising,
+tion. On the contrary, MWCNN combines DWT to CNN                                                SISR, and JPEG compression artifact removal.
+from perspective of enlarging receptive field without infor-                                       In future work, we will extend MWCNN for more gen-
+mation loss, allowing to embed DWT with any CNNs with                                           eral restoration tasks such as image deblurring and blind
+pooling. Moreover, our embedded DWT can be treated as                                           deconvolution. Moreover, our MWCNN can also be used
+predefined parameters to ease network learning, and the dy-                                     to substitute the pooling operation in the CNN architectures
+namic range of subbands can be jointly adjusted by the CN-                                      for high-level vision tasks such as image classification.
+N blocks. Taking all subbands as input, MWCNN is more
+powerful in modeling inter-band dependency.
+    As described in Sec. 3.2, our MWCNN can be extend-
+                                                                                                Acknowledgement
+ed to higher level of wavelet decomposition. Nevertheless,                                      This work is partially supported by the National Science
+higher level inevitably results in deeper network and heav-                                     Foundation of China (NSFC) (grant No.s 61671182 and
+ier computational burden. Thus, a suitable level is required                                    61471146).
+
+
+
+
+                                                                                              893
+References                                                                  IEEE Conference on Computer Vision and Pattern Recogni-
+                                                                            tion, pages 2862–2869, 2014.
+ [1] Ntire 2018 super resolution challenge. http://vision.
+                                                                       [18] J. Guo and H. Chao. Building dual-domain representations
+     ee.ethz.ch/ntire18. Accessed Mar, 2018.
+                                                                            for compression artifacts reduction. In European Conference
+ [2] F. Agostinelli, M. R. Anderson, and H. Lee. Robust im-                 on Computer Vision, pages 628–644, 2016.
+     age denoising with multi-column deep neural networks. In
+                                                                       [19] J. Guo and H. Chao. One-to-many network for visually
+     Advances in Neural Information Processing Systems, pages
+                                                                            pleasing compression artifacts reduction. In IEEE Confer-
+     1493–1501, 2013.
+                                                                            ence on Computer Vision and Pattern Recognition, 2017.
+ [3] E. Agustsson and R. Timofte. Ntire 2017 challenge on sin-
+                                                                       [20] T. Guo, H. S. Mousavi, T. H. Vu, and V. Monga. Deep
+     gle image super-resolution: Dataset and study. In IEEE Con-
+                                                                            wavelet prediction for image super-resolution. In IEEE Con-
+     ference on Computer Vision and Pattern Recognition Work-
+                                                                            ference on Computer Vision and Pattern Recognition Work-
+     shops (CVPRW), pages 1122–1131. IEEE, 2017.
+                                                                            shops (CVPRW), 2017.
+ [4] A. N. Akansu and R. A. Haddad. Multiresolution signal de-
+     composition: transforms, subbands, and wavelets. Academ-          [21] Y. Han and J. C. Ye. Framing U-Net via deep convolutional
+     ic Press, 2001.                                                        framelets: Application to sparse-view CT. arXiv preprint
+                                                                            arXiv:1708.08333, 2017.
+ [5] W. Bae, J. Yoo, and J. C. Ye. Beyond deep residual learn-
+     ing for image restoration: Persistent homology-guided man-        [22] K. He, X. Zhang, S. Ren, and J. Sun. Deep residual learning
+     ifold simplification. In IEEE Conference on Computer Vision            for image recognition. In IEEE Conference on Computer
+     and Pattern Recognition Workshops (CVPRW), pages 1141–                 Vision and Pattern Recognition, pages 770–778, 2016.
+     1149. IEEE, 2017.                                                 [23] J.-B. Huang, A. Singh, and N. Ahuja. Single image super-
+ [6] M. R. Banham and A. K. Katsaggelos. Digital image restora-             resolution from transformed self-exemplars. In IEEE Con-
+     tion. IEEE Signal Processing Magazine, 14(2):24–41, 1997.              ference on Computer Vision and Pattern Recognition, pages
+ [7] M. Bevilacqua, A. Roumy, C. Guillemot, and M. L. Alberi-               5197–5206, 2015.
+     Morel. Low-complexity single-image super-resolution based         [24] S. Ioffe and C. Szegedy. Batch normalization: Accelerating
+     on nonnegative neighbor embedding. 2012.                               deep network training by reducing internal covariate shift. In
+ [8] H. C. Burger, C. J. Schuler, and S. Harmeling. Image de-               International Conference on Machine Learning, 2015.
+     noising: Can plain neural networks compete with BM3D? In          [25] V. Jain and S. Seung. Natural image denoising with convo-
+     IEEE Conference on Computer Vision and Pattern Recogni-                lutional networks. In Advances in Neural Information Pro-
+     tion, pages 2392–2399, 2012.                                           cessing Systems, pages 769–776, 2009.
+ [9] S. G. Chang, B. Yu, and M. Vetterli. Adaptive wavelet thresh-     [26] J. Johnson, A. Alahi, and L. Fei-Fei. Perceptual losses for
+     olding for image denoising and compression. IEEE Transac-              real-time style transfer and super-resolution. In European
+     tions on Image Processing, 9(9):1532–1546, 2000.                       Conference on Computer Vision, pages 694–711, 2016.
+[10] Y. Chen and T. Pock. Trainable nonlinear reaction diffusion:      [27] A. K. Katsaggelos. Digital image restoration. Springer Pub-
+     A flexible framework for fast and effective image restora-             lishing Company, Incorporated, 2012.
+     tion. IEEE Transactions on Pattern Analysis and Machine           [28] J. Kim, J. Kwon Lee, and K. Mu Lee. Deeply-recursive con-
+     Intelligence, PP(99):1–1, 2015.                                        volutional network for image super-resolution. In IEEE Con-
+[11] K. Dabov, A. Foi, V. Katkovnik, and K. Egiazarian. Im-                 ference on Computer Vision and Pattern Recognition, pages
+     age denoising by sparse 3-d transform-domain collabora-                1637–1645, 2016.
+     tive filtering. IEEE Transactions on Image Processing,            [29] J. Kim, J. K. Lee, and K. M. Lee. Accurate image super-
+     16(8):2080–2095, 2007.                                                 resolution using very deep convolutional networks. In IEEE
+[12] I. Daubechies. The wavelet transform, time-frequency local-            Conference on Computer Vision and Pattern Recognition,
+     ization and signal analysis. IEEE Transactions on Informa-             pages 1646–1654, 2016.
+     tion Theory, 36(5):961–1005, 1990.                                [30] D. Kingma and J. Ba. Adam: A method for stochastic op-
+[13] I. Daubechies. Ten lectures on wavelets. SIAM, 1992.                   timization. In International Conference for Learning Repre-
+[14] C. Dong, C. L. Chen, and X. Tang. Accelerating the super-              sentations, 2015.
+     resolution convolutional neural network. In European Con-         [31] W.-S. Lai, J.-B. Huang, N. Ahuja, and M.-H. Yang. Deep
+     ference on Computer Vision, pages 391–407, 2016.                       laplacian pyramid networks for fast and accurate super-
+[15] C. Dong, Y. Deng, C. Change Loy, and X. Tang. Compres-                 resolution. IEEE Conference on Computer Vision and Pat-
+     sion artifacts reduction by a deep convolutional network. In           tern Recognition, 2017.
+     IEEE Conference on International Conference on Computer           [32] C. Ledig, L. Theis, F. Huszár, J. Caballero, A. Cunningham,
+     Vision, pages 576–584, 2015.                                           A. Acosta, A. Aitken, A. Tejani, J. Totz, Z. Wang, et al.
+[16] C. Dong, C. C. Loy, K. He, and X. Tang.                Image           Photo-realistic single image super-resolution using a gener-
+     super-resolution using deep convolutional networks. IEEE               ative adversarial network. IEEE Conference on Computer
+     Transactions on Pattern Analysis and Machine Intelligence,             Vision and Pattern Recognition, 2017.
+     38(2):295–307, 2016.                                              [33] A. S. Lewis and G. Knowles. Image compression using the
+[17] S. Gu, L. Zhang, W. Zuo, and X. Feng. Weighted nuclear                 2-d wavelet transform. IEEE Transactions on Image Pro-
+     norm minimization with application to image denoising. In              cessing, 1(2):244–250, 1992.
+
+
+
+
+                                                                     894
+[34] M. Li, W. Zuo, S. Gu, D. Zhao, and D. Zhang. Learning con-            [49] A. Vedaldi and K. Lenc. Matconvnet: Convolutional neural
+     volutional networks for content-weighted image compres-                    networks for matlab. In Proceedings of the 23rd ACM inter-
+     sion. arXiv preprint arXiv:1703.10553, 2017.                               national conference on Multimedia, pages 689–692, 2015.
+[35] K. Ma, Z. Duanmu, Q. Wu, Z. Wang, H. Yong, H. Li, and                 [50] P. Wang, P. Chen, Y. Yuan, D. Liu, Z. Huang, X. Hou, and
+     L. Zhang. Waterloo exploration database: New challenges                    G. Cottrell. Understanding convolution for semantic seg-
+     for image quality assessment models. IEEE Transactions on                  mentation. arXiv preprint arXiv:1702.08502, 2017.
+     Image Processing, 26(2):1004–1016, 2017.                              [51] Z. Wang, D. Liu, S. Chang, Q. Ling, Y. Yang, and T. S.
+[36] S. G. Mallat. A theory for multiresolution signal decom-                   Huang. D3: Deep dual-domain based fast restoration of
+     position: the wavelet representation. IEEE Transactions on                 jpeg-compressed images. In IEEE Conference on Computer
+     Pattern Analysis and Machine Intelligence, 11(7):674–693,                  Vision and Pattern Recognition, pages 2764–2772, 2016.
+     1989.                                                                 [52] J. Wright, A. Y. Yang, A. Ganesh, S. S. Sastry, and Y. Ma.
+[37] X. Mao, C. Shen, and Y. Yang. Image restoration using very                 Robust face recognition via sparse representation. IEEE
+     deep convolutional encoder-decoder networks with symmet-                   Transactions on Pattern Analysis and Machine Intelligence,
+     ric skip connections. In Advances in Neural Information Pro-               31(2):210–227, 2009.
+     cessing Systems, pages 2802–2810, 2016.                               [53] J. Xie, L. Xu, and E. Chen. Image denoising and inpaint-
+[38] D. Martin, C. Fowlkes, D. Tal, and J. Malik. A database                    ing with deep neural networks. In International Conference
+     of human segmented natural images and its application to e-                on Neural Information Processing Systems, pages 341–349,
+     valuating segmentation algorithms and measuring ecological                 2012.
+     statistics. In IEEE Conference on International Conference            [54] J. C. Ye and Y. S. Han. Deep convolutional framelets: A
+     Computer Vision, volume 2, pages 416–423, 2001.                            general deep learning for inverse problems. Society for In-
+[39] A. K. Moorthy and A. C. Bovik. Visual importance pool-                     dustrial and Applied Mathematics, 2018.
+     ing for image quality assessment. IEEE journal of selected            [55] F. Yu and V. Koltun. Multi-scale context aggregation by di-
+     topics in signal processing, 3(2):193–201, 2009.                           lated convolutions. arXiv preprint arXiv:1511.07122, 2015.
+[40] Y. Romano, M. Elad, and P. Milanfar. The little engine that           [56] R. Zeyde, M. Elad, and M. Protter. On single image scale-up
+     could: Regularization by denoising (red). arXiv preprint                   using sparse-representations. In International conference on
+     arXiv:1611.02862, 2016.                                                    curves and surfaces, pages 711–730, 2010.
+                                                                           [57] K. Zhang, W. Zuo, Y. Chen, D. Meng, and L. Zhang. Be-
+[41] O. Ronneberger, P. Fischer, and T. Brox. U-Net: Convolu-
+                                                                                yond a gaussian denoiser: Residual learning of deep cnn for
+     tional networks for biomedical image segmentation. In In-
+                                                                                image denoising. IEEE Transactions on Image Processing,
+     ternational Conference on Medical Image Computing and
+                                                                                PP(99):1–1, 2016.
+     Computer-Assisted Intervention, pages 234–241, 2015.
+                                                                           [58] K. Zhang, W. Zuo, S. Gu, and L. Zhang. Learning deep cnn
+[42] M. S. M. Sajjadi, B. Scholkopf, and M. Hirsch. EnhanceNet:
+                                                                                denoiser prior for image restoration. In IEEE Conference
+     Single image super-resolution through automated texture
+                                                                                on Computer Vision and Pattern Recognition, pages 3929–
+     synthesis. In IEEE International Conference on Computer
+                                                                                3938, 2017.
+     Vision, pages 4501–4510, 2017.
+[43] V. Santhanam, V. I. Morariu, and L. S. Davis. General-
+     ized deep image to image regression. IEEE Conference
+     on Computer Vision and Pattern Recognition, pages 5609–
+     5619, 2017.
+[44] U. Schmidt and S. Roth. Shrinkage fields for effective image
+     restoration. In IEEE Conference on Computer Vision and
+     Pattern Recognition, pages 2774–2781, 2014.
+[45] W. Shi, J. Caballero, F. Huszár, J. Totz, A. P. Aitken, R. Bish-
+     op, D. Rueckert, and Z. Wang. Real-time single image and
+     video super-resolution using an efficient sub-pixel convolu-
+     tional neural network. In IEEE Conference on Computer Vi-
+     sion and Pattern Recognition, pages 1874–1883, 2016.
+[46] Y. Shi, K. Wang, C. Chen, L. Xu, and L. Lin. Structure-
+     preserving image super-resolution via contextualized multi-
+     task learning. IEEE Transactions on Multimedia, PP(99):1–
+     1, 2017.
+[47] Y. Tai, J. Yang, and X. Liu. Image super-resolution via deep
+     recursive residual network. In IEEE Conference on Comput-
+     er Vision and Pattern Recognition, 2017.
+[48] Y. Tai, J. Yang, X. Liu, and C. Xu. MemNet: A persistent
+     memory network for image restoration. In IEEE Conference
+     on International Conference on Computer Vision, 2017.
+
+
+
+
+                                                                         895
+

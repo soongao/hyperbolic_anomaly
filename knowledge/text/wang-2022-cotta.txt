@@ -1,0 +1,692 @@
+                                                                            Continual Test-Time Domain Adaptation
+
+                                                              Qin Wang1 Olga Fink1,3* Luc Van Gool1,4 Dengxin Dai2
+                                          1
+                                            ETH Zurich, Switzerland 2 MPI for Informatics, Germany 3 EPFL, Switzerland 4 KU Lueven, Belgium
+                                                                        {qin.wang,vangool,dai}@vision.ee.ethz.ch olga.fink@epfl.ch
+
+
+
+
+arXiv:2203.13591v1 [cs.CV] 25 Mar 2022
+                                                                    Abstract
+
+                                             Test-time domain adaptation aims to adapt a source pre-
+                                         trained model to a target domain without using any source
+                                         data. Existing works mainly consider the case where the
+                                         target domain is static. However, real-world machine per-
+                                         ception systems are running in non-stationary and contin-
+                                         ually changing environments where the target domain dis-
+                                         tribution can change over time. Existing methods, which
+                                         are mostly based on self-training and entropy regulariza-
+                                         tion, can suffer from these non-stationary environments.
+                                         Due to the distribution shift over time in the target do-
+                                         main, pseudo-labels become unreliable. The noisy pseudo-
+                                         labels can further lead to error accumulation and catas-
+                                         trophic forgetting. To tackle these issues, we propose a con-
+                                         tinual test-time adaptation approach (CoTTA) which com-
+                                         prises two parts. Firstly, we propose to reduce the error       Figure 1. We consider the online continual test-time adaptation
+                                         accumulation by using weight-averaged and augmentation-         scenario. The target data is provided in a sequence and from a
+                                         averaged predictions which are often more accurate. On          continually changing environment. An off-the-shelf source pre-
+                                                                                                         trained network is used to initialize the target network. The model
+                                         the other hand, to avoid catastrophic forgetting, we pro-
+                                                                                                         is updated online based on the current target data, and the predic-
+                                         pose to stochastically restore a small part of the neurons to   tions are given in an online fashion. The adaptation of the target
+                                         the source pre-trained weights during each iteration to help    network does not rely on any source data. Existing methods often
+                                         preserve source knowledge in the long-term. The proposed        suffer from error accumulation and forgetting which result in per-
+                                         method enables the long-term adaptation for all parame-         formance deterioration over time. Our method enables long-term
+                                         ters in the network. CoTTA is easy to implement and can be      test-time adaptation under continually changing environments.
+                                         readily incorporated in off-the-shelf pre-trained models. We
+                                         demonstrate the effectiveness of our approach on four clas-     clear weather conditions can suffer significant performance
+                                         sification tasks and a segmentation task for continual test-    deterioration when tested on snowy night conditions [50].
+                                         time adaptation, on which we outperform existing methods.       Similarly, a pre-trained image classification model can also
+                                         Our code is available at https://qin.ee/cotta.                  suffer this phenomenon when tested on corrupted images re-
+                                                                                                         sulting from sensor degradation. Due to privacy concerns or
+                                                                                                         legal constraints, the source data is generally considered un-
+                                                                                                         available during inference time under this setup, making it a
+                                         1. Introduction                                                 more challenging but more realistic problem than unsuper-
+                                             Test-time domain adaptation aims to adapt a source pre-     vised domain adaptation. In many scenarios, the adaptation
+                                         trained model by learning from the unlabeled test (target)      also needs to be performed in an online fashion. Therefore,
+                                         data during inference time. Due to the domain shift be-         test-time adaptation is critical to the success of real-world
+                                         tween source training data and target test data, an adapta-     machine perception applications under domain shift.
+                                         tion is necessary to achieve good performance. For exam-           Existing works on test-time adaptation often tackle the
+                                         ple, a semantic segmentation model trained on data from         distribution shift between the source domain and a fixed
+                                                                                                         target domain by updating model parameters using pseudo-
+                                           * The corresponding author                                    labels or entropy regularization [43,61]. These self-training
+methods have been proven to be effective when the test data        ily implemented. The weight-and-augmentation-averaged
+are drawn from the same stationary domain. However, they           strategy and the stochastic restoration can be readily incor-
+can be unstable [48] when the target test data originates          porated into any off-the-shelf pre-trained model without the
+from an environment which is continually changing. There           need to re-train it on source data. We demonstrate the ef-
+are two aspects that contribute to this: Firstly, under the con-   fectiveness of our proposed approach on four classification
+tinually changing environment, the pseudo-labels become            tasks and a segmentation task for continual test-time adap-
+noisier and mis-calibrated [13] because of the distribution        tation, on which we significantly improve performance over
+shift. Therefore, early prediction mistakes are more likely        existing methods. Our contributions are summarized blow:
+to result in error accumulation [4]. Secondly, as the model
+                                                                      • We propose a continual test-time adaptation approach
+is being continually adapted to new distributions for a long
+                                                                        which can effectively adapt off-the-shelf source pre-
+time, knowledge from the source domain is harder to pre-
+                                                                        trained models to continually changing target data.
+serve, leading to catastrophic forgetting [11, 41, 45].
+    Aiming to tackle these problems under the continually             • Specifically, we reduce the error accumulation by
+changing environment, this work focuses on the practical                using weight-averaged and augmentation-averaged
+problem of online continual test-time adaptation. As shown              pseudo-labels that are more accurate.
+in Figure 1, the goal is to start from an off-the-shelf source
+pre-trained model, and continually adapt it to the current            • The long-term forgetting effect is alleviated by explic-
+test data. Under this setup, we assume that the target test             itly preserving the knowledge from the source model.
+data is streamed from a continually changing environment.             • The proposed approach significantly improves the con-
+The prediction and updates are performed online, meaning                tinual test-time adaptation performance on both classi-
+that the model will only have access to the current stream              fication and segmentation benchmarks.
+of data without having access to the full test data nor any
+source data. The proposed setup is very relevant for real-         2. Related Work
+world machine perception systems. For example, surround-
+ing environments are continually changing for autonomous           2.1. Domain Adaptation
+driving systems (e.g. weather change from sunny to cloudy             Unsupervised domain adaptation (UDA) [44,46] aims to
+then to rainy). They can even change abruptly (e.g. when           improve the target model performance in the presence of a
+a car exits a tunnel and the camera gets suddenly over-            domain shift between the labeled source domain and unla-
+exposed). A perception model need to adapt itself and make         beled target domain. During training, UDA methods often
+decisions online under these non-stationary domain shifts.         align the feature distributions between the two domains us-
+    To effectively adapt the pre-trained source model to           ing discrepancy losses [39] or adversarial training [12, 58].
+the continually changing test data, we propose a contin-           Alternatively, the alignment can also be done in the input
+ual test-time adaptation approach (CoTTA) which tackles            space [18, 67]. In recent years, self-training has also shown
+the two main limitations of existing methods. The first            promising results by iteratively using gradually-improving
+component of the proposed method aims to alleviate er-             target pseudo-labels to train the network [19, 36, 62, 75].
+ror accumulation. We propose to improve the pseudo-label
+quality under the self-training framework in two different         2.2. Test-time Adaptation
+ways. On the one hand, motivated by the fact that the                  Test-time adaptation is also referred to as source-free do-
+mean teacher predictions often have a higher quality than          main adaptation in some references [28,66]. Unlike domain
+the standard model [55], we use a weight-averaged teacher          adaptation which requires access to both source and target
+model to provide more accurate predictions. On the other           data for adaptation, test-time adaptation methods do not re-
+hand, for test data which suffers larger domain gap, we use        quire any data from the source domain for adaptation. Some
+the augmentation-averaged predictions to further boost the         existing works [29, 33, 68] utilize generative models to sup-
+quality of pseudo-labels. The second component of the pro-         port the feature alignment in absence of source data.
+posed method aims to help preserve the source knowledge                Another popular direction is to finetune the source model
+and avoid forgetting. We propose to stochastically restore a       without explicitly conducting domain alignment. Test en-
+small part of neurons in the network back to the pre-trained       tropy minimization (TENT) [61] takes a pre-trained model
+source model. By reducing error accumulation and preserv-          and adapts to the test data by updating the trainable pa-
+ing knowledge, CoTTA enables long-term adaptation in a             rameters in Batchnorm layers using entropy minimization.
+continuously changing environment, and makes it possible           Source hypothesis transfer (SHOT) [37] utilizes both en-
+to train all parameters of the network. In contrast, previous      tropy minimization and a diversity regularizer for the adap-
+methods [43, 61] can only train batchnorm parameters.              tation. SHOT requires using source data to train a spe-
+    It is worth pointing out that our approach can be eas-         cialized source model using the label-smoothing technique
+              Table 1. The difference between our proposed continual test-time adaptation and related adaptation settings.
+                                                                  Data                                Learning
+              Setting                             Source              Target                Train stage        Test stage
+              standard domain adaptation           Yes              stationary                  Yes               No
+              standard test-time training [54]     Yes              stationary             Yes (aux task)         Yes
+              fully test-time adaptation [61]      No               stationary            No (pre-trained)        Yes
+              continual test-time adaptation       No          continually changing       No (pre-trained)        Yes
+
+with the weight normalization layer. Thus, it cannot sup-                sion of TENT [61] could adapt under this setup by contin-
+port the use an arbitrary pre-trained model. [43] proposes to            ually updating the BN parameters using the entropy loss.
+apply a diversity regularizer combined with an input trans-              However, it can suffer from error accumulation because of
+formation module to further improve the performance. [23]                mis-calibrated predictions. Test-time training (TTT) [54]
+uses a separate normalization convolutional network to nor-              could also continually update the feature extractor using su-
+malize test images from new domains. [22] only updates                   pervision from the rotation prediction auxiliary task. How-
+the final classification layer during inference time using               ever, it requires re-training of the source model using the
+pseudo-prototypes. [74] analyzes the problem in a Bayesian               source data to learn the auxiliary task. Therefore, it cannot
+perspective and proposes a regularized entropy minimiza-                 be considered as source-free for the full pipeline and does
+tion procedure at test-time adaptation, which requires ap-               not support off-the-shelf source pre-trained models.
+proximating density during training time. Updating the
+statistics in the Batch Normalization layer using the tar-               2.4. Continual Learning
+get data is a different path which also shows promising re-                 Continual learning [10] and lifelong learning [45] are
+sults [21, 34, 70]. While most existing works focus on im-               closely related to the continuous adaptation problems as
+age classification, [20, 27, 38] extend test-time adaptation to          a potential cure to the catastrophic forgetting. Contin-
+semantic segmentation. Standard test-time adaptation con-                ual learning methods can often be categorized into replay-
+siders the offline scenario where access to the full set of              based [49] and regularization-based [53, 72] methods.
+test data is provided for the training. This is often unrealis-          The latter can further be divided into data-focused meth-
+tic for online machine perception applications. Most exist-              ods, such as learning without forgetting (LwF) [35], and
+ing works (except TENT variants [60]) also require the re-               prior-focused methods, such as elastic weight consolida-
+training of the source model to support the test-time adap-              tion (EWC) [24]. Ideas from continual learning are adopted
+tation. Therefore, they cannot directly use off-the-shelf pre-           for continuous domain adaptation approaches [3, 30].
+trained model from the source domain.
+                                                                         2.5. Domain Generalization
+2.3. Continuous Domain Adaptation
+                                                                            This work is also related to domain generalization [42]
+    Unlike standard domain adaptation which assumes a spe-               in a broad sense, because of the shared goal of improv-
+cific target domain, continuous domain adaptation consid-                ing performance on potentially changing target domains.
+ers the adaptation problem with continually changing target              A number of works have also shown that data augmenta-
+data. Continuous Manifold Adaptation (CMA) [17] is an                    tion [52] during training [14, 16, 32, 69] and during test-
+early work which considers adaptation to evolving domains.               ing [1, 40, 73] can improve model robustness and general-
+Incremental adversarial domain adaptation (IADA) [63]                    izability. Domain randomization is one of the most popu-
+adapts to continually changing domains by adversarially                  lar methods which improves the model generalizability by
+aligning source and target features. [59] aims to continually            learning from different synthesis parameters of simulation
+adapt the unseen visual domain while alleviate the forget-               environments [56, 57]. Unlike domain generalization meth-
+ting on the seen domain without retaining the source train-              ods which mostly aim to train a more generalizable neural
+ing data. [3] aims to adapt to gradually changing domains by             network from the source domain, this work focuses on im-
+making use of the assumption of continuity between grad-                 proving the performance of existing pre-trained neural net-
+ually varying domains. Existing continuous domain adap-                  works during test-time by using the unlabeled online data
+tation methods need to have access to data from both the                 from the continually changing target domain.
+source and target domains in order to align the distributions.
+    The main focus of this paper is continual test-time adap-            3. Continual Test-Time Domain Adaptation
+tation, which additionally considers the adaptation at test-
+                                                                         3.1. Problem Definition
+time without accessing the source data. While this is a re-
+alistic scenario for machine perception systems in the real                 Given an existing pre-trained model fθ0 (x) with param-
+world, there are very limited number of approaches which                 eters θ trained on the source data (X S , Y S ), we aim at im-
+are applicable to such scenarios. In theory, the online ver-             proving the performance of this existing model during in-
+                                                                     reduce error accumulation. In addition, to help reduce for-
+                                                                     getting in continual adaptation, we propose to explicitly pre-
+                                                                     serve information from the source model. An overview of
+                                                                     the proposed method is presented in Figure 2.
+
+                                                                     Source Model Existing works on test-time adaptation of-
+                                                                     ten require special treatment in the training process of the
+                                                                     source model to improve domain generalization ability and
+                                                                     to facilitate the adaptation. For example, during source
+                                                                     training, TTT [54] has an additional auxiliary rotation pre-
+                                                                     diction branch to train to facilitate the target adaptation su-
+                                                                     pervision. This requires a retraining on the source data, and
+                                                                     makes it impossible to reuse existing pre-trained models. In
+                                                                     our proposed test-time adaptation method, we lift this bur-
+                                                                     den and do not require a modification of the architecture or
+                                                                     an additional source training process. Therefore, any exist-
+                                                                     ing pre-trained models can be used without retraining on the
+Figure 2. An overview of the proposed continual test-time adap-      source. We will show in the experiments that our method
+tation (CoTTA) approach. CoTTA adapts from an off-the-shelf          can work on a wide range of pre-trained networks including
+source pre-trained network. Error accumulation is mitigated by us-   ResNet variants and Transformer-based architectures.
+ing a teacher model to provide weight-averaged pseudo-labels and
+using multiple augmentations to average the predictions. Knowl-
+                                                                     Weight-Averaged Pseudo-Labels Given target data xTt
+edge from the source data is preserved by stochastically restoring
+a small number of elements of trainable weights.                     and the model fθt , the common test-time objective under
+                                                                     the self-training framework is to minimize the cross-entropy
+ference time for a continually changing target domain in             consistency between the prediction ŷtT = fθt (xTt ) and a
+an online fashion without having access to any source data.          pseudo-label. For example, directly using the model predic-
+Unlabeled target domain data X T is provided sequentially            tion itself as the pseudo-label leads to the training objective
+and the model only have access to the data of the current            of TENT [61] (i.e. entropy minimization). While this works
+time step. At time step t, target data xTt is provided as input      for a stationary target domain, the quality of pseudo-labels
+and the model fθt needs to make the prediction fθt (xTt ) and        can drop significantly for continually changing target data
+adapts itself accordingly for future inputs θt − → θt+1 . The        because of the distribution shift.
+data distribution of xTt is continually changing. The model               Motivated by the observation that weight-averaged mod-
+is evaluated based on the online predictions.                        els over training steps often provide a more accurate model
+    This setup is largely motivated by the need of machine           than the final model [47, 55], we use a weight-averaged
+perception applications in continually changing environ-             teacher model fθ0 to generate the pseudo-labels. At time-
+ments. For example, the surrounding environment is con-              step t = 0, the teacher network is initialized to be the
+tinually changing for autonomous driving cars because of             same as the source pre-trained network. At time-step t,
+location, weather, and time. Perception decisions need to                                                                      T
+                                                                     the pseudo-label is first generated by the teacher yˆ0 t =
+be made online and models need to be adapted.
+                                                                     fθt0 (xTt ). The student fθt is then updated by the cross-
+    We list the main differences between our online contin-
+                                                                     entropy loss between the student and teacher predictions:
+ual test-time adaptation setup with existing adaptation se-
+tups in Table 1. Compared to previous setups which focus                                              X       T
+on a fixed target domain, we consider the long-term adapta-                          Lθt (xTt ) = −       yˆ0 tc log ŷtc
+                                                                                                                       T
+                                                                                                                          ,       (1)
+                                                                                                      c
+tion on continually changing target environments.
+                                                                              T
+3.2. Methodology                                                     where yˆ0 tc is the probability of class c in the teacher model’s
+                                                                                                             T
+                                                                     soft pseudo-label prediction, and ŷtc     is the prediction from
+   We propose an adaptation method for the online contin-            the main model (student). The loss enforces a consistency
+ual test-time adaptation setup. The proposed method takes            between the teacher and student predictions.
+an off-the-shelf source pre-trained model and adapts it to              After the update of the student model θt −       → θt+1 using
+the continually changing target data in an online fashion.           Equation 1, we update the weights of the teacher model by
+Motivated by the fact that error accumulation is one of the          exponential moving average using the student weights:
+key bottlenecks in the self-training framework, we propose
+                                                                                       0
+to use weight-and-augmentation-averaged pseudo-labels to                              θt+1 = αθt0 + (1 − α)θt+1 ,                 (2)
+where α is a smoothing factor. Our final prediction for the           Algorithm 1 The proposed continual test-time adaptation
+                                                                T
+input data xTt is the class with the highest probability in yˆ0 t .   Initialization: A source pre-trained model fθ0 (x), teacher
+   The benefits of the weight-averaged consistency are two-           model fθ00 (x) initialized from fθ0 (x).
+fold. On the one hand, by using the often more accu-                  Input: For each time step t, current stream of data xt .
+rate [47] weight-averaged prediction as the pseudo-label tar-          1: Augment xt and get weight and augmentation-averaged
+get, our model suffers less from the error accumulation dur-               pseudo-labels from the teacher fθt0 by Equation 4.
+ing the continual adaptation. On the other hand, the mean              2: Update student fθt by consistency loss in Equation 5.
+                       T
+teacher prediction yˆ0 t encodes the information from mod-             3: Update teacher fθt0 by moving average in Equation 2.
+els in past iterations and is, therefore, less likely to suffer        4: Stochastically restore student fθt by Equation 8.
+from catastrophic forgetting in long-term continual adapta-           Output: Prediction fθt0 (xt ); Updated student model
+tion and improve the generalization capability to new un-             fθt+1 (x); Updated teacher model fθt+10  (x).
+seen domains. This is inspired by the mean teacher method
+proposed in [55] in semi-supervised learning.
+                                                                      on confident samples with small domain gaps can some-
+Augmentation-Averaged Pseudo-Labels Data augmen-                      times decrease model performance. We provide detailed
+tation during training time [52] has been widely applied to           discussion on this observation in the supplementary. In
+improve model performance. Different augmentation poli-               summary, we use the confidence to approximate the domain
+cies are often manually designed [26] or searched [9] for             difference and determine when to apply the augmentations.
+different datasets. While test-time augmentation has also                The student is updated by the refined pseudo-label:
+been proven to be able to improve robustness [5, 54], the                                           X T
+augmentation policies are generally determined and fixed                             Lθt (xTt ) = −    y 0 tc log ŷtc
+                                                                                                                    T
+                                                                                                                       ,     (5)
+                                                                                                     c
+for a specific dataset without considering the distribution
+change during inference time. Under a continually chang-
+ing environment, test distributions can change dramatically,          Stochastic Restoration While more accurate pseudo-
+which may make the augmentation policy invalid. Here, we              labels can mitigate error accumulation, continual adapta-
+take the test-time domain shift into account and approxi-             tion by self-training for a long time inevitably introduces
+mate the domain difference by prediction confidence. The              errors and leads to forgetting. This issue can be especially
+augmentation is only applied when the domain difference is            relevant if we encounter strong domain shifts within a se-
+large, to reduce error accumulation.                                  quence of data, because the strong distribution shift leads
+                                                                      to mis-calibrated and even wrong predictions. Self-training
+                 T   1 X
+                        N −1                                          in this case may only lead to reinforcing wrong predictions.
+             y˜0 t =          fθ0 (augi (xTt )),               (3)    What’s worse is that after encountering hard examples, the
+                     N i=0 t
+                                                                      model may not be able to recover because of the continual
+                     ( T
+                      yˆ0 t , if conf(fθ0 (xTt )) ≥ pth               adaptation, even when the new data are not severely shifted.
+               0T
+             yt =         T                                    (4)        To further tackle the problem of catastrophic forgetting,
+                      y˜0 t , otherwise,                              we propose a stochastic restoration method which explicitly
+         T                                                            restores the knowledge from the source pre-trained model.
+where y˜0 t is the augmentation-averaged prediction from the              Consider a convolution layer within the student model fθ
+                     T
+teacher model, yˆ0 t is the direct prediction from the teacher        after gradient update based on Equation 1 at time step t:
+model, conf(fθ0 (xTt )) is the source pre-trained model’s
+prediction confidence on the current input xTt , and pth is                               xl+1 = Wt+1 ∗ xl ,                   (6)
+a confidence threshold. By calculating the prediction confi-
+                                                                      where ∗ denotes the convolution operation, xl and xl+1
+dence on the current input xTt using the pre-trained model
+                                                                      denote the input and output to this layer, Wt+1 denotes
+fθ0 in Equation 4, we attempt to approximate the domain
+                                                                      the trainable convolution filters. The proposed stochastic
+difference between the source and the current domain. We
+                                                                      restoration method additionally updates the weight W by:
+hypothesize that a lower confidence indicates a larger do-
+main gap and a relatively high confidence level indicates                          M ∼ Bernoulli(p),                           (7)
+a smaller domain gap. Therefore, when the confidence is
+                                                          T                    Wt+1 = M        W0 + (1 − M )      Wt+1 ,       (8)
+high and larger than the threshold, we directly use yˆ0 t as
+our pseudo-label without using any augmentation. When                 where     denotes the element-wise multiplication. p is a
+the confidence is low, we apply additionally N random aug-            small restore probability, and M is a mask tensor of the
+mentations to further improve the pseudo-label quality. The           same shape as Wt+1 . The mask tensor decides which ele-
+filtering is critical as we observe that random augmentations         ment within Wt+1 to restore back to the source weight W0 .
+    The stochastic restoration can also be seen as a special     sian noise. We use 32 augmentations for our experiments.
+form of Dropout. By stochastically restoring a small num-        We discuss the choice of the augmentation threshold pth in
+ber of tensor elements in the trainable weights to the initial   our supplementary material. Unlike TENT models which
+weight, the network avoids drifting too far away from the        only update the BN scale and shift weights, we update all
+initial source model and therefore, avoids catastrophic for-     trainable parameters in the experiments. We use a restora-
+getting. In addition, by preserving the information from the     tion probability of p = 0.01 for all our experiments.
+source model, we are able to train all trainable parameters          For CIFAR100-to-CIFAR100C experiments, we adopt
+without suffering from model collapse. This brings more          the pre-trained ResNeXt-29 [65] model from [16], which is
+capacity for the adaptation and is another major difference      used as one of the default architectures for CIFAR100 in the
+compared to entropy minimization methods [43, 61] which          RobustBench benchmark [8]. The same hyperparameters
+only train the BN parameters for test-time adaptation.           are used as in the CIFAR10 experiments. The ImageNet-to-
+    As shown in Algorithm 1, combining the refined pseudo-       ImageNet-C [15] experiments use the standard pre-trained
+labels with stochastic restoration leads to our online contin-   resnet50 model in RobustBench [8]. ImageNet-C experi-
+ual test-time adaptation (CoTTA) method.                         ments are evaluated under ten diverse corruption orders.
+
+4. Experiments
+                                                                 Cityscapes-to-ACDC is a continual semantic segmen-
+   We evaluate our proposed method on five continual test-       tation task we designed to mimic continual distribution
+time adaptation benchmark tasks: CIFAR10-to-CIFAR10C             shifts in the real world. The source model is an off-
+(standard and gradual), CIFAR100-to-CIFAR100C, and               the-shelf pre-trained segmentation model trained on the
+ImageNet-to-ImageNet-C for image classification, as well         Cityscapes dataset [7]. The target domain contains im-
+as Cityscapses-to-ACDC for semantic segmentation.                ages from various scenarios from the Adverse Conditions
+                                                                 Dataset (ACDC) [50]. The ACDC dataset shares the same
+4.1. Datasets and tasks                                          semantic classes with Cityscapes and is collected in four
+CIFAR10C, CIFAR100C, and ImageNet-C were origi-                  different adverse visual conditions: Fog, Night, Rain, and
+nally created to benchmark robustness of classification net-     Snow. We evaluate our continual test-time adaptation fol-
+works [15]. Each dataset contains 15 types of corruptions        lowing the same default order. We use 400 unlabeled
+with 5 levels of severity. The corruptions were applied on       images from each adverse condition for the adaptation.
+images from the test set of the clean CIFAR10 or CIFAR100        To mimic the scenario in real life where similar envi-
+dataset [25]. There are 10,000 images for each corruption        ronments might be revisited, and to evaluate the forget-
+type for both CIFAR10C and CIFAR100C datasets.                   ting effect of our methods, we repeat the same sequence
+    For our online continual test-time adaptation task, a net-   group (of the four conditions) 10 times (i.e. in total 40:
+work pre-trained on the clean training set of CIFAR10 or         Fog− →Night− →Rain− →Snow−   →Fog...). This also provides an
+CIFAR100 dataset is used. During test time, the corrupted        evaluation of the adaptation performance in the long term.
+images are provided in an online fashion to the network.             For the implementation details, we adopt a transformer-
+Unlike previous methods which evaluate the test-time adap-       based architecture, Segformer [64], for our Cityscapse-to-
+tation performance from the clean images pre-trained model       ACDC experiments. We use the publicly-available pre-
+to each corruption type individually, we continually adapt       trained Segformer-B5 trained on Cityscapes as our off-the-
+the source pre-trained model to each corruption type se-         shelf source model. For the baseline comparison method,
+quentially. We evaluate all models under the largest cor-        T EN T optimizes the parameters in the normalization lay-
+ruption severity level 5. The evaluation is based on the on-     ers. For the proposed CoTTA model, all trainable layers
+line prediction results immediately after the encounter of       are updated without the need to choose specific layers. Im-
+the data. Both the CIFAR10 and CIFAR100 experiments              ages from ACDC have a resolution of 1920x1080. We use
+follow this online continual test-time adaptation scheme.        down-sampled resolutions of 960x540 as inputs to the net-
+    For CIFAR10-to-CIFAR10C, we follow the official pub-         work and the predictions are evaluated under the original
+lic implementation from TENT [61] for the CIFAR10 ex-            resolution. Adam optimizer is used with the learning rate
+periments. The same pre-trained model is adopted, which is       8 times smaller than the default one for Segformer, because
+a WideResNet-28 [71] model from the RobustBench bench-           we use batch size 1 instead of 8 (default for source training)
+mark [8]. We update the model for one step at each iter-         in our online continual test-time adaptation experiments.
+ation (i.e. one gradient step per test point). We use the        We use the multi-scaling input with flip as the augmentation
+same Adam optimizer with a learning rate of 1e-3 as the of-      method for the proposed method to generate augmentation-
+ficial implementation. Following [5], we use the same ran-       weighted pseudo-label (as in Equation 3). Following the
+dom augmentation composition including color jitter, ran-        default practice designed for Cityscapes in MMSeg [6], we
+dom affine, gaussian blur, random horizonal flip, and gaus-      use the scale factors of [0.5, 0.75, 1.0, 1.25, 1.5, 1.75, 2.0].
+Table 2. Classification error rate (%) for the standard CIFAR10-to-CIFAR10C online continual test-time adaptation task. Tesults are
+evaluated on WideResNet-28 with the largest corruption severity level 5. * denotes the requirement on additional domain information.
+                                                         t −−−−−−−−−−−−−−−−−−−−−−−−−−−−−−−−−−−−−−−−−−−−−−−−−−−−−−−−−−−−−−−−→
+                                              Stoc                                                                                                                   rans
+                           Wei                            ssia               lse     us                                                    htne     cont
+                               ght    Aug          ha          n                                   mot      zoom                               ss                           pixe
+   Method                  avg. -    avg.
+                                          -   Res stic             shot
+                                                                           imp     defo    glas
+                                                                                               s      ion
+                                                                                                                    snow   fros
+                                                                                                                               t   fog                   rast   elas            late
+                                                                                                                                                                                       jpeg     Mean
+                                                 tore    Gau                  u        c                                                 brig                       tic t
+   Source                                                72.3 65.7 72.9 46.9 54.3 34.8 42.0 25.1 41.3 26.0 9.3 46.7 26.6 58.5 30.3   43.5
+   BN Stats Adapt                                        28.1 26.1 36.3 12.8 35.3 14.2 12.1 17.3 17.4 15.3 8.4 12.6 23.8 19.7 27.3   20.4
+   Pseudo-label                                          26.7 22.1 32.0 13.8 32.2 15.3 12.7 17.3 17.3 16.5 10.1 13.4 22.4 18.9 25.9  19.8
+   TENT-online* [61]                                     24.8 23.5 33.0 12.0 31.8 13.7 10.8 15.9 16.2 13.7 7.9 12.1 22.0 17.3 24.2   18.6
+   TENT-continual [61]                                   24.8 20.6 28.6 14.4 31.1 16.5 14.1 19.1 18.6 18.6 12.2 20.3 25.7 20.8 24.9  20.7
+   CoTTA (Ours)              X                           27.2 22.8 30.8 12.1 30.1 13.9 11.9 17.2 16.0 14.3 9.4 13.1 19.9 15.4 19.9   18.3
+   CoTTA (Ours)              X         X                 24.5 21.0 26.0 12.3 27.9 13.9 12.0 16.6 15.9 14.7 9.4 13.6 19.8 14.7 18.7   17.4
+   CoTTA (Ours)              X         X         X       24.3 21.3 26.6 11.6 27.6 12.2 10.3 14.8 14.1 12.4 7.5 10.6 18.3 13.4 17.3 16.2 (0.1)
+
+Table 3. Gradually changing CIFAR10-to-CIFAR10C results. The                                       cumulation by using averaged pseudo-labels and random
+severity level changes gradually between the lowest and the high-                                  restoration. To validate our motivation, we conduct an ab-
+est. The corruption type changes when the severity is the lowest.                                  lation study on each of the elements of the proposed ap-
+Results are the mean over ten diverse corruption type sequences.
+                                                                                                   proach. As listed in Table 2, by using the weight-averaged
+ Avg. Error (%)   Source     BN Adapt      TENT-continual [61]             CoTTA                   pseudo-labels from the teacher model, the error rate is re-
+  CIFAR10C         24.8        13.7              30.7                     10.4 ± 0.2
+                                                                                                   duced from 20.7% to 18.3%. This indicates that the weight-
+4.2. Experiments on CIFAR10-to-CIFAR10C                                                            averaged predictions are indeed more accurate than the di-
+                                                                                                   rect predictions. By using multiple augmentations to further
+    We first evaluate the effectiveness of the proposed model                                      refine the weight-averaged predictions, we are able to fur-
+on the CIFAR10-to-CIFAR10C task. We compare our                                                    ther improve the performance to 17.4%. However, the per-
+method to the source-only baseline and four popular meth-                                          formance is still deteriorating over time (e.g. comparing to
+ods. As shown in Table 2, directly using the pre-trained                                           TENT-online* for contrast), indicating that even though the
+model without adaptation yields a high average error rate                                          pseudo-labels are more accurate, error can still accumulate
+of 43.5%, indicating that an adaptation is necessary. The                                          because of the inevitable wrong predictions. Finally, by us-
+BN Stats Adapt method keeps the network weights and uses                                           ing stochastic restoration to explicitly preserve the source
+the Batch Normalization statistics from the input data of the                                      knowledge, the long-term predictions can be largely im-
+current iteration for the prediction [34, 51]. The approach                                        proved. This leads to an improved error rate of 16.2%. The
+is simple and fully online, and significantly improves the                                         number in bracket is the standard deviation over 5 seeds.
+performance over the source-only baseline. Using hard                                              Gradually changing setup.              In the above stan-
+pseudo-labels [31] to update the BN-trainable parameters                                           dard setup, corruption types change abruptly in the
+can reduce the error rate to 19.8%. If the TENT-online [61]                                        highest severity, we now report the results for the
+method has access to the additional domain information and                                         gradual setup.       We design the sequence by grad-
+resets itself to the initial pre-trained model whenever it en-                                     ually changing severity for the 15 corruption types:
+counters a new domain, the performance can be further im-                                                           change                                                             change
+                                                                                                          →1 −−−−−→ 1−
+                                                                                                    . . .2−          →2−
+                                                                                                                       →3−
+                                                                                                                         →4−
+                                                                                                                           →5− →4−
+                                                                                                                                 →3−
+                                                                                                                                   →2−
+                                                                                                                                     →1 −−−−−→ 1−
+                                                                                                                                                →2. . . ,
+                                                                                                    | {z } type |                      } type | {z }
+proved to 18.6%. However, such information is usually un-
+                                                                                                                             {z
+                                                                                                   t-1 and before             corruption type t, gradually changing severity                    t+1 and on
+available in real applications. Without having access to this                                      where the severity level is the lowest (1) when corruption
+additional information, the TENT-continual method does                                             type changes, therefore, the type change is gradual. The
+not yield any improvement over the BN Stats Adapt method.                                          distribution shift within each type is also gradual. We cre-
+It is worth mentioning that in earlier stages of the adap-                                         ate 10 randomly shuffled orders for the corruption types t
+tation, TENT-continual outperforms the BN Stats Adapt.                                             and then evaluate the methods using the average error rate
+However, the model quickly deteriorates after observing                                            over the ten diverse sequences. Table 3 shows that the pro-
+three types of corruptions. This indicates that TENT based                                         posed method outperforms competing methods, leading to
+methods can be unstable under continual adaptation in the                                          an error rate of 10.4%, compared to TENT’s 30.7%.
+long term because of error accumulation. Our proposed
+method can continuously outperform all the above meth-                                             4.3. Experiments on CIFAR100-to-CIFAR100C
+ods by using the weight-and-augmentation-averaged con-                                                To further demonstrate the effectiveness of the proposed
+sistency. The error rate is significantly reduced to 16.2%. In                                     method, we evaluate it on the more difficult CIFAR100-
+addition, it does not suffer from performance deterioration                                        to-CIFAR100C task. The experimental results are summa-
+in the long term because of our stochastic restore approach.                                       rized in Table 4. We compare our method with the source-
+Ablation study: individual components The main contri-                                             only baseline, BN stats adapt, Pseudo-label, as well as the
+bution of our proposed method is to reduce the error ac-                                           TENT-continual method. We observe that performance of
+Table 4. Classification error rate (%) for the standard CIFAR100-to-CIFAR100C online continual test-time adaptation task. All results are
+evaluated on the ResNeXt-29 architecture with the largest corruption severity level 5.
+          Time                    t −−−−−−−−−−−−−−−−−−−−−−−−−−−−−−−−−−−−−−−−−−−−−−−−−−−−−−−−−−−−−−−−−−−−−→
+
+                                    ssia                     cus                                                  tnes                 tic t
+                                                     ulse                                                                  cont             rans    late
+                                                                             n
+                                         n   shot                  glas    mot     zoom   snow   fros    fog           s                                   jpeg
+          Method
+                                  Gau               imp     defo       s      io                     t          brig           rast                pixe
+                                                                                                                                                                  Mean
+                                                                                                                     h                elas
+          Source                  73.0       68.0   39.4    29.3   54.1    30.8    28.8   39.5   45.8    50.3   29.5       55.1       37.2         74.7    41.2   46.4
+          BN Stats Adapt          42.1       40.7   42.7    27.6   41.9    29.7    27.9   34.9   35.0    41.5   26.5       30.3       35.7         32.9    41.2   35.4
+          Pseudo-label            38.1       36.1   40.7    33.2   45.9    38.3    36.4   44.0   45.6    52.8   45.2       53.5       60.1         58.1    64.5   46.2
+          TENT-continual [61]     37.2       35.8   41.7    37.9   51.2    48.3    48.5   58.4   63.7    71.1   70.4       82.3       88.0         88.5    90.4   60.9
+          CoTTA (Proposed)        40.1       37.7   39.7    26.9   38.0    27.9    26.4   32.8   31.8    40.3   24.7       26.9       32.5         28.3    33.5   32.5
+
+Table 5. Semantic segmentation results (mIoU in %) on the Cityscapes-to-ACDC online continual test-time adaptation task. We evaluate
+the four test conditions continually for ten times to evaluate the long-term adaptation performance. To save space, we only show the
+continual adaptation results in the first, fourth, seventh, and last round. Full results can be found in the supplementary material. All results
+are evaluated based on the Segformer-B5 architecture.
+         Time                t −−−−−−−−−−−−−−−−−−−−−−−−−−−−−−−−−−−−−−−−−−−−−−−−−−−−−−−−−−−−−−−−−−−−−−−−→
+         Round               1                   4                   7                   10                  All
+         Condition           Fog Night rain snow Fog Night rain snow Fog Night rain snow Fog Night rain snow Mean
+         Source              69.1 40.3 59.7 57.8 69.1 40.3 59.7 57.8 69.1 40.3 59.7 57.8 69.1 40.3 59.7 57.8 56.7
+         BN Stats Adapt      62.3 38.0 54.6 53.0 62.3 38.0 54.6 53.0 62.3 38.0 54.6 53.0 62.3 38.0 54.6 53.0 52.0
+         TENT-continual [61] 69.0 40.2 60.1 57.3 66.5 36.3 58.7 54.0 64.2 32.8 55.3 50.9 61.8 29.8 51.9 47.8 52.3
+         CoTTA (Proposed) 70.9 41.2 62.4 59.7 70.9 41.0 62.7 59.7 70.9 41.0 62.8 59.7 70.8 41.0 62.8 59.7 58.6
+
+Table 6. Average error of standard ImageNet-to-ImageNet-C ex-                             ing that BN Stats Adapt and TENT do not perform well in
+periments over 10 diverse corruption sequences (severity level 5).                        this task and the performance deteriorates significantly over
+  Avg. Error (%) Source BN Adapt Test Aug [5] TENT [58]     CoTTA
+   ImageNet-C     82.4    72.1       71.4       66.5    63.0 ± 1.8 (0.1)
+                                                                                          time. This is partly because both were specifically designed
+                                                                                          for networks with Batch Normalization layers, while there
+the TENT-continual model deteriorates rapidly over time on                                is only one Batch Normalization layer in Segformer and the
+the later corruption types because of the error accumula-                                 majority of normalization layers in transformer models are
+tion and forgetting. Our method yields an absolute improve-                               based on LayerNorm [2]. Our method, however, does not
+ment of 2.9% error rate over BN stats adapt, and achieves                                 rely on specific layers and can still be effective for this more
+32.5%. More importantly, the improvement becomes larger                                   complex task on a very different architecture. The improved
+over time, this indicates that the proposed method is able to                             performance is also largely maintained after being continu-
+learn from the unlabeled test images from the past streams                                ally adapted for a relatively long term.
+to further improve the performance on the current test data.
+                                                                                          5. Conclusion
+4.4. Experiments on ImageNet-to-ImageNet-C
+                                                                                              In this work, we focused on the continual test-time adap-
+   To provide a more comprehensive evaluation on the pro-                                 tation in non-stationary environments where the target do-
+posed method, ImageNet-to-ImageNet-C experiments are                                      main distribution can continually change over time. To
+conducted over ten diverse corruption type sequences in                                   tackle the error accumulation and catastrophic forgetting in
+severity level of 5. As shown in Table 6, CoTTA is able to                                this setup, we proposed a novel method CoTTA which com-
+continually outperform TENT and other competing meth-                                     prises two parts. Firstly, we reduced the error accumulation
+ods. The number after ± is the standard deviation over 10                                 by using weight-averaged and augmentation-averaged pre-
+diverse corruption type sequences.                                                        dictions which are often more accurate. Secondly, to pre-
+                                                                                          serve the knowledge from the source model, we stochas-
+4.5. Experiments on Cityscapes-to-ACDC
+                                                                                          tically restored a small part of the weights to the source
+   We additionally evaluate our method on the more com-                                   pre-trained weights. The proposed method can be incorpo-
+plex continual test-time semantic segmentation Cityscapes-                                rated in off-the-shelf pre-trained models without requiring
+to-ACDC task. The experimental results are summarized in                                  any access to source data. The effectiveness of CoTTA was
+Table 5. The results demonstrate that our method is also                                  validated on four classification and one segmentation tasks.
+effective for semantic segmentation tasks and is robust to                                Acknowledgement The contributions of Qin Wang and
+the different choices of architectures. Our proposed method                               Olga Fink were funded by the Swiss National Science Foun-
+yields an absolute improvement of 1.9% mIoU over the                                      dation Grant PP00P2 176878. This work is also funded by
+baseline, and achieves 58.6% mIoU. It is worth mention-                                   Toyota Motor Europe via the project TRACE-Zurich.
+References                                                                   simple data processing method to improve robustness and
+                                                                             uncertainty. ICLR, 2020. 3, 6
+ [1] Arsenii Ashukha, Alexander Lyzhov, Dmitry Molchanov,
+                                                                        [17] Judy Hoffman, Trevor Darrell, and Kate Saenko. Continuous
+     and Dmitry Vetrov. Pitfalls of in-domain uncertainty esti-
+                                                                             manifold based adaptation for evolving visual domains. In
+     mation and ensembling in deep learning. ICLR, 2020. 3
+                                                                             CVPR, pages 867–874, 2014. 3
+ [2] Jimmy Lei Ba, Jamie Ryan Kiros, and Geoffrey E Hin-
+                                                                        [18] Judy Hoffman, Eric Tzeng, Taesung Park, Jun-Yan Zhu,
+     ton. Layer normalization. arXiv preprint arXiv:1607.06450,
+                                                                             Phillip Isola, Kate Saenko, Alexei Efros, and Trevor Darrell.
+     2016. 8
+                                                                             Cycada: Cycle-consistent adversarial domain adaptation. In
+ [3] Andreea Bobu, Eric Tzeng, Judy Hoffman, and Trevor Dar-
+                                                                             ICML, pages 1989–1998. PMLR, 2018. 2
+     rell. Adapting to continuously shifting domains. In ICLR
+                                                                        [19] Lukas Hoyer, Dengxin Dai, and Luc Van Gool. Daformer:
+     Workshops, 2018. 3
+                                                                             Improving network architectures and training strategies for
+ [4] Chaoqi Chen, Weiping Xie, Wenbing Huang, Yu Rong,
+                                                                             domain-adaptive semantic segmentation. arXiv preprint
+     Xinghao Ding, Yue Huang, Tingyang Xu, and Junzhou
+                                                                             arXiv:2111.14887, 2021. 2
+     Huang. Progressive feature alignment for unsupervised do-
+     main adaptation. In CVPR, pages 627–636, 2019. 2                   [20] Minhao Hu, Tao Song, Yujun Gu, Xiangde Luo, Jieneng
+                                                                             Chen, Yinan Chen, Ya Zhang, and Shaoting Zhang. Fully
+ [5] Gilad Cohen and Raja Giryes. Katana: Simple post-training
+                                                                             test-time adaptation for image segmentation. In Inter-
+     robustness using test time augmentations. arXiv preprint
+                                                                             national Conference on Medical Image Computing and
+     arXiv:2109.08191, 2021. 5, 6
+                                                                             Computer-Assisted Intervention, pages 251–260. Springer,
+ [6] MMSegmentation Contributors.                MMSegmentation:
+                                                                             2021. 3
+     Openmmlab semantic segmentation toolbox and
+     benchmark.          https : / / github . com / open -              [21] Xuefeng Hu, Gokhan Uzunbas, Sirius Chen, Rui Wang,
+     mmlab/mmsegmentation, 2020. 6                                           Ashish Shah, Ram Nevatia, and Ser-Nam Lim. Mixnorm:
+                                                                             Test-time adaptation through online normalization estima-
+ [7] Marius Cordts, Mohamed Omran, Sebastian Ramos, Timo
+                                                                             tion. arXiv preprint arXiv:2110.11478, 2021. 3
+     Rehfeld, Markus Enzweiler, Rodrigo Benenson, Uwe
+     Franke, Stefan Roth, and Bernt Schiele. The cityscapes             [22] Yusuke Iwasawa and Yutaka Matsuo. Test-time classifier ad-
+     dataset for semantic urban scene understanding. In CVPR,                justment module for model-agnostic domain generalization.
+     2016. 6                                                                 In NeuIPS, 2021. 3
+ [8] Francesco Croce, Maksym Andriushchenko, Vikash Se-                 [23] Neerav Karani, Ertunc Erdil, Krishna Chaitanya, and En-
+     hwag, Edoardo Debenedetti, Nicolas Flammarion, Mung                     der Konukoglu. Test-time adaptable neural networks for ro-
+     Chiang, Prateek Mittal, and Matthias Hein. Robustbench:                 bust medical image segmentation. Medical Image Analysis,
+     a standardized adversarial robustness benchmark. In NeuIPS              68:101907, 2021. 3
+     Datasets and Benchmarks Track, 2021. 6                             [24] James Kirkpatrick, Razvan Pascanu, Neil Rabinowitz, Joel
+ [9] Ekin D Cubuk, Barret Zoph, Dandelion Mane, Vijay Vasude-                Veness, Guillaume Desjardins, Andrei A Rusu, Kieran
+     van, and Quoc V Le. Autoaugment: Learning augmentation                  Milan, John Quan, Tiago Ramalho, Agnieszka Grabska-
+     strategies from data. In CVPR, pages 113–123, 2019. 5                   Barwinska, et al. Overcoming catastrophic forgetting in neu-
+[10] Matthias Delange, Rahaf Aljundi, Marc Masana, Sarah                     ral networks. Proceedings of the national academy of sci-
+     Parisot, Xu Jia, Ales Leonardis, Greg Slabaugh, and Tinne               ences, 114(13):3521–3526, 2017. 3
+     Tuytelaars. A continual learning survey: Defying forgetting        [25] Alex Krizhevsky and Geoffrey Hinton. Learning multiple
+     in classification tasks. T-PAMI, 2021. 3                                layers of features from tiny images. Technical report, Cite-
+[11] Sayna Ebrahimi, Franziska Meier, Roberto Calandra, Trevor               seer, 2009. 6
+     Darrell, and Marcus Rohrbach. Adversarial continual learn-         [26] Alex Krizhevsky, Ilya Sutskever, and Geoffrey E Hinton.
+     ing. In ECCV. Springer, 2020. 2                                         Imagenet classification with deep convolutional neural net-
+[12] Yaroslav Ganin and Victor Lempitsky. Unsupervised domain                works. In NeuIPS, pages 1097–1105, 2012. 5
+     adaptation by backpropagation. In ICML, pages 1180–1189,           [27] Jogendra Nath Kundu, Akshay Kulkarni, Amit Singh, Varun
+     2015. 2                                                                 Jampani, and R Venkatesh Babu. Generalize then adapt:
+[13] Chuan Guo, Geoff Pleiss, Yu Sun, and Kilian Q Weinberger.               Source-free domain adaptive semantic segmentation. In
+     On calibration of modern neural networks. In ICML, pages                ICCV, pages 7046–7056, 2021. 3
+     1321–1330. PMLR, 2017. 2                                           [28] Jogendra Nath Kundu, Naveen Venkat, R Venkatesh Babu,
+[14] Dan Hendrycks, Steven Basart, Norman Mu, Saurav Kada-                   et al. Universal source-free domain adaptation. In CVPR,
+     vath, Frank Wang, Evan Dorundo, Rahul Desai, Tyler Zhu,                 pages 4544–4553, 2020. 2
+     Samyak Parajuli, Mike Guo, et al. The many faces of robust-        [29] Vinod K Kurmi, Venkatesh K Subramanian, and Vinay P
+     ness: A critical analysis of out-of-distribution generalization.        Namboodiri. Domain impression: A source data free do-
+     In ICCV, pages 8340–8349, 2021. 3                                       main adaptation method. In WACV, pages 615–625, 2021.
+[15] Dan Hendrycks and Thomas Dietterich. Benchmarking neu-                  2
+     ral network robustness to common corruptions and perturba-         [30] Qicheng Lao, Xiang Jiang, Mohammad Havaei, and
+     tions. ICLR, 2019. 6                                                    Yoshua Bengio. Continuous domain adaptation with vari-
+[16] Dan Hendrycks, Norman Mu, Ekin D. Cubuk, Barret Zoph,                   ational domain-agnostic feature replay. arXiv preprint
+     Justin Gilmer, and Balaji Lakshminarayanan. AugMix: A                   arXiv:2003.04382, 2020. 3
+[31] Dong-Hyun Lee. Pseudo-label: The simple and efficient           [46] Vishal M Patel, Raghuraman Gopalan, Ruonan Li, and Rama
+     semi-supervised learning method for deep neural networks.            Chellappa. Visual domain adaptation: A survey of recent
+     In Workshop on Challenges in Representation Learning,                advances. IEEE signal processing magazine, 32(3):53–69,
+     ICML, volume 3, page 2, 2013. 7                                      2015. 2
+[32] Boyi Li, Felix Wu, Ser-Nam Lim, Serge Belongie, and Kil-        [47] Boris T Polyak and Anatoli B Juditsky. Acceleration of
+     ian Q Weinberger. On feature normalization and data aug-             stochastic approximation by averaging. SIAM journal on
+     mentation. In CVPR, pages 12383–12392, 2021. 3                       control and optimization, 30(4):838–855, 1992. 4, 5
+[33] Rui Li, Qianfen Jiao, Wenming Cao, Hau-San Wong, and            [48] Viraj Prabhu, Shivam Khare, Deeksha Kartik, and Judy Hoff-
+     Si Wu. Model adaptation: Unsupervised domain adaptation              man. Sentry: Selective entropy optimization via committee
+     without source data. In CVPR, pages 9641–9650, 2020. 2               consistency for unsupervised domain adaptation. In ICCV,
+[34] Yanghao Li, Naiyan Wang, Jianping Shi, Jiaying Liu, and              pages 8558–8567, 2021. 2
+     Xiaodi Hou. Revisiting batch normalization for practical do-
+                                                                     [49] Sylvestre-Alvise Rebuffi, Alexander Kolesnikov, Georg
+     main adaptation. arXiv preprint arXiv:1603.04779, 2016. 3,
+                                                                          Sperl, and Christoph H Lampert. icarl: Incremental classi-
+     7
+                                                                          fier and representation learning. In CVPR, pages 2001–2010,
+[35] Zhizhong Li and Derek Hoiem. Learning without forgetting.
+                                                                          2017. 3
+     T-PAMI, 40(12):2935–2947, 2017. 3
+[36] Qing Lian, Fengmao Lv, Lixin Duan, and Boqing Gong.             [50] Christos Sakaridis, Dengxin Dai, and Luc Van Gool. ACDC:
+     Constructing self-motivated pyramid curriculums for cross-           The adverse conditions dataset with correspondences for se-
+     domain semantic segmentation: A non-adversarial approach.            mantic driving scene understanding. In ICCV, October 2021.
+     In ICCV, October 2019. 2                                             1, 6
+[37] Jian Liang, Dapeng Hu, and Jiashi Feng. Do we really need       [51] Steffen Schneider, Evgenia Rusak, Luisa Eck, Oliver Bring-
+     to access the source data? source hypothesis transfer for un-        mann, Wieland Brendel, and Matthias Bethge. Improving
+     supervised domain adaptation. In ICLR, pages 6028–6039.              robustness against common corruptions by covariate shift
+     PMLR, 2020. 2                                                        adaptation. NeuIPS, 33, 2020. 7
+[38] Yuang Liu, Wei Zhang, and Jun Wang. Source-free do-             [52] Connor Shorten and Taghi M Khoshgoftaar. A survey on
+     main adaptation for semantic segmentation. In CVPR, pages            image data augmentation for deep learning. Journal of Big
+     1215–1224, 2021. 3                                                   Data, 6(1):1–48, 2019. 3, 5
+[39] Mingsheng Long, Yue Cao, Jianmin Wang, and Michael Jor-         [53] Daniel L Silver and Robert E Mercer. The task rehearsal
+     dan. Learning transferable features with deep adaptation net-        method of life-long learning: Overcoming impoverished
+     works. In ICML, pages 97–105, 2015. 2                                data. In Conference of the Canadian Society for Computa-
+[40] Alexander Lyzhov, Yuliya Molchanova, Arsenii Ashukha,                tional Studies of Intelligence, pages 90–101. Springer, 2002.
+     Dmitry Molchanov, and Dmitry Vetrov. Greedy policy                   3
+     search: A simple baseline for learnable test-time augmenta-     [54] Yu Sun, Xiaolong Wang, Zhuang Liu, John Miller, Alexei
+     tion. In Jonas Peters and David Sontag, editors, Conference          Efros, and Moritz Hardt. Test-time training with self-
+     on Uncertainty in Artificial Intelligence (UAI), volume 124          supervision for generalization under distribution shifts. In
+     of Proceedings of Machine Learning Research, pages 1308–             ICML, pages 9229–9248. PMLR, 2020. 3, 4, 5
+     1317. PMLR, 03–06 Aug 2020. 3                                   [55] Antti Tarvainen and Harri Valpola. Mean teachers are better
+[41] Michael McCloskey and Neal J Cohen. Catastrophic inter-              role models: Weight-averaged consistency targets improve
+     ference in connectionist networks: The sequential learning           semi-supervised deep learning results. In NeuIPS, pages
+     problem. In Psychology of learning and motivation, vol-              1195–1204, 2017. 2, 4, 5
+     ume 24, pages 109–165. Elsevier, 1989. 2
+                                                                     [56] Josh Tobin, Rachel Fong, Alex Ray, Jonas Schneider, Woj-
+[42] Krikamol Muandet, David Balduzzi, and Bernhard
+                                                                          ciech Zaremba, and Pieter Abbeel. Domain randomization
+     Schölkopf.     Domain generalization via invariant fea-
+                                                                          for transferring deep neural networks from simulation to the
+     ture representation. In ICML, pages 10–18. PMLR, 2013.
+                                                                          real world. In IROS, pages 23–30. IEEE, 2017. 3
+     3
+[43] Chaithanya Kumar Mummadi, Robin Hutmacher, Kilian               [57] Jonathan Tremblay, Aayush Prakash, David Acuna, Mark
+     Rambach, Evgeny Levinkov, Thomas Brox, and Jan Hendrik               Brophy, Varun Jampani, Cem Anil, Thang To, Eric Cam-
+     Metzen. Test-time adaptation to distribution shift by confi-         eracci, Shaad Boochoon, and Stan Birchfield. Training deep
+     dence maximization and input transformation. arXiv preprint          networks with synthetic data: Bridging the reality gap by do-
+     arXiv:2106.14999, 2021. 1, 2, 3, 6                                   main randomization. In CVPR Workshops, pages 969–977,
+[44] Sinno Jialin Pan, Ivor W Tsang, James T Kwok, and Qiang              2018. 3
+     Yang. Domain adaptation via transfer component analy-           [58] Y.-H. Tsai, W.-C. Hung, S. Schulter, K. Sohn, M.-H. Yang,
+     sis. IEEE Transactions on Neural Networks, 22(2):199–210,            and M. Chandraker. Learning to adapt structured output
+     2011. 2                                                              space for semantic segmentation. In CVPR, 2018. 2
+[45] German I Parisi, Ronald Kemker, Jose L Part, Christopher        [59] Riccardo Volpi, Diane Larlus, and Grégory Rogez. Continual
+     Kanan, and Stefan Wermter. Continual lifelong learning with          adaptation of visual representations via domain randomiza-
+     neural networks: A review. Neural Networks, 113:54–71,               tion and meta-learning. In CVPR, pages 4443–4453, 2021.
+     2019. 2, 3                                                           3
+[60] Dequan Wang, Shaoteng Liu, Sayna Ebrahimi, Evan Shel-
+     hamer, and Trevor Darrell. On-target adaptation. arXiv
+     preprint arXiv:2109.01087, 2021. 3
+[61] Dequan Wang, Evan Shelhamer, Shaoteng Liu, Bruno Ol-
+     shausen, and Trevor Darrell. Tent: Fully test-time adaptation
+     by entropy minimization. In ICLR, 2021. 1, 2, 3, 4, 6, 7, 8
+[62] Qin Wang, Dengxin Dai, Lukas Hoyer, Luc Van Gool, and
+     Olga Fink. Domain adaptive semantic segmentation with
+     self-supervised depth estimation. In ICCV, pages 8515–
+     8525, 2021. 2
+[63] Markus Wulfmeier, Alex Bewley, and Ingmar Posner. Incre-
+     mental adversarial domain adaptation for continually chang-
+     ing environments. In ICRA, pages 4489–4495. IEEE, 2018.
+     3
+[64] Enze Xie, Wenhai Wang, Zhiding Yu, Anima Anandkumar,
+     Jose M. Alvarez, and Ping Luo. Segformer: Simple and ef-
+     ficient design for semantic segmentation with transformers.
+     In NeuIPS, 2021. 6
+[65] Saining Xie, Ross Girshick, Piotr Dollár, Zhuowen Tu, and
+     Kaiming He. Aggregated residual transformations for deep
+     neural networks. In CVPR, pages 1492–1500, 2017. 6
+[66] Shiqi Yang, Yaxing Wang, Joost van de Weijer, Luis Herranz,
+     and Shangling Jui. Generalized source-free domain adapta-
+     tion. In ICCV, pages 8978–8987, 2021. 2
+[67] Yanchao Yang and Stefano Soatto. Fda: Fourier domain
+     adaptation for semantic segmentation. In CVPR, pages
+     4085–4095, 2020. 2
+[68] Hao-Wei Yeh, Baoyao Yang, Pong C Yuen, and Tatsuya
+     Harada. Sofa: Source-data-free feature alignment for un-
+     supervised domain adaptation. In WACV, pages 474–483,
+     2021. 2
+[69] Dong Yin, Raphael Gontijo Lopes, Jonathon Shlens, Ekin D
+     Cubuk, and Justin Gilmer. A fourier perspective on model
+     robustness in computer vision. NeuIPS, 2019. 3
+[70] Fuming You, Jingjing Li, and Zhou Zhao. Test-time batch
+     statistics calibration for covariate shift. arXiv preprint
+     arXiv:2110.04065, 2021. 3
+[71] Sergey Zagoruyko and Nikos Komodakis. Wide residual net-
+     works. BMVC, 2016. 6
+[72] Friedemann Zenke, Ben Poole, and Surya Ganguli. Contin-
+     ual learning through synaptic intelligence. In International
+     Conference on Machine Learning, pages 3987–3995. PMLR,
+     2017. 3
+[73] Marvin Zhang, Sergey Levine, and Chelsea Finn. Memo:
+     Test time robustness via adaptation and augmentation. arXiv
+     preprint arXiv:2110.09506, 2021. 3
+[74] Aurick Zhou and Sergey Levine. Training on test data
+     with bayesian adaptation for covariate shift. arXiv preprint
+     arXiv:2109.12746, 2021. 3
+[75] Yang Zou, Zhiding Yu, BVK Vijaya Kumar, and Jinsong
+     Wang. Unsupervised domain adaptation for semantic seg-
+     mentation via class-balanced self-training. In ECCV, pages
+     289–305, 2018. 2
+

@@ -1,0 +1,615 @@
+                                                Anomaly Detection via Reverse Distillation from One-Class Embedding
+
+                                                                               Hanqiu Deng        Xingyu Li
+                                                          Department of Electrical and Computer Engineering, University of Alberta
+                                                                                     {hanqiu1,xingyu}@ualberta.ca
+
+
+
+
+arXiv:2201.10703v2 [cs.CV] 23 Mar 2022
+                                                                  Abstract
+
+                                            Knowledge distillation (KD) achieves promising results
+                                         on the challenging problem of unsupervised anomaly detec-
+                                         tion (AD). The representation discrepancy of anomalies in
+                                         the teacher-student (T-S) model provides essential evidence
+                                         for AD. However, using similar or identical architectures
+                                         to build the teacher and student models in previous stud-
+                                         ies hinders the diversity of anomalous representations. To
+                                         tackle this problem, we propose a novel T-S model consist-
+                                         ing of a teacher encoder and a student decoder and intro-        Figure 1. Anomaly detection examples on MVTec [3]. Multires-
+                                         duce a simple yet effective ”reverse distillation” paradigm      olution Knowledge Distillation (MKD) [33] adopts the conven-
+                                         accordingly. Instead of receiving raw images directly, the       tional KD architecture in Fig. Fig. 2(a). Our reverse distillation
+                                         student network takes teacher model’s one-class embed-           method is capable of precisely localising a variate of anomalies.
+                                         ding as input and targets to restore the teacher’s multi-
+                                         scale representations. Inherently, knowledge distillation in
+                                         this study starts from abstract, high-level presentations to     tation [23, 42, 46], knowledge distillation [4, 33, 39], etc.
+                                         low-level features. In addition, we introduce a trainable            In this study, we tackle the problem of unsupervised
+                                         one-class bottleneck embedding (OCBE) module in our T-S          anomaly detection from the knowledge distillation-based
+                                         model. The obtained compact embedding effectively pre-           point of view. In knowledge distillation (KD) [6, 15],
+                                         serves essential information on normal patterns, but aban-       knowledge is transferred within a teacher-student (T-S) pair.
+                                         dons anomaly perturbations. Extensive experimentation on         In the context of unsupervised AD, since the student expe-
+                                         AD and one-class novelty detection benchmarks shows that         riences only normal samples during training, it is likely to
+                                         our method surpasses SOTA performance, demonstrating             generate discrepant representations from the teacher when
+                                         our proposed approach’s effectiveness and generalizability.      a query is anomalous. This hypothesis forms the basis of
+                                                                                                          KD-based methods for anomaly detection. However, this
+                                                                                                          hypothesis is not always true in practice due to (1) the
+                                                                                                          identical or similar architectures of the teacher and student
+                                         1. Introduction                                                  networks (i.e., non-distinguishing filters [33]) and (2) the
+                                                                                                          same data flow in the T-S model during knowledge trans-
+                                             Anomaly detection (AD) refers to identifying and local-      fer/distillation. Though the use of a smaller student network
+                                         izing anomalies with limited, even no, prior knowledge of        partially addresses this issue [33, 39], the weaker represen-
+                                         abnormality. The wide applications of AD, such as indus-         tation capability of shallow architectures hinders the model
+                                         trial defect detection [3], medical out-of-distribution detec-   from precisely detecting and localizing anomalies.
+                                         tion [50], and video surveillance [24], makes it a critical          To holistically address the issue mentioned above, we
+                                         task as well as a spotlight. In the context of unsupervised      propose a new paradigm of knowledge distillation, namely
+                                         AD, no prior information on anomalies is available. In-          Reverse Distillation, for anomaly detection. We use sim-
+                                         stead, a set of normal samples is provided for reference.        ple diagrams in Fig. 2 to highlight the systematic differ-
+                                         To tackle this problem, previous efforts attempt to construct    ence between conventional knowledge distillation and the
+                                         various self-supervision tasks on those anomaly-free sam-        proposed reverse distillation. First, unlike the conventional
+                                         ples. These tasks include, but not limited to, sample recon-     knowledge distillation framework where both teacher and
+                                         struction [2,5,11,16,26,34,38,48], pseudo-outlier augmen-        student adopt the encoder structure, the T-S model in our
+                                                                   retain essential information favorable for the student to de-
+                                                                   code out the teacher’s response.
+                                                                      We perform extensive experiments on public bench-
+                                                                   marks. The experimental results indicate that our re-
+                                                                   verse distillation paradigm achieves comparable perfor-
+                                                                   mance with prior arts. The proposed OCBE module further
+                                                                   improves the performance to a new state-of-the-art (SOTA)
+                                                                   record. Our main contributions are summarized as follows:
+
+                                                                     • We introduce a simple, yet effective Reverse Distilla-
+Figure 2. T-S models and data flow in (a) conventional KD frame-       tion paradigm for anomaly detection. The encoder-
+work [6, 33] and (b) our Reverse Distillation paradigm.                decoder structure and reverse knowledge distillation
+                                                                       strategy holistically address the non-distinguishing fil-
+                                                                       ter problem in conventional KD models, boosting the
+reverse distillation consists of heterogeneous architectures:          T-S model’s discrimination capability on anomalies.
+a teacher encoder and a student decoder. Second, instead
+of directly feeding the raw data to the T-S model simulta-           • We propose a one-class bottleneck embedding mod-
+neously, the student decoder takes the low-dimensional em-             ule to project the teacher’s high-dimensional features
+bedding as input, targeting to mimic the teacher’s behavior            to a compact one-class embedding space. This inno-
+by restoring the teacher model’s representations in different          vation facilitates retaining rich yet compact codes for
+scales. From the regression perspective, our reverse distil-           anomaly-free representation restoration at the student.
+lation uses the student network to predict the representa-
+                                                                     • We perform extensive experiments and show that our
+tion of the teacher model. Therefore, ”reverse” here indi-
+                                                                       approach achieves new SOTA performance.
+cates both the reverse shapes of teacher encoder and stu-
+dent decoder and the distinct knowledge distillation order
+where high-level representation is first distilled, followed by
+                                                                   2. Related Work
+low-level features. It is noteworthy that our reverse distilla-        This section briefly reviews previous efforts on unsuper-
+tion presents two significant advantages: i) Non-similarity        vised anomaly detection. We will highlight the similarity
+structure. In the proposed T-S model, one can consider             and difference between the proposed method and prior arts.
+the teacher encoder as a down-sampling filter and the stu-             Classical anomaly detection methods focus on defining
+dent decoder as an up-sampling filter. The ”reverse struc-         a compact closed one-class distribution using normal sup-
+tures” avoid the confusion caused by non-distinguishing fil-       port vectors. The pioneer studies include one-class support
+ters [33] as we discussed above. ii) Compactness embed-            vector machine (OC-SVM) [35] and support vector data
+ding. The low-dimensional embedding fed to the student             description (SVDD) [36]. To cope with high-dimensional
+decoder acts as an information bottleneck for normal pat-          data, DeepSVDD [31] and PatchSVDD [43] estimate data
+tern restoration. Let’s formulate anomaly features as pertur-      representations through deep networks.
+bations on normal patterns. Then the compact embedding                 Another unsupervised AD prototype is the use of gener-
+helps to prohibit the propagation of such unusual perturba-        ative models, such as AutoEncoder (AE) [19] and Genera-
+tions to the student model and thus boosts the T-S model’s         tive Adversarial Nets (GAN) [12], for sample reconstruc-
+representation discrepancy on anomalies. Notably, tradi-           tion. These methods rely on the hypothesis that genera-
+tional AE-based methods [5, 11, 16, 26] detect anomalies           tive models trained on normal samples only can success-
+utilising pixel differences, whereas we perform discrimi-          fully reconstruct anomaly-free regions, but fail for anoma-
+nation with dense descriptive features. Deep features as           lous regions [2, 5, 34]. However, recent studies show that
+region-aware descriptors provide more effective discrimi-          deep models generalize so well that even anomalous re-
+native information than per-pixel in images.                       gions can be well-restored [46]. To address this issue,
+    In addition, since the compactness of the bottleneck em-       memory mechanism [11, 16, 26] , image masking strat-
+bedding is vital for anomaly detection (as discussed above),       egy [42, 46] and pseudo-anomaly [28, 45] are incorporated
+we introduce a one-class bottleneck embedding (OCBE)               in reconstruction-based methods. However, these meth-
+module to condense the feature codes further. Our OCBE             ods still lack a strong discriminating ability for real-world
+module consists of a multi-scale feature fusion (MFF) block        anomaly detection [3, 5]. Recently, Metaformer (MF) [40]
+and one-class embedding (OCE) block, both jointly opti-            proposes the use of meta-learning [9] to bridge model adap-
+mized with the student decoder. Notably, the former aggre-         tation and reconstruction gap for reconstruction-based ap-
+gates low- and high-level features to construct a rich embed-      proaches. Notably, the proposed reverse knowledge distil-
+ding for normal pattern reconstruction. The latter targets to      lation also adopts the encoder-decoder architecture, but it
+differs from construction-based methods in two-folds. First,      tion. Out-of-distribution samples are considered anomalies.
+the encoder in a generative model is jointly trained with the         System overview: Fig. 3 depicts the proposed reserve
+decoder, while our reverse distillation freezes a pre-trained     distillation framework for anomaly detection. Our reverse
+model as the teacher. Second, instead of pixel-level recon-       distillation framework consists of three modules: a fixed
+struction error, it performs anomaly detection on the seman-      pre-trained teacher encoder E, a trainable one-class bottle-
+tic feature space.                                                neck embedding module, and a student decoder D. Given
+    Data augmentation strategy is also widely used. By            an input sample I ∈ I t , the teacher E extracts multi-
+adding pseudo anomalies in the provided anomaly-free              scale representations. We propose to train a student D to
+samples, the unsupervised task is converted to a supervised       restore the features from the bottleneck embedding. Dur-
+learning task [23, 42, 46]. However, these approaches are         ing testing/inference, the representation extracted by the
+prone to bias towards pseudo outliers and fail to detect a        teacher E can capture abnormal, out-of-distribution fea-
+large variety of anomaly types. For example, CutPaste [23]        tures in anomalous samples. However, the student decoder
+generates pseudo outliers by adding small patches onto nor-       D fails to reconstruct these anomalous features from the
+mal images and trains a model to detect these anomalous           corresponding embedding. The low similarity of anoma-
+regions. Since the model focuses on detecting local fea-          lous representations in the proposed T-S model indicates a
+tures such as edge discontinuity and texture perturbations,       high abnormality score. We argue that the heterogeneous
+it fails to detect and localize large defects and global struc-   encoder and decoder structures and reverse knowledge dis-
+tural anomalies as shown in Fig. 6.                               tillation order contribute a lot to the discrepant representa-
+    Recently, networks pre-trained on the large dataset are       tions of anomalies. In addition, the trainable OCBE module
+proven to be capable of extracting discriminative features        further condenses the multi-scale patterns into an extreme
+for anomaly detection [7,8,23,25,29,30]. With a pre-trained       low-dimensional space for downstream normal representa-
+model, memorizing its anomaly-free features helps to iden-        tion reconstruction. This further improves feature discrep-
+tify anomalous samples [7, 29]. The studies in [8, 30] show       ancy on anomalies in our T-S model, as abnormal represen-
+that using the Mahalanobis distance to measure the simi-          tations generated by the teacher model are likely to be aban-
+larity between anomalies and anomaly-free features leads          doned by OCBE. In the rest of this section, we first specify
+to accurate anomaly detection. Since these methods re-            the reverse distillation paradigm. Then, we elaborate on the
+quire memorizing all features from training samples, they         OCBE module. Finally, we describe anomaly detection and
+are computationally expensive.                                    localization using reserve distillation.
+    Knowledge distillation from pre-trained models is an-
+other potential solution to anomaly detection. In the con-        3.1. Reverse Distillation
+text of unsupervised AD, since the student model is ex-
+                                                                      In conventional KD, the student network adopts a simi-
+posed to anomaly-free samples in knowledge distillation,
+                                                                  lar or identical neural network to the teacher model, accepts
+the T-S model is expected to generate discrepant features
+                                                                  raw data/images as input, and targets to match its feature ac-
+on anomalies in inference [4,33,39]. To further increase the
+                                                                  tivations to the teacher’s [4, 33]. In the context of one-class
+discrimnating capability of the T-S model on various types
+                                                                  distillation for unsupervised AD, the student model is ex-
+of abnormalities, different strategies are introduced. For in-
+                                                                  pected to generate highly different representations from the
+stance, in order to capture multi-scale anomaly, US [4] en-
+                                                                  teacher when the queries are anomalous samples [11, 26].
+sembles several models trained on normal data at different
+                                                                  However, the activation discrepancy on anomalies vanishes
+scales, and MKD [33] propose to use multi-level features
+                                                                  sometimes, leading to anomaly detection failure. We argue
+alignment. It should be noted that though the proposed
+                                                                  that this issue is attributed to the similar architectures of
+method is also based on knowledge distillation, our reverse
+                                                                  the teacher and student nets and the same data flow during
+distillation is the first to adopt an encoder and a decoder to
+                                                                  T-S knowledge transfer. To improve the T-S model’s rep-
+construct the T-S model. The heterogeneity of the teacher
+                                                                  resentation diversity on unknown, out-of-distribution sam-
+and student networks and reverse data flow in knowledge
+                                                                  ples, we propose a novel reserves distillation paradigm,
+distillation distinguishes our method from prior arts.
+                                                                  where the T-S model adopts the encoder-decoder architec-
+                                                                  ture and knowledge is distilled from teacher’s deep layers to
+3. Our Approach
+                                                                  its early layers, i.e., high-level, semantic knowledge being
+   Problem formulation: Let I t = {I1t , ..., Int } be a set      transferred to the student first. To further facilitate the one-
+of available anomaly-free images and I q = {I1q , ..., Im q
+                                                            }     class distillation, we designed a trainable OCEB module to
+be a query set containing both normal and abnormal sam-           connect the teacher and student models (Sec. 3.2).
+ples. The goal is to train a model to recognize and localize          In the reverse distillation paradigm, the teacher encoder
+anomalies in the query set. In the anomaly detection setting,     E aims to extract comprehensive representations. We fol-
+normal samples in both I t and I q follow the same distribu-      low previous work and use a pre-trained encoder on Ima-
+Figure 3. Overview of our reverse distillation framework for anomaly detection and localization. (a) Our model consists of a pre-trained
+teacher encoder E, a trainable one-class bottleneck embedding module (OCBE), and a student decoder D. We use a multi-scale feature
+fusion (MFF) block to ensemble low- and high-level features from E and map them onto a compact code by one-class embedding (OCE)
+block. During training, the student D learns to mimic the behavior of E by minimizing the similarity loss L. (b) During inference, E
+extracts the features truthfully, while D outputs anomaly-free ones. A low similarity between the feature vectors at the corresponding
+position of E and D implies an abnormality. (c) The final prediction is calculated by the accumulation of multi-scale similarity maps M .
+
+
+geNet [21] as our backbone E. To avoid the T-S model                   is that shallow layers of a neural network extract local de-
+converging to trivial solutions, all parameters of teacher E           scriptors for low-level information (e.g., color, edge, tex-
+are frozen during knowledge distillation. We show in the               ture, etc.), while deep layers have wider receptive fields, ca-
+ablation study that both ResNet [14] and WideResNet [44]               pable of characterizing regional/global semantic and struc-
+are good candidates, as they are capable of extracting rich            tural information. That is, low similarity of low- and high-
+features from images [4, 8, 23, 29].                                   level features in the T-S model suggests local abnormalities
+    To match the intermediate representations of E, the ar-            and regional/global structural outliers, respectively.
+chitecture of student decoder D is symmetrical but reversed                Mathematically, let ϕ indicates the projection from raw
+compared to E. The reverse design facilitates eliminating              data I to the one-class bottleneck embedding space, the
+the response of the student network to abnormalities, while            paired activation correspondence in our T-S model is {fEk =
+the symmetry allows it to have the same representation di-             E k (I), fDk
+                                                                                     = Dk (ϕ)}, where E k and Dk represent the
+mension as the teacher network. For instance, when we                  k th encoding and decoding block in the teacher and student
+take ResNet as the teacher model, the student D consists               model, respectively. fEk , fDk
+                                                                                                       ∈ RCk ×Hk ×Wk , where Ck , Hk
+of several residual-like decoding blocks for mirror symme-             and Wk denote the number of channels, height and width of
+try. Specifically, the downsampling in ResNet is realized              the k th layer activation tensor. For knowledge transfer in
+by a convolutional layer with a kernel size of 1 and a stride          the T-S model, the cosine similarity is taken as the KD loss,
+of 2 [14]. The corresponding decoding block in the student             as it is more precisely to capture the relation in both high-
+D adopts deconvolutional layers [47] with a kernel size of 2           and low-dimensional information [37, 49]. Specifically, for
+and a stride of 2. More details on the student decoder design          feature tensors fEk and fD  k
+                                                                                                     , we calculate their vector-wise
+are given in Supplementary Material.                                   cosine similarity loss along the channel axis and obtain a
+    In our reverse distillation, the student decoder D targets         2-D anomaly map M k ∈ RHk ×Wk :
+to mimic the behavior of the teacher encoder E during train-
+ing. In this work, we explore multi-scale feature-based dis-
+                                                                                  M^k(h,w) = 1-\frac {(f^k_E(h,w))^T \cdot f^k_D(h,w)}{\left \| f^k_E(h,w) \right \| \left \| f^k_D(h,w) \right \|} \label {eq:hw_loss}.    (1)
+tillation for anomaly detection. The motivation behind this
+A large value in M k indicates high anomaly in that loca-
+tion. Considering the multi-scale knowledge distillation,
+the scalar loss function for student’s optimization is ob-
+tained by accumulating multi-scale anomaly maps:
+
+          \mathcal {L_{KD}} = \sum _{k=1}^{K} \bigg \{\frac {1}{H_kW_k}\sum _{h=1}^{H_k}\sum _{w=1}^{W_k}M^k(h,w)\bigg \} \label {eq:loss},    (2)
+
+where K indicates the number of feature layers used in the
+experiment.
+3.2. One-Class Bottleneck Embedding
+    Since the student model D attempts to restore represen-
+tations of a teacher model E in our reverse knowledge dis-
+tillation paradigm, one can directly feed the activation out-                                                                                        Figure 4. Our one-class bottleneck embedding module consists of
+put of the last encoding block in backbone to D. How-                                                                                                trainable MFF and OCE blocks. MFF aligns multi-scale features
+ever, this naive connection has two shortfalls. First, the                                                                                           from teacher E and OCE condenses the obtained rich feature to a
+                                                                                                                                                     compact bottleneck code ϕ.
+teacher model in KD usually has a high capacity. Though
+the high-capacity model helps extract rich features, the ob-
+tained high-dimensional descriptors likely have a consid-
+                                                                                                                                                     bedding for normal pattern reconstruction and OCE targets
+erable redundancy. The high freedom and redundancy of
+                                                                                                                                                     to retain essential information favorable for the student to
+representations are harmful to the student model to decode
+                                                                                                                                                     decode out the teacher’s response. The convolutional layers
+the essential anomaly-free features. Second, the activation
+                                                                                                                                                     in grey and ResBlock in green in Fig. 4 are trainable and op-
+of the last encoder block in backbone usually characterizes
+                                                                                                                                                     timized jointly with the student model D during knowledge
+semantic and structural information of the input data. Due
+                                                                                                                                                     distillation on normal samples.
+to the reverse order of knowledge distillation, directly feed-
+ing this high-level representation to the student decoder set                                                                                        3.3. Anomaly Scoring
+a challenge for low-level features reconstruction. Previous
+efforts on data reconstruction usually introduce skip paths                                                                                             At the inference stage, We first consider the measure-
+to connect the encoder and decoder. However, this approach                                                                                           ment of pixel-level anomaly score for anomaly localiza-
+doesn’t work in knowledge distillation, as the skip paths                                                                                            tion (AL). When a query sample is anomalous, the teacher
+leak anomaly information to the student during inference.                                                                                            model is capable of reflecting abnormality in its features.
+    To tackle the first shortfall above in one-class distilla-                                                                                       However, the student model is likely to fail in abnormal
+tion, we introduce a trainable one-class embedding block                                                                                             feature restoration, since the student decoder only learns to
+to project the teacher model’s high-dimensional represen-                                                                                            restore anomaly-free representations from the compact one-
+tations into a low-dimensional space. Let’s formulate                                                                                                class embedding in knowledge distillation. In other words,
+anomaly features as perturbations on normal patterns. Then                                                                                           the student D generates discrepant representations from the
+the compact embedding acts as an information bottleneck                                                                                              teacher when the query is anomalous. Following Eq. (1),
+and helps to prohibit the propagation of unusual pertur-                                                                                             we obtain a set of anomaly maps from T-S representation
+bations to the student model, therefore boosting the T-S                                                                                             pairs, where the value in a map Mk reflects the point-wise
+model’s representation discrepancy on anomalies. In this                                                                                             anomaly of the k th feature tensors. To localize anomalies
+study, we adopt the 4th residule block of ResNet [14] as the                                                                                         in a query image, we up-samples M k to image size. Let
+one-class embedding block.                                                                                                                           Ψ denotes the bilinear up-sampling operation used in this
+    To address the problem on low-level feature restoration                                                                                          study. Then a precise score map SI q is formulated as the
+at decoder D, the MFF block concatenates multi-scale rep-                                                                                            pixel-wise accumulation of all anomaly maps:
+resentations before one-class embedding. To achieve rep-
+resentation alignment in feature concatenation, we down-                                                                                                                   S_{AL} = \sum _{i=1}^{L}\Psi (M^i) \label {eq:score}.    (3)
+sample the shallow features through one or more 3 × 3 con-
+volutional layers with stride of 2, followed by batch normal-
+ization and ReLU activation function. Then a 1×1 convolu-                                                                                            In order to remove the noises in the score map, we smooth
+tional layer with stride of 1 and a batch normalization with                                                                                         SAL by a Gaussian filter.
+relu activation are exploited for a rich yet compact feature.                                                                                           For anomaly detection, averaging all values in a score
+    We depict the OCBE module in Fig. 4, where MFF ag-                                                                                               map SAL is unfair for samples with small anomalous re-
+gregates low- and high-level features to construct a rich em-                                                                                        gions. The most responsive point exists for any size of
+      Image Size              128                                                       256
+   Category/Method   MKD [33]       Ours   GT [10]   GN [2]   US [4]   PSVDD [43]   DAAD [16]   MF [40]   PaDiM [8]   CutPaste [23]   Ours
+        Carpet         79.3         99.2    43.7     69.9     91.6        92.9        86.6       94.0       99.8          93.9        98.9
+        Grid           78.0         95.7    61.9     70.8     81.0        94.6        95.7       85.9       96.7          100         100
+
+   Textures
+        Leather        95.1         100     84.1     84.2     88.2        90.9        86.2       99.2       100           100         100
+        Tile           91.6         99.4    41.7     79.4     99.1        97.8        88.2       99.0       98.1          94.6        99.3
+        Wood           94.3         98.8    61.1     83.4     97.7        96.5        98.2       99.2       99.2          99.1        99.2
+        Average        87.7         98.6    58.5     77.5     91.5        94.5        91.0       95.5       98.8          97.5        99.5
+        Bottle         99.4         100     74.4     89.2     99.0        98.6        97.6       99.1       99.9          98.2        100
+        Cable          89.2         97.1    78.3     75.7     86.2        90.3        84.4       97.1       92.7          81.2        95.0
+        Capsule        80.5         89.5    67.0     73.2     86.1        76.7        76.7       87.5       91.3          98.2        96.3
+        Hazelnut       98.4         99.8    35.9     78.5     93.1        92.0        92.1       99.4       92.0          98.3        99.9
+
+   Objects
+        Metal Nut      73.6         99.2    81.3     70.0     82.0        94.0        75.8       96.2       98.7          99.9        100
+        Pill           82.7         93.3    63.0     74.3     87.9        86.1        90.0       90.1       93.3          94.9        96.6
+        Screw          83.3         91.1    50.0     74.6     54.9        81.3        98.7       97.5       85.8          88.7        97.0
+        Toothbrush     92.2         90.3    97.2     65.3     95.3        100         99.2       100        96.1          99.4        99.5
+        Transistor     85.6         99.5    86.9     79.2     81.8        91.5        87.6       94.4       97.4          96.1        96.7
+        Zipper         93.2         94.3    82.0     74.5     91.9        97.9        85.9       98.6       90.3          99.9        98.5
+        Average        87.8         95.4    71.6     75.5     85.8        90.8        88.8       96.0       93.8          95.5        98.0
+    Total Average      87.8         96.5    67.2     76.2     87.7        92.1        89.5       95.8       95.5          96.1        98.5
+
+Table 1. Anomaly Detection results on MVTec [3]. For each category with images of 256 × 256 resolution, methods achieved for the top
+two AUROC (%) are highlighted in bold. Our method ranks first according to the average scores of textures, objects and overall.
+
+
+anomalous region. Hence, we define the maximum value                      with σ = 4 is used to smooth the anomaly score map (as
+in SAL as sample-level anomaly score SAD . The intuition                  described in Sec. 3.3).
+is that no significant response exists in their anomaly score                 For Anomaly dectction, we take area under the receiver
+map for normal samples.                                                   operating characteristic (AUROC) as the evaluation met-
+                                                                          ric. We include prior arts in this experiments, including
+4. Experiments and Discussions                                            MKD [33], GT [10], GANomaly (GN) [2], Uninformed
+                                                                          Student (US) [4], PSVDD [43], DAAD [16], MetaFormer
+   Empirical evaluations are carried on both the MVTec                    (MF) [40], PaDiM (WResNet50) [8] and CutPaste [23].
+anomaly detection and localization benchmark and unsu-                        For Anomaly Localization, we report both AUROC and
+pervised one-class novelty detection datasets. In addition,               per-region-overlap (PRO) [4]. Different from AUROC,
+we perform ablation study on the MVTec benchmark, in-                     which is used for per-pixel measurement, the PRO score
+vestigating the effects of different modules/blocks on the                treats anomaly regions with any size equally. The compari-
+final results.                                                            son baselines includes MKD [33], US [4], MF [40], SPADE
+                                                                          (WResNet50) [7, 29], PaDiM (WResNet50) [8], RIAD [46]
+4.1. Anomaly Detection and Localization
+                                                                          and CutPaste [23].
+    Dataset. MVTec [3] contains 15 real-world datasets                        Experimental results and discussions. Anomaly de-
+for anomaly detection, with 5 classes of textures and 10                  tection results on MVTec are shown in Tab. 1. The average
+classes of objects. The training set comprises a total of                 outcome shows that our method exceeds SOTA by 2.5%.
+3,629 anomaly-free images. The test set has both anoma-                   For textures and objects, our model reaches new SOTA of
+lous and anomaly-free images, totaling 1,725. Each class                  99.5% and 98.0% of AUROC, respectively. The statistics
+has multiple defects for testing. In addition, pixel-level an-            of the anomaly scores are shown in Fig. 5. The non-overlap
+notations are available in the test dataset for anomaly local-            distribution of normal (blue) and anomalies (red) indicates
+ization evaluation.                                                       the strong AD capability in our T-S model.
+    Experimental settings. All images in MVTec are re-                        Quantitative results on anomaly localization are summa-
+sized to a specific resolution (e.g. 128 × 128, 256 × 256                 rized in Tab. 2. For both AUROC and PRO average scores
+etc.). Following convention in prior works, anomaly de-                   over all categories, our approach surpasses state-of-the-art
+tection and localization are performed on one category at a               with 97.8% and 93.9%. To investigate the robustness of our
+time. In this experiment, we adopt WideResNet50 as Back-                  method to various anomalies, we classify the defect types
+bone E in our T-S model. We also report the AD results                    into two categories: large defects or structural anomalies
+with ResNet18 and ResNet50 in ablation study. To train our                and tiny or inconspicuous defects, and qualitative evalu-
+reserve distillation model, we utilize Adam optimizer [18]                ate the performance by visualization in Fig. 6 and Fig. 7.
+with β = (0.5, 0.999). The learning rate is set to 0.005. We              Compared to the runner-up (i.e. CutPaste [23]) in Tab. 1,
+train 200 epochs with a batch size of 16. A Gaussian filter               our method produces a significant response to the whole
+        Image Size              128                                                    256
+     Category/Method    MKD [33]      Ours      US [4]    MF [40]   SPADE [7]    PaDiM [8]   RIAD [46]   CutPaste [23]     Ours
+          Carpet         95.6/-     98.1/95.3   -/87.9     -/87.8    97.5/94.7   99.1/96.2     96.3/-       98.3/-       98.9/97.0
+          Grid           91.8/-     97.3/92.6   -/95.2     -/86.5    93.7/86.7   97.3/94.6     98.8/-       97.5/-       99.3/97.6
+
+     Textures
+          Leather        98.1/-     99.0/98.6   -/94.5     -/95.9    97.6/97.2   99.2/97.8     99.4/-       99.5/-       99.4/99.1
+          Tile           82.8/-     92.6/84.8   -/94.6     -/88.1    87.4/75.9   94.1/86.0     89.1/-       90.5/-       95.6/90.6
+          Wood           84.8/-     92.1/82.3   -/91.1     -/84.8    88.5/87.4   94.9/91.1     85.8/-       95.5/-       95.3/90.9
+          Average        90.6/-     95.8/90.7   -/92.7     -/88.6    92.9/88.4   96.9/93.2     93.9/-       96.3/-       97.7/95.0
+          Bottle         96.3/-     98.2/94.7   -/93.1     -/88.8    98.4/95.5   98.3/94.8     98.4/-       97.6/-       98.7/96.6
+          Cable          82.4/-     97.8/90.5   -/81.8     -/93.7    97.2/90.9   96.7/88.8     84.2/-       90.0/-       97.4/91.0
+          Capsule        95.9/-     96.5/87.2   -/96.8     -/87.9    99.0/93.7   98.5/93.5     92.8/-       97.4/-       98.7/95.8
+          Hazelnut       94.6/-     98.8/89.2   -/96.5     -/88.6    99.1/95.4   98.2/92.6     96.1/-       97.3/-       98.9/95.5
+
+     Objects
+          Metal Nut      86.4/-     96.6/84.1   -/94.2     -/86.9    98.1/94.4   97.2/85.6     92.5/-       93.1/-       97.3/92.3
+          Pill           89.6/-     97.0/90.0   -/96.1     -/93.0    96.5/94.6   95.7/92.7     95.7/-       95.7/-       98.2/96.4
+          Screw          96.0/-     98.3/94.4   -/94.2     -/95.4    98.9/96.0   98.5/94.4     98.8/-       96.7/-       99.6/98.2
+          Toothbrush     96.1/-     98.2/86.7   -/93.3     -/87.7    97.9/93.5   98.8/93.1     98.9/-       98.1/-       99.1/94.5
+          Transistor     76.5/-     97.6/85.2   -/66.6     -/92.6    94.1/87.4   97.5/84.5     87.7/-       93.0/-       92.5/78.0
+          Zipper         93.9/-     97.0/92.3   -/95.1     -/93.6    96.5/92.6   98.5/95.9     97.8/-       99.3/-       98.2/95.4
+          Average        90.8/-     97.6/89.4   -/90.8     -/90.8    97.6/93.4   97.8/91.6     94.3/-       95.8/-       97.9/93.4
+      Total Average      90.7/-     97.0/89.9   -/91.4     -/90.1    96.5/91.7   97.5/92.1     94.2/-       96.0-        97.8/93.9
+
+Table 2. Anomaly Localization results with AUROC and PRO on MVTec [3]. AUROC represents a pixel-wise comparison, while PRO
+focuses on region-based behavior. We show the best results for AUROC and PRO in bold. Remarkable, our approach is robust and
+represents state-of-the-art performance under both metrics.
+
+
+                                                                         Limitations. We observe that the localization perfor-
+                                                                      mance on the transistor dataset is relatively weak, despite
+                                                                      the good AD performance. This performance drop is caused
+                                                                      by misinterpretation between prediction and annotation. As
+                                                                      shown in Fig. 6, our method localize the misplaced regions,
+                                                                      while the ground truth covers both misplaced and original
+                                                                      areas. Alleviating this problem requires associating more
+                                                                      features with contextual relationships. We empirically find
+                                                                      that a higher-level feature layer with a wider perceptive field
+                                                                      can improve the performance. For instance, anomaly detec-
+                                                                      tion with the second and third layer features achieves 94.5%
+Figure 5. Histogram of anomaly scores for all categories of           AUROC, while using only the third layer improve the per-
+MVTec [3] (x-axis: anomaly score from 0 to 1, and y-axis: count).     formance to 97.3%. In addition, reducing image resolution
+                                                                      to 128×128 also achieves 97.6% AUROC. We present more
+                                                                      cases of anomaly detection and localization, both positive
+anomaly region.                                                       and negative, in the supplementary material.
+   Complexity analysis. Recent pre-trained model based
+approaches achieve promising performance by extracting                4.2. One-Class Novelty Detection
+features from anomaly-free samples as a measurement [7,                   To evaluate the generality of proposed approach, we con-
+8]. However, storing feature models leads to large memory             duct one-class novelty detection experiment on 3 sematic
+consumption. In comparison, our approach achieves better              datasets [32], MNIST [22], FashionMNIST [41] and CI-
+performance depending only on an extra CNN model. As                  FAR10 [20]. MNIST is a hand-written digits dataset from
+shown in Tab. 3. Our model obtain performance gain with               numbers 0-9. FashionMNIST consists of images from 10
+low time and memory complexity.                                       fashion product classes. Both datasets includes 60K sam-
+                                                                      ples for training and 10K samples for testing, all in reso-
+         Methods         Infer. time   Memory     Performance         lution of 28 × 28. CIFAR10 is a challenging dataset for
+   SPADE (WResNet50)        1.40        1400     85.5/96.5/91.7
+   PaDiM (WResNet50)        0.95        3800     95.5/97.5/92.1
+                                                                      novelty detection because of its inclusion of diverse natu-
+    Ours (WResNet50)        0.31        352      98.5/97.8/93.9       ral objects. It includes 50K training images and 10K test
+                                                                      images with scale of 32 × 32 in 10 categories.
+Table 3. Comparison of pre-trained based approaches in terms of           Following the protocol mentioned in [27], we train the
+inference time (second on Intel i7), memory usage (MB), and per-      model with samples from a single class and detect novel
+formance (AD-AUROC/AL-AUROC/AL-PRO ) on MVTec [3].                    samples. Note that the novelty score is defined as the sum
+                                                                         the pre-trained residual block [14] as baseline. Embedding
+                                                                         from pre-trained residual block may contain anomaly fea-
+                                                                         tures, which decreases the T-S model’s representation dis-
+                                                                         crepancy. Our trainable OCE block condenses feature codes
+                                                                         and the MFM block fuses rich features into embedding, al-
+                                                                         lows for more accurate anomaly detection and localization.
+
+                                                                           Metric            Pre           Pre+OCE          Pre+OCE+MFM
+                                                                         AU ROCAD            96.0            97.9                98.5
+                                                                         AU ROCAL            96.9            97.4                97.8
+                                                                           RP O              91.2            92.4                93.9
+
+                                                                         Table 5. Ablation study on pre-trained bottleneck, OCE, and MFF.
+
+Figure 6. Anomalies from top to bottom: ”flip” on ”metal nut”,
+”misplaced” on ”transistor” and ”crack” on ”hazelnut”. Normal               Tab. 6 displays qualitative comparisons of different back-
+samples are provided as reference.                                       bone networks as the teacher model. Intuitively, a deeper
+                                                                         and wider network usually have a stronger representative
+                                                                         capacity, which facilitates detecting anomalies precisely.
+                                                                         Noteworthy that even with a smaller neural network such
+                                                                         as ResNet18, our reverse distillation method still achieves
+                                                                         excellent performance.
+
+                                                                          Backbone           ResNet18          ResNet50           WResNet50
+                                                                         AU ROCAD              97.9              98.4               98.5
+                                                                         AU ROCAL              97.1              97.7               97.8
+                                                                           RP O                91.2              93.1               93.9
+
+Figure 7. Visualization on tiny or inconspicuous anomalies. From            Table 6. Quantitative comparison with different backbones.
+left to right: carpet, tile, wood, cable, pill, toothbrush, and screw.
+                                                                            Besides, we also explored the impact of different net-
+  Method         MNIST        F-MNIST       CIFAR10       Caltech-256    work layers on anomaly detection and shown the results in
+  LSA [1]         97.5          92.2          64.1             -
+                                                                         Tab. 7. For single-layer features, M 2 yields the best result
+OCGAN [27]        97.3          87.8          65.7             -
+ HRN [17]         97.6          92.8          71.3             -         as it trades off both local texture and global structure in-
+DAAD [16]         99.0           -            75.3             -         formation. Multi-scale feature fusion helps to cover more
+ MKD [33]         98.7          94.5          84.5             -         types of anomalies.
+ G2D [28]          -             -             -              95.7
+ OiG [45]          -             -             -              98.2
+                                                                          Score Map       M1        M2         M3         M 2,3      M 1,2,3
+   Ours           99.3          95.0          86.5            99.9
+                                                                         AU ROCAD         90.1      97.5       97.2       98.0        98.5
+                                                                         AU ROCAL         94.0      96.9       96.9       97.6        97.8
+Table 4. AUROC(%) results for One-Class Novelty Detection.                  RP O          88.6      92.6       89.5       93.2        93.9
+The best results are marked in bold.
+                                                                            Table 7. Ablation study on multi-scale feature distillation.
+
+of scores in the similarity map. The baselines in this exper-
+iment include LSA [1], OCGAN [27], HRN [17], DAAD
+[16] and MKD [33]. We also include the comparision with                  5. Conclusion
+OiG [45] and G2D [28] on Caltech-256 [13].
+                                                                            We proposed a novel knowledge distillation paradigm,
+   Tab. 4 summarizes the quantitative results on the three
+                                                                         reverse distillation, for anomaly detection. It holistically ad-
+datasets. Remarkably, our approach produces excellent re-
+                                                                         dressed the problem in previous KD-based AD methods and
+sults. Details of the experiments and the results of per-class
+                                                                         boosted the T-S model’s response on anomalies. In addition,
+comparisons are provided in the Supplementary Material.
+                                                                         we introduced trainable one-class embedding and multi-
+                                                                         scale feature fusion blocks in reverse distillation to improve
+4.3. Ablation analysis
+                                                                         one-class knowledge transfer. Experiments showed that our
+  We investigate effective of OCE and MFF blocks on                      method significantly outperformed previous arts in anomaly
+AD and reports the numerical results in Tab. 5. We take                  detection, anomaly localization, and novelty detection.
+References                                                               of the 27th International Conference on Neural Information
+                                                                         Processing Systems - Volume 2, NIPS’14, page 2672–2680,
+ [1] Davide Abati, Angelo Porrello, Simone Calderara, and Rita           Cambridge, MA, USA, 2014. MIT Press. 2
+     Cucchiara. Latent space autoregression for novelty detec-
+                                                                    [13] Gregory Griffin, Alex Holub, and Pietro Perona. Caltech-256
+     tion. In Proceedings of the IEEE/CVF Conference on Com-
+                                                                         object category dataset. 2007. 8
+     puter Vision and Pattern Recognition, pages 481–490, 2019.
+                                                                    [14] Kaiming He, Xiangyu Zhang, Shaoqing Ren, and Jian Sun.
+     8
+                                                                         Deep residual learning for image recognition. In Proceed-
+ [2] Samet Akcay, Amir Atapour-Abarghouei, and Toby P.
+                                                                         ings of the IEEE Conference on Computer Vision and Pattern
+     Breckon. Ganomaly: Semi-supervised anomaly detection
+                                                                         Recognition (CVPR), June 2016. 4, 5, 8
+     via adversarial training. In C. V. Jawahar, Hongdong Li,
+                                                                    [15] Geoffrey Hinton, Oriol Vinyals, and Jeffrey Dean. Distilling
+     Greg Mori, and Konrad Schindler, editors, Computer Vision
+                                                                         the knowledge in a neural network. In NIPS Deep Learning
+     – ACCV 2018, pages 622–637, Cham, 2019. Springer Inter-
+                                                                         and Representation Learning Workshop, 2015. 1
+     national Publishing. 1, 2, 6
+ [3] Paul Bergmann, Michael Fauser, David Sattlegger, and           [16] Jinlei Hou, Yingying Zhang, Qiaoyong Zhong, Di Xie, Shil-
+     Carsten Steger. Mvtec ad – a comprehensive real-world               iang Pu, and Hong Zhou. Divide-and-assemble: Learning
+     dataset for unsupervised anomaly detection. In Proceedings          block-wise memory for unsupervised anomaly detection. In
+     of the IEEE/CVF Conference on Computer Vision and Pat-              Proceedings of the IEEE/CVF International Conference on
+     tern Recognition (CVPR), June 2019. 1, 2, 6, 7                      Computer Vision (ICCV), pages 8791–8800, October 2021.
+                                                                         1, 2, 6, 8
+ [4] Paul Bergmann, Michael Fauser, David Sattlegger, and
+     Carsten Steger. Uninformed students: Student-teacher           [17] Wenpeng Hu, Mengyu Wang, Qi Qin, Jinwen Ma, and Bing
+     anomaly detection with discriminative latent embeddings. In         Liu. Hrn: A holistic approach to one class learning. In
+     Proceedings of the IEEE/CVF Conference on Computer Vi-              H. Larochelle, M. Ranzato, R. Hadsell, M. F. Balcan, and
+     sion and Pattern Recognition (CVPR), June 2020. 1, 3, 4, 6,         H. Lin, editors, Advances in Neural Information Process-
+     7                                                                   ing Systems, volume 33, pages 19111–19124. Curran Asso-
+                                                                         ciates, Inc., 2020. 8
+ [5] Paul Bergmann, Sindy Löwe, Michael Fauser, David Sattleg-
+     ger, and Carsten Steger. Improving unsupervised defect seg-    [18] Diederik P Kingma and Jimmy Ba. Adam: A method for
+     mentation by applying structural similarity to autoencoders,        stochastic optimization. arXiv preprint arXiv:1412.6980,
+     2018. 1, 2                                                          2014. 6
+ [6] Pengguang Chen, Shu Liu, Hengshuang Zhao, and Jiaya Jia.       [19] Diederik P Kingma and Max Welling. Auto-encoding varia-
+     Distilling knowledge via knowledge review. In Proceedings           tional bayes, 2013. 2
+     of the IEEE/CVF Conference on Computer Vision and Pat-         [20] Alex Krizhevsky. Learning multiple layers of features from
+     tern Recognition, pages 5008–5017, 2021. 1, 2                       tiny images, 2009. 7
+ [7] Niv Cohen and Yedid Hoshen. Sub-image anomaly detection        [21] Alex Krizhevsky, Ilya Sutskever, and Geoffrey E. Hinton.
+     with deep pyramid correspondences, 2020. 3, 6, 7                    Imagenet classification with deep convolutional neural net-
+ [8] Thomas Defard, Aleksandr Setkov, Angelique Loesch, and              works. In Proceedings of the 25th International Confer-
+     Romaric Audigier. Padim: A patch distribution modeling              ence on Neural Information Processing Systems - Volume 1,
+     framework for anomaly detection and localization. In Inter-         NIPS’12, page 1097–1105, Red Hook, NY, USA, 2012. Cur-
+     national Conference on Pattern Recognition, pages 475–489.          ran Associates Inc. 4
+     Springer, 2021. 3, 4, 6, 7                                     [22] Yann LeCun. The mnist database of handwritten digits,
+ [9] Chelsea Finn, Pieter Abbeel, and Sergey Levine. Model-              1998. 7
+     agnostic meta-learning for fast adaptation of deep networks.   [23] Chun-Liang Li, Kihyuk Sohn, Jinsung Yoon, and Tomas
+     In International Conference on Machine Learning, pages              Pfister. Cutpaste: Self-supervised learning for anomaly de-
+     1126–1135. PMLR, 2017. 2                                            tection and localization. In Proceedings of the IEEE/CVF
+[10] Izhak Golan and Ran El-Yaniv. Deep anomaly detection us-            Conference on Computer Vision and Pattern Recognition
+     ing geometric transformations. In Proceedings of the 32nd           (CVPR), pages 9664–9674, June 2021. 1, 3, 4, 6, 7
+     International Conference on Neural Information Processing      [24] W. Liu, D. Lian W. Luo, and S. Gao. Future frame pre-
+     Systems, NIPS’18, page 9781–9791, Red Hook, NY, USA,                diction for anomaly detection – a new baseline. In 2018
+     2018. Curran Associates Inc. 6                                      IEEE Conference on Computer Vision and Pattern Recog-
+[11] Dong Gong, Lingqiao Liu, Vuong Le, Budhaditya Saha,                 nition (CVPR), 2018. 1
+     Moussa Reda Mansour, Svetha Venkatesh, and Anton               [25] Paolo Napoletano, Flavio Piccoli, and Raimondo Schettini.
+     van den Hengel. Memorizing normality to detect anomaly:             Anomaly detection in nanofibrous materials by cnn-based
+     Memory-augmented deep autoencoder for unsupervised                  self-similarity. Sensors, 18(1), 2018. 3
+     anomaly detection. In Proceedings of the IEEE/CVF Inter-       [26] Hyunjong Park, Jongyoun Noh, and Bumsub Ham. Learn-
+     national Conference on Computer Vision (ICCV), October              ing memory-guided normality for anomaly detection. In
+     2019. 1, 2, 3                                                       IEEE/CVF Conference on Computer Vision and Pattern
+[12] Ian J. Goodfellow, Jean Pouget-Abadie, Mehdi Mirza, Bing            Recognition (CVPR), June 2020. 1, 2, 3
+     Xu, David Warde-Farley, Sherjil Ozair, Aaron Courville, and    [27] Pramuditha Perera, Ramesh Nallapati, and Bing Xiang. Oc-
+     Yoshua Bengio. Generative adversarial nets. In Proceedings          gan: One-class novelty detection using gans with constrained
+     latent representations. In Proceedings of the IEEE/CVF Con-     [40] Jhih-Ciang Wu, Ding-Jie Chen, Chiou-Shann Fuh, and Tyng-
+     ference on Computer Vision and Pattern Recognition, pages            Luh Liu. Learning unsupervised metaformer for anomaly
+     2898–2906, 2019. 7, 8                                                detection. In Proceedings of the IEEE/CVF International
+[28] Masoud Pourreza, Bahram Mohammadi, Mostafa Khaki,                    Conference on Computer Vision (ICCV), pages 4369–4378,
+     Samir Bouindour, Hichem Snoussi, and Mohammad                        October 2021. 2, 6, 7
+     Sabokrou. G2d: generate to detect anomaly. In Proceed-          [41] Han Xiao, Kashif Rasul, and Roland Vollgraf. Fashion-
+     ings of the IEEE/CVF Winter Conference on Applications of            mnist: a novel image dataset for benchmarking machine
+     Computer Vision, pages 2003–2012, 2021. 2, 8                         learning algorithms, 2017. 7
+[29] Tal Reiss, Niv Cohen, Liron Bergman, and Yedid Hoshen.          [42] Xudong Yan, Huaidong Zhang, Xuemiao Xu, Xiaowei Hu,
+     Panda: Adapting pretrained features for anomaly detection            and Pheng-Ann Heng. Learning semantic context from
+     and segmentation. In Proceedings of the IEEE/CVF Confer-             normal samples for unsupervised anomaly detection. Pro-
+     ence on Computer Vision and Pattern Recognition (CVPR),              ceedings of the AAAI Conference on Artificial Intelligence,
+     pages 2806–2814, June 2021. 3, 4, 6                                  35(4):3110–3118, May 2021. 1, 2, 3
+[30] Oliver Rippel, Patrick Mertens, and Dorit Merhof. Model-        [43] Jihun Yi and Sungroh Yoon. Patch svdd: Patch-level svdd for
+     ing the distribution of normal data in pre-trained deep fea-         anomaly detection and segmentation. In Proceedings of the
+     tures for anomaly detection. In 2020 25th International Con-         Asian Conference on Computer Vision (ACCV), November
+     ference on Pattern Recognition (ICPR), pages 6726–6733,              2020. 2, 6
+     2021. 3                                                         [44] Sergey Zagoruyko and Nikos Komodakis. Wide residual net-
+[31] Lukas Ruff, Robert Vandermeulen, Nico Goernitz, Lucas                works. In Edwin R. Hancock Richard C. Wilson and William
+     Deecke, Shoaib Ahmed Siddiqui, Alexander Binder, Em-                 A. P. Smith, editors, Proceedings of the British Machine Vi-
+     manuel Müller, and Marius Kloft. Deep one-class classifi-           sion Conference (BMVC), pages 87.1–87.12. BMVA Press,
+     cation. In Jennifer Dy and Andreas Krause, editors, Pro-             September 2016. 4
+     ceedings of the 35th International Conference on Machine        [45] Muhammad Zaigham Zaheer, Jin-ha Lee, Marcella Astrid,
+     Learning, volume 80 of Proceedings of Machine Learning               and Seung-Ik Lee. Old is gold: Redefining the adversarially
+     Research, pages 4393–4402. PMLR, 10–15 Jul 2018. 2                   learned one-class classifier training paradigm. In Proceed-
+[32] Mohammadreza Salehi, Hossein Mirzaei, Dan Hendrycks,                 ings of the IEEE/CVF Conference on Computer Vision and
+     Yixuan Li, Mohammad Hossein Rohban, and Mohammad                     Pattern Recognition, pages 14183–14193, 2020. 2, 8
+     Sabokrou. A unified survey on anomaly, novelty, open-set,       [46] Vitjan Zavrtanik, Matej Kristan, and Danijel Skočaj. Recon-
+     and out-of-distribution detection: Solutions and future chal-        struction by inpainting for visual anomaly detection. Pattern
+     lenges. arXiv preprint arXiv:2110.14051, 2021. 7                     Recognition, 112:107706, 2021. 1, 2, 3, 6, 7
+[33] Mohammadreza Salehi, Niousha Sadjadi, Soroosh
+                                                                     [47] Matthew D. Zeiler, Dilip Krishnan, Graham W. Taylor, and
+     Baselizadeh, Mohammad H. Rohban, and Hamid R.
+                                                                          Rob Fergus. Deconvolutional networks. In 2010 IEEE Com-
+     Rabiee. Multiresolution knowledge distillation for anomaly
+                                                                          puter Society Conference on Computer Vision and Pattern
+     detection. In Proceedings of the IEEE/CVF Conference on
+                                                                          Recognition, pages 2528–2535, 2010. 4
+     Computer Vision and Pattern Recognition (CVPR), pages
+                                                                     [48] Kang Zhou, Yuting Xiao, Jianlong Yang, Jun Cheng, Wen
+     14902–14912, June 2021. 1, 2, 3, 6, 7, 8
+                                                                          Liu, Weixin Luo, Zaiwang Gu, Jiang Liu, and Shenghua
+[34] Thomas Schlegl, Philipp Seeböck, Sebastian M. Waldstein,
+                                                                          Gao. Encoding structure-texture relation with p-net for
+     Georg Langs, and Ursula Schmidt-Erfurth. f-anogan: Fast
+                                                                          anomaly detection in retinal images. In Computer Vision–
+     unsupervised anomaly detection with generative adversarial
+                                                                          ECCV 2020: 16th European Conference, Glasgow, UK, Au-
+     networks. Medical Image Analysis, 54:30–44, 2019. 1, 2
+                                                                          gust 23–28, 2020, Proceedings, Part XX 16, pages 360–377.
+[35] Bernhard Schölkopf, John C Platt, John Shawe-Taylor,
+                                                                          Springer, 2020. 1
+     Alex J Smola, and Robert C Williamson. Estimating the sup-
+                                                                     [49] Jinguo Zhu, Shixiang Tang, Dapeng Chen, Shijie Yu, Yakun
+     port of a high-dimensional distribution. Neural computation,
+                                                                          Liu, Mingzhe Rong, Aijun Yang, and Xiaohua Wang. Com-
+     13(7):1443–1471, 2001. 2
+                                                                          plementary relation contrastive distillation. In Proceedings
+[36] David MJ Tax and Robert PW Duin. Support vector data
+                                                                          of the IEEE/CVF Conference on Computer Vision and Pat-
+     description. Machine learning, 54(1):45–66, 2004. 2
+                                                                          tern Recognition (CVPR), pages 9260–9269, June 2021. 4
+[37] Frederick Tung and Greg Mori. Similarity-preserving knowl-
+                                                                     [50] David Zimmerer, Jens Petersen, Gregor Köhler, Paul Jäger,
+     edge distillation. In Proceedings of the IEEE/CVF Inter-
+                                                                          Peter Full, Tobias Roß, Tim Adler, Annika Reinke, Lena
+     national Conference on Computer Vision (ICCV), October
+                                                                          Maier-Hein, and Klaus Maier-Hein.            Medical out-of-
+     2019. 4
+                                                                          distribution analysis challenge 2021, Mar. 2021. 1
+[38] Shashanka Venkataramanan, Kuan-Chuan Peng, Ra-
+     jat Vikram Singh, and Abhijit Mahalanobis. Attention
+     guided anomaly localization in images.          In European
+     Conference on Computer Vision, pages 485–503. Springer,
+     2020. 1
+[39] Guodong Wang, Shumin Han, Errui Ding, and Di Huang.
+     Student-teacher feature pyramid matching for anomaly de-
+     tection, 2021. 1, 3
+

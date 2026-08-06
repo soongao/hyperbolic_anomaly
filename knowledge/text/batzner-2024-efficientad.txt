@@ -1,0 +1,1481 @@
+                                        EfficientAD: Accurate Visual Anomaly Detection at Millisecond-Level Latencies
+
+                                                                    Kilian Batzner          Lars Heckler     Rebecca König
+                                                                                         MVTec Software GmbH
+                                                                 {kilian.batzner, lars.heckler, rebecca.koenig}@mvtec.com
+
+
+
+
+arXiv:2303.14535v3 [cs.CV] 8 Feb 2024
+                                                                 Abstract                                                 96                EfficientAD-M
+                                                                                                                                     EfficientAD-S
+                                            Detecting anomalies in images is an important task, es-                       94
+
+
+
+                                                                                                             AU-ROC [%]
+                                        pecially in real-time computer vision applications. In this
+                                        work, we focus on computational efficiency and propose                                                                   AST     PatchCoreEns
+                                                                                                                          92
+                                        a lightweight feature extractor that processes an image in                                                          PatchCore
+                                        less than a millisecond on a modern GPU. We then use a                                                        DSR
+                                                                                                                          90                          FastFlow
+                                        student–teacher approach to detect anomalous features. We
+                                        train a student network to predict the extracted features of                                                               S-T
+                                                                                                                          88                        SimpleNet
+                                        normal, i.e., anomaly-free training images. The detection
+                                        of anomalies at test time is enabled by the student failing to                         100            101                  102                  103
+                                        predict their features. We propose a training loss that hin-                                                Latency [ms]
+                                        ders the student from imitating the teacher feature extractor
+                                        beyond the normal images. It allows us to drastically reduce         Figure 1. Anomaly detection performance vs. latency per image on
+                                        the computational cost of the student–teacher model, while           an NVIDIA RTX A6000 GPU. Each AU-ROC value is an average
+                                                                                                             of the image-level detection AU-ROC values on the MVTec AD
+                                        improving the detection of anomalous features. We further-
+                                                                                                             [7, 9], VisA [74], and MVTec LOCO [8] dataset collections.
+                                        more address the detection of challenging logical anomalies
+                                        that involve invalid combinations of normal local features,
+                                        for example, a wrong ordering of objects. We detect these            putational requirements remain suitable for real-world ap-
+                                        anomalies by efficiently incorporating an autoencoder that           plications. The field of visual anomaly detection has also
+                                        analyzes images globally. We evaluate our method, called             seen rapid progress in the recent past, especially on indus-
+                                        EfficientAD, on 32 datasets from three industrial anomaly            trial anomaly detection benchmarks [7, 9, 51, 54]. State-of-
+                                        detection dataset collections. EfficientAD sets new stan-            the-art anomaly detection methods, however, often sacrifice
+                                        dards for both the detection and the localization of anoma-          computational efficiency for an increased anomaly detec-
+                                        lies. At a latency of two milliseconds and a throughput of           tion performance. Common techniques are ensembling, the
+                                        six hundred images per second, it enables a fast handling            use of large backbones, and increasing the input image res-
+                                        of anomalies. Together with its low error rate, this makes           olution to up to 768×768 pixels.
+                                        it an economical solution for real-world applications and a
+                                                                                                                 Real-world anomaly detection applications frequently
+                                        fruitful basis for future research.
+                                                                                                             put constraints on the computational requirements of a
+                                                                                                             method. There are cases where detecting an anomaly too
+                                                                                                             late can cause substantial economic damage, such as metal
+                                        1. Introduction
+                                                                                                             objects in a crop field entering the interior of a combine
+                                           In the past years, deep learning methods have continued           harvester. In other cases, even human health is at risk,
+                                        to improve the state of the art across a wide range of com-          for example, if a limb of a machine operator approaches
+                                        puter vision applications. This progress has been accom-             a blade. Furthermore, industrial settings commonly involve
+                                        panied by advances in making neural network architectures            strict runtime limits caused by high production rates [4].
+                                        faster and more efficient [47, 63, 65, 68]. Modern classifi-         Not adhering to these limits would decrease the production
+                                        cation architectures, for example, focus on characteristics          rate of the respective application and thus its economic via-
+                                        such as latency, throughput, memory consumption, and the             bility. It is therefore essential to pay attention to the compu-
+                                        number of trainable parameters [34, 35, 58, 63, 64, 68]. This        tational and economic cost of anomaly detection methods
+                                        ensures that as networks become more capable, their com-             to keep them suitable for real-world applications.
+
+
+                                                                                                         1
+   In this work, we propose EfficientAD, a method that sets            2. Related Work
+new standards for both the anomaly detection performance
+and the inference runtime, as shown in Figure 1. We first              2.1. Anomaly Detection Tasks
+introduce an efficient network architecture for computing                  Visual anomaly detection is a rapidly growing area of re-
+expressive features in less than a millisecond on a mod-               search with a diverse range of applications, including med-
+ern GPU. To detect anomalous features, we use a student–               ical imaging [3, 19, 38], autonomous driving [13, 24, 32],
+teacher approach [10, 54, 66]. We train a student network to           and industrial inspection [7, 18, 43]. Applications often
+predict the features computed by a pretrained teacher net-             have specific characteristics, such as the availability of im-
+work on normal, i.e., anomaly-free training images. Be-                age sequences in surveillance datasets [31, 37, 72] or the
+cause the student is not trained on anomalous images, it               different modalities of medical imaging datasets (MRI [5],
+generally fails to mimic the teacher on these. A large dis-            CT [3], X-ray [27], etc.). This work focuses on detecting
+tance between the outputs of the teacher and the student thus          anomalies in RGB or gray-scale images without condition-
+enables the detection of anomalies at test time. To further            ing the prediction on a sequence of images. We use indus-
+increase this effect, Rudolph et al. [54] use architectural            trial anomaly detection datasets to benchmark our proposed
+asymmetry between the teacher and the student. We instead              method against existing ones.
+propose loss-induced asymmetry in the form of a training                   The introduction of the MVTec AD dataset [7,9] has cat-
+loss that hinders the student from imitating the teacher be-           alyzed the development of methods for industrial applica-
+yond the normal images. This loss does not affect the com-             tions. It comprises 15 separate inspection scenarios, each
+putational cost at test time and does not restrict the architec-       consisting of a training set and a test set. Each training
+ture design. It allows us to use our efficient network archi-          set contains only normal images, for example, defect-free
+tecture for both the student and the teacher, while improving          screws, while the test sets also contain anomalous images.
+the detection of anomalous features.                                   This represents a frequent challenge in real-world applica-
+   Identifying anomalous local features enables the detec-             tions where the types and possible locations of defects are
+tion of anomalies that are structurally different from the             unknown during the development of the anomaly detection
+normal images, for example, contaminations or stains on                system. Therefore, it is a challenging yet crucial require-
+manufactured products. A challenging problem, however,                 ment that methods perform well when trained only on nor-
+are violations of logical constraints regarding the position,          mal images.
+size, arrangement, etc. of normal objects. To address this,                Recently, several new industrial anomaly detection
+EfficientAD includes an autoencoder that learns the logical            datasets have been introduced [8, 11, 26, 28, 39, 74]. The
+constraints of training images and detects violations at test          Visual Anomaly (VisA) dataset [74] and the MVTec Logi-
+time. We show how to integrate the autoencoder efficiently             cal Constraints (MVTec LOCO) dataset [8] follow the de-
+with a student–teacher model. Furthermore, we present a                sign of MVTec AD and comprise twelve and five anomaly
+method to improve the anomaly detection performance by                 detection scenarios, respectively. They contain anomalies
+calibrating the detection results of the autoencoder and the           that are empirically more challenging than those of MVTec
+student–teacher model before combining their results.                  AD. Furthermore, MVTec LOCO contains not only struc-
+   Our contributions are summarized as follows:                        tural anomalies, such as stains or scratches, but also logical
+                                                                       anomalies. These are violations of logical constraints, for
+   • We substantially improve the state of the art for both
+                                                                       example, a wrong ordering or a wrong combination of nor-
+     the detection and the localization of anomalies on
+                                                                       mal objects. We refer to MVTec AD, VisA, and MVTec
+     industrial benchmarks, at a latency of 2 ms and a
+                                                                       LOCO as dataset collections, as each scenario is a separate
+     throughput of more than 600 images per second.
+                                                                       dataset consisting of a training and a test set. All three pro-
+   • We propose an efficient network architecture to speed             vide pixel-precise defect segmentation masks for evaluating
+     up feature extraction by an order of magnitude in com-            the anomaly localization performance of a method.
+     parison to the feature extractors used by recent meth-
+     ods [51, 54, 69].                                                 2.2. Anomaly Detection Methods
+
+   • We introduce a training loss that significantly improves              Traditional computer vision algorithms have been ap-
+     the anomaly detection performance of a student–                   plied successfully to industrial anomaly detection tasks for
+     teacher model without affecting its inference runtime.            several decades [62]. These algorithms commonly fulfill
+                                                                       the requirement of processing an image within a few mil-
+   • We achieve an efficient autoencoder-based detection               liseconds. Bergmann et al. [7] evaluate some of these meth-
+     of logical anomalies and propose a method for a cal-              ods and find that they fail when requirements such as well-
+     ibrated combination of the detection results with those           aligned objects are not met. Deep-learning-based methods
+     of a student–teacher model.                                       have been shown to handle such cases more robustly [7, 8].
+
+
+                                                                   2
+    A successful approach in the recent past has been to ap-          Input Patch
+                                                                       33×33×3
+                                                                                                                                         Patch Descriptor
+                                                                                                                                             1×1×384
+ply outlier detection and density estimation methods in the                                × 128
+                                                                                                          × 128          × 256
+feature space of a pretrained and frozen convolutional neu-                                                                             × 256      × 256
+
+ral network (CNN). If feature vectors can be mapped to in-                          4×4            2×2            4×4            2×2            3×3    4×4
+                                                                                    conv           pool           conv           pool           conv   conv
+put pixels, assigning their outlier scores to the respective
+pixels yields a 2D anomaly map of pixel anomaly scores.
+Common methods include multivariate Gaussian distribu-               Figure 2. Patch description network (PDN) architecture of
+tions [16, 30, 49], Gaussian Mixture Models [39, 73], Nor-           EfficientAD-S. Applying it to an image in a fully convolutional
+malizing Flows [22,48,52,53,69], and the k-Nearest Neigh-            manner yields all features in a single forward pass.
+bor (kNN) algorithm [14, 40, 41, 51]. A runtime bottleneck
+for kNN-based methods is the search for nearest neighbors
+during inference. With PatchCore [51], Roth et al. there-            detect anomalous features at test time using a lightweight
+fore perform kNN on a reduced database of clustered fea-             student–teacher model, as described in section 3.2. A key
+ture vectors. They achieve state-of-the-art anomaly detec-           challenge is to achieve a competitive anomaly detection per-
+tion results on MVTec AD. In our experiments, we include             formance while keeping the overall runtime low. To this
+PatchCore and FastFlow [69], a recent Normalizing-Flow-              end, we introduce a novel loss function for the training of
+based method with a comparatively low inference runtime.             a student–teacher model. In section 3.3, we explain how
+    Bergmann et al. [10] propose a student–teacher (S–T)             to efficiently detect logical anomalies with an autoencoder-
+framework for anomaly detection, in which the teacher is             based approach. Finally, we provide a solution for calibrat-
+a pretrained frozen CNN. They train student networks to              ing and combining the detection results of the autoencoder
+mimic the output of the teacher on the training images. Be-          with those of the student–teacher model in section 3.4.
+cause the students have not seen anomalous images during
+training, they generally fail to predict the teacher’s output        3.1. Efficient Patch Descriptors
+on these images, which enables anomaly detection. Vari-
+                                                                         Recent anomaly detection methods commonly use
+ous modifications of S–T have been proposed [54, 57, 66].
+                                                                     the features of a deep pretrained network, such as a
+Rudolph et al. [54] reach a competitive anomaly detection
+                                                                     WideResNet-101 [51, 70]. We use a network with a drasti-
+performance on MVTec AD by restricting the teacher to be
+                                                                     cally reduced depth as a feature extractor. It consists of only
+an invertible neural network. We compare our method to
+                                                                     four convolutional layers and is visualized in Figure 2. Each
+their Asymmetric Student Teacher (AST) approach and to
+                                                                     output neuron has a receptive field of 33×33 pixels and thus
+the original S–T method [10].
+                                                                     each output feature vector describes a 33×33 patch. Due to
+    Generative models such as autoencoders [6, 8, 12, 20, 33,
+                                                                     this clear correspondence, we refer to the network as a patch
+44, 56] and GANs [2, 21, 46, 59, 60] have been used exten-
+                                                                     description network (PDN). The PDN is fully convolutional
+sively for anomaly detection. Recent autoencoder-based
+                                                                     and can be applied to an image of variable size to generate
+methods rely on accurate reconstructions of normal im-
+                                                                     all feature vectors in a single forward pass.
+ages and inaccurate reconstructions of anomalous images
+[8, 12, 20, 44]. This enables detecting anomalies by com-                The S–T method [10] also uses features from networks
+paring the reconstruction to the input image. A common               with only few convolutional layers. The computational cost
+problem are false-positive detections caused by inaccurate           of these networks is nevertheless high because of the lack
+reconstructions of normal images, e.g., blurry reconstruc-           of downsampling in convolutional and pooling layers. The
+tions. To avoid this, GCAD [8] lets an autoencoder recon-            number of parameters of the networks used by S–T is com-
+struct images in the feature space of a pretrained network.          parably low (between 1.6 and 2.7 million per network). Yet,
+Another recent reconstruction-based method is DSR [71],              executing a single network takes longer and requires more
+which uses the latent space of a pretrained autoencoder and          memory in our experiments than a U-Net [50] with 31 mil-
+generates synthetic anomalies in it. Similarly, the recently         lion parameters, an architecture used by the GCAD method
+proposed SimpleNet [36] generates synthetic anomalies in             [8]. This demonstrates how the number of parameters can
+a pretrained feature space to train a discriminator network          be a misleading proxy metric for the latency, throughput,
+for detecting anomalous features. In our experiments, we             and memory footprint of a method. Modern classification
+include GCAD, DSR, and SimpleNet.                                    architectures typically perform downsampling early to re-
+                                                                     duce the size of feature maps and thus the runtime and mem-
+3. Method                                                            ory requirements [23]. We implement this in our PDN via
+                                                                     strided average-pooling layers after the first and the second
+   We describe the components of EfficientAD in the fol-             convolutional layer. With the proposed PDN, we are able
+lowing subsections. It begins with the efficient extraction of       to obtain the features for an image of size 256×256 in less
+features from a pretrained neural network in section 3.1. We         than 800 µs on an NVIDIA RTX A6000 GPU.
+
+
+                                                                 3
+    Input         DenseNet      WideResNet         PDN
+                                                                ≥10-1        Training
+                                                                10-2          Image
+                                                                10-3
+                                                                             Loss
+                                                                10-4         Mask
+                                                                    -5
+                                                                ≤10
+                                                                ≥1
+
+                                                                             Figure 4. Randomly picked loss masks generated by the hard fea-
+                                                                0
+                                                                             ture loss during training. The brightness of a mask pixel indicates
+                                                                             how many of the dimensions of the respective feature vector were
+                                                                ≤-1          selected for backpropagation. The student network already mimics
+                                                                             the teacher well on the background and thus focuses on learning
+Figure 3. Upper row: absolute gradient of a single feature vec-              the features of differently rotated screws.
+tor, located in the center of the output, with respect to each input
+pixel, averaged across input and output channels. Lower row: Av-
+erage feature map of the first output channel across 1000 randomly               We observe that in the standard S–T framework, increas-
+chosen images from ImageNet [55]. The mean of these images is                ing the number of training images can improve the student’s
+shown on the left. The feature maps of the DenseNet [25] and the
+                                                                             ability to imitate the teacher on anomalies. This worsens the
+WideResNet exhibit strong artifacts.
+                                                                             anomaly detection performance. At the same time, deliber-
+                                                                             ately decreasing the number of training images can suppress
+                                                                             important information about normal images. Our goal is
+    To make the PDN generate expressive features, we distill                 to show the student enough data so that it can mimic the
+a deep pretrained classification network into it. For a con-                 teacher sufficiently on normal images while avoiding gen-
+trolled comparison, we use the same pretrained features as                   eralization to anomalous images. Similar to Online Hard
+PatchCore [51] from a WideResNet-101. We train the PDN                       Example Mining [61], we therefore restrict the student’s
+on images from ImageNet [55] by minimizing the mean                          loss to the most relevant parts of an image. These are the
+squared difference between its output and the features ex-                   patches where the student currently mimics the teacher the
+tracted from the pretrained network. We provide the full                     least. We propose a hard feature loss, which only uses the
+list of training hyperparameters in Appendix A.2. Besides                    output elements with the highest loss for backpropagation.
+higher efficiency, the PDN has another benefit in compari-                       Formally, we apply a teacher T and a student S to a
+son to the deep networks used by recent methods. By de-                      training image I, which yields T (I) ∈ RC×W ×H and
+sign, a feature vector generated by the PDN only depends                     S(I) ∈ RC×W ×H . We compute the squared difference for
+on the pixels in its respective 33×33 patch. The feature                     each tuple (c, w, h) as Dc,w,h = (T (I)c,w,h − S(I)c,w,h )2 .
+vectors of pretrained classifiers, on the other hand, exhibit                Based on a mining factor phard ∈ [0, 1], we then com-
+long-range dependencies on other parts of the image. This                    pute the phard -quantile of the elements of D. Given the
+is shown in Figure 3, using PatchCore’s feature extractors                   phard -quantile dhard , we compute the training loss Lhard
+as an example. The well-defined receptive field of the PDN                   as the mean of all Dc,w,h ≥ dhard . Setting phard to zero
+ensures that an anomaly in one part of the image cannot trig-                would yield the original S–T loss. In our experiments, we
+ger anomalous feature vectors in other, distant parts, which                 set phard to 0.999, which corresponds to using, on average,
+would impair the localization of anomalies.                                  ten percent of the values in each of the three dimensions
+                                                                             of D for backpropagation. Figure 4 visualizes the effect
+3.2. Lightweight Student–Teacher
+                                                                             of the hard feature loss for phard = 0.999. During infer-
+   For detecting anomalous feature vectors, we use a                         ence, the 2D anomaly      score map M ∈ RW ×H is given by
+                                                                                                c Dc,w,h , i.e., by D averaged across chan-
+                                                                                          −1
+student–teacher (S–T) approach in which the teacher is
+                                                                                              P
+                                                                             Mw,h = C
+given by our distilled PDN. Since we can execute the PDN                     nels. It assigns an anomaly score to each feature vector. By
+in under a millisecond, we use its architecture for the                      using the hard feature loss, we avoid outliers in the anomaly
+student as well, resulting in a low overall latency. This                    scores on normal images, i.e., false-positive detections.
+lightweight student–teacher pair, however, lacks techniques                      In addition to the hard feature loss, we use a loss penalty
+used by previous methods to increase the anomaly detec-                      during training that further hinders the student from imi-
+tion performance: ensembling multiple teachers and stu-                      tating the teacher on images that are not part of the nor-
+dents [10], using features from a pyramid of layers [66], and                mal training images. In the standard S–T framework, the
+using architectural asymmetry between the student and the                    teacher is pretrained on an image classification dataset, or
+teacher network [54]. We therefore introduce a training loss                 it is a distilled version of such a pretrained network. The
+that substantially improves the detection of anomalies with-                 student is not trained on that pretraining dataset but only on
+out affecting the computational requirements at test time.                   the application’s normal images. We propose to also use
+
+
+                                                                         4
+                                                       Local Map                                                            Local Map
+                                                                                                                                           ≥1
+                            Teacher                                                              Teacher
+                                                Diff                                                                Diff
+
+
+
+                                                                                                                                                 Anomaly Score
+                            Student                    Global Map                                Student                   Global Map      0.5
+
+
+                                                Diff                                                                Diff
+                             Auto                                                                Auto
+                            encoder                                                             encoder                                    ≤0
+
+
+Figure 5. EfficientAD applied to two test images from MVTec LOCO. Normal input images contain a horizontal cable connecting the two
+splicing connectors at an arbitrary height. The anomaly on the left is a foreign object in the form of a small metal washer at the end of the
+cable. It is visible in the local anomaly map because the outputs of the student and the teacher differ. The logical anomaly on the right is the
+presence of a second cable. The autoencoder fails to reconstruct the two cables on the right in the feature space of the teacher. The student
+also predicts the output of the autoencoder in addition to that of the teacher. Because its receptive field is restricted to small patches of the
+image, it is not influenced by the presence of the additional red cable. This causes the outputs of the autoencoder and the student to differ.
+“Diff” refers to computing the element-wise squared difference between two collections of output feature maps and computing its average
+across feature maps. To obtain pixel anomaly scores, the anomaly maps are resized to match the input image using bilinear interpolation.
+
+
+the images from the teacher’s pretraining during the train-                case for the background grids in Figure 5. Using the differ-
+ing of the student. Specifically, we sample a random image                 ence between the teacher’s output and the autoencoder’s re-
+P from the pretraining dataset, in our case ImageNet, in                   construction as an anomaly map would cause false-positive
+each training step. We compute P the loss of the student as                detections in these cases. Instead, we double the number of
+LST = Lhard + (CW H)−1 c ∥S(P )c ∥2F . This penalty                        output channels of our student network and train it to pre-
+hinders the student from generalizing its imitation of the                 dict the output of the autoencoder in addition to the output
+teacher to out-of-distribution images.                                     of the teacher. Let S ′ (I) ∈ RC×W ×H denote the additional
+                                                                           output channels of the student.P The student’s additional loss
+3.3. Logical Anomaly Detection
+                                                                           is then LSTAE = (CW H)−1 c ∥A(I)c − S ′ (I)c ∥2F . The
+    There are many types of logical anomalies, such as miss-               total training loss is the sum of LAE , LST , and LSTAE .
+ing, misplaced, or surplus objects or the violation of ge-                     The student learns the systematic reconstruction errors
+ometrical constraints, for example, the length of a screw.                 of the autoencoder on normal images, e.g., blurry recon-
+As recommended by the authors of the MVTec LOCO                            structions. At the same time, it does not learn the recon-
+dataset [8], we use an autoencoder for learning logical con-               struction errors for anomalies because these are not part of
+straints of the training images and detecting violations of                the training set. This makes the difference between the au-
+these constraints. Figure 5 depicts the anomaly detection                  toencoder’s output and the student’s output well-suited for
+methodology for EfficientAD. It consists of the aforemen-                  computing the anomaly map. Analogous to the student–
+tioned student–teacher pair and an autoencoder. The au-                    teacher pair, the anomaly map is the squared difference be-
+toencoder is trained to predict the output of the teacher.                 tween the two outputs, averaged across channels. We re-
+Formally, we apply an autoencoder A to a training image                    fer to this anomaly map as the global anomaly map and
+I, yielding A(I) ∈PRC×W ×H , and compute the loss as                       to the anomaly map generated by the student–teacher pair
+LAE = (CW H)−1 c ∥T (I)c − A(I)c ∥2F . We use a stan-                      as the local anomaly map. We average these two anomaly
+dard convolutional autoencoder comprising strided convo-                   maps to compute the combined anomaly map and use its
+lutions in the encoder and bilinear upsampling in the de-                  maximum value as the image-level anomaly score. The
+coder. We provide the detailed hyperparameters of its layers               combined anomaly map thus contains the detection results
+in in Appendix A.                                                          of the student–teacher pair and the detection results of the
+    In contrast to the patch-based student, the autoencoder                autoencoder–student pair. Sharing the student’s hidden lay-
+must encode and decode the complete image through a bot-                   ers in the computation of these detection results allows our
+tleneck of 64 latent dimensions. On images with logical                    method to maintain low computational requirements, while
+anomalies, the autoencoder usually fails to generate the cor-              enabling the detection of structural and logical anomalies.
+rect latent code for reconstructing the image in the teacher’s
+                                                                           3.4. Anomaly Map Normalization
+feature space. However, its reconstructions are also flawed
+on normal images, as autoencoders generally struggle with                     The local and the global anomaly map must be normal-
+reconstructing fine-grained patterns [12, 17]. This is the                 ized to similar scales before averaging them to obtain the
+
+
+                                                                       5
+combined anomaly map. This is important for cases where              gle model variant, for which the authors report the lowest
+the anomaly is only detected in one of the maps, such as             latency, and the ensemble variant, denoted by PatchCoreEns .
+in Figure 5. Otherwise, noise in one map could make ac-              We are able to reproduce the official results but disable the
+curate detections in the other map indiscernible in the com-         cropping of the center 76.6 % of input images for a fair com-
+bined map. To estimate the scale of the noise in normal              parison. In the case of MVTec AD, 99.9 % of the defects lie
+images, we use validation images, i.e., unseen images from           fully or partially within this cropped area. In real-world ap-
+the training set. For each of the two anomaly map types, we          plications, anomalies can occur outside of this area as well.
+compute the set of all pixel anomaly scores across the val-          We disable custom cropping, as it implies knowledge about
+idation images. We then compute two p-quantiles for each             the anomalies in the test set. For FastFlow, we use the ver-
+set: qa and qb , for p = a and p = b, respectively. We de-           sion based on the WideResNet-50-2 feature extractor, as it is
+termine a linear transformation that maps qa to an anomaly           similar to the WideResNet used by PatchCore, SimpleNet,
+score of 0 and qb to a score of 0.1. At test time, the local         and our method. We use the implementation provided by
+and global anomaly maps are normalized with the respec-              the Intel anomalib [1] but disable early stopping, i.e., the
+tive linear transformation.                                          scenario-specific tuning of the training duration on test im-
+   By using quantiles, the normalization becomes robust to           ages, analogously to SimpleNet. With early stopping en-
+the distribution of anomaly scores on normal images, which           abled, EfficientAD itself achieves an image-level detection
+can vary between scenarios. Whether the scores between qa            AU-ROC of 99.8 % on MVTec AD.
+and qb are normally distributed or a mixture of Gaussians                For our method, we evaluate two variants: EfficientAD-S
+or follow another distribution has no influence on the nor-          and EfficientAD-M. EfficientAD-S uses the architecture
+malization. Our experiments include an ablation study on             displayed in Figure 2 for the teacher and the student. For
+the values of a and b. The choice of the mapping destina-            EfficientAD-M, we double the number of kernels in the
+tion values 0 and 0.1 has no effect on anomaly detection             hidden convolutional layers of the teacher and the student.
+metrics such as the area under the ROC curve (AU-ROC).               Furthermore, we insert a 1×1 convolution after the second
+That is because the AU-ROC only depends on the ranking               pooling layer and after the last convolutional layer. We pro-
+of scores, not on their scale. We choose 0 and 0.1 because           vide a list of implementation details, such as the learning
+they yield maps that are suitable for a standard zero-to-one         rate schedule, in Appendix A.1.
+color scale.                                                             We evaluate each method on the 32 anomaly detec-
+                                                                     tion scenarios of MVTec AD, VisA, and MVTec LOCO.
+4. Experiments                                                       The anomaly detection performance of a method is mea-
+    We compare EfficientAD to AST [54], DSR [71], Fast-              sured with the AU-ROC based on its predicted image-level
+Flow [69], GCAD [8], PatchCore [51], SimpleNet [36], and             anomaly scores. We measure the anomaly localization per-
+S–T [10], using official implementations where available.            formance using the AU-PRO segmentation metric up to a
+We provide configuration details for all evaluated meth-             false positive rate of 30 %, as recommended by [7]. For
+ods in Appendix B. GCAD consists of an ensemble of two               MVTec LOCO, we use the AU-sPRO metric [8], a general-
+anomaly detection models that use different feature extrac-          ization of the AU-PRO metric for evaluating the localization
+tors. We find that one of the two ensemble members per-              of logical anomalies. Appendix D provides the results for
+forms better on average than the combined ensemble and               additional anomaly detection metrics, such as the area un-
+therefore report the results for this member. This reduces           der the precision-recall curve and the pixel-wise AU-ROC
+the latency reported for GCAD by a factor of two. For                computed on pixel anomaly scores.
+SimpleNet, we are able to reproduce the official results but             When reporting the AU-ROC or AU-PRO for a dataset
+find that SimpleNet tunes the training duration on the test          collection, we follow the policy of the dataset authors. For
+images of a scenario. During training, the model is re-              each collection, we evaluate the respective metric for each
+peatedly evaluated on all test images and the maximum of             scenario and then compute the mean across scenarios. For
+all obtained test scores is reported after training. We dis-         MVTec LOCO, we use the official evaluation script, which
+able this technique, since it overestimates the actual perfor-       gives logical and structural anomalies an equal weight in the
+mance of the model on unseen images. In practice, it would           computed metrics. When reporting the average AU-ROC or
+furthermore require a validation set with anomalous im-              AU-PRO on the three dataset collections, we compute the
+ages. MVTec AD, VisA, and MVTec LOCO do not include                  average of the three dataset means. Thus, an overall aver-
+anomalous images in their training and validation sets to            age score weights logical anomalies and structural anoma-
+avoid defect-type-specific tuning of hyperparameters. For            lies by roughly one-sixth and five-sixths, respectively. We
+SimpleNet, we therefore evaluate the final trained model,            provide the evaluation results for each of the 32 anomaly
+following common practice.                                           detection scenarios individually in the appendix to enable
+    For PatchCore, we include two variants: the default sin-         an evaluation with a custom weighting.
+
+
+                                                                 6
+                        Detect. Segment. Latency Throughput                                                 EfficientAD-S        FastFlow         AST
+     Method                                                                                                 EfficientAD-M        DSR              S-T
+                       AU-ROC AU-PRO      [ms]    [img / s]
+                                                                                                            GCAD                 PatchCore        PatchCoreEns
+     GCAD                85.4           88.0           11             121                                   SimpleNet
+   SimpleNet             87.9           74.4          12              194
+      S–T                88.4           89.7           75              16
+    FastFlow             90.0           86.5           17             120                          102
+      DSR                90.8           78.6           17             104
+
+                                                                                    Latency [ms]
+   PatchCore             91.1           80.9           32              76
+  PatchCoreEns           92.1           80.7          148              13
+                                                                                                   101
+      AST                92.4           77.2           53             41
+
+  EfficientAD-S          95.4           92.5          2.2             614
+                       (± 0.06)        (± 0.05)     (± 0.01)          (± 2)
+ EfficientAD-M           96.0           93.3          4.5             269                          100
+                       (± 0.09)        (± 0.04)     (± 0.01)          (± 1)                              RTX A6000 RTX A5000 Tesla V100 RTX 3080 RTX 2080 Ti
+
+Table 1. Anomaly detection and anomaly localization performance
+in comparison to the latency and throughput. Each AU-ROC and                         Figure 6. Latency per GPU. The ranking of methods is the same
+AU-PRO percentage is an average of the mean AU-ROCs and                              on each GPU, except for two cases in which DSR is slightly faster
+mean AU-PROs, respectively, on MVTec AD, VisA, and MVTec                             than FastFlow.
+LOCO. For EfficientAD, we report the mean and standard devia-
+tion of five runs.
+
+                                                            LOCO LOCO                    Table 1 reports the overall anomaly detection perfor-
+     Method           MAD LOCO VisA Mean
+                                                            Logic. Struct.
+                                                                                     mance for each method. EfficientAD achieves a strong
+     GCAD              89.1     83.3      83.7    85.4         83.9      82.7        image-level detection and pixel-level localization of anoma-
+   SimpleNet           98.2     77.6      87.9    87.9         71.5      83.7        lies. Reliably localizing anomalies in an image provides
+      S–T              93.2     77.4      94.6    88.4         66.5      88.3        explainable detection results and allows the discovery of
+    FastFlow           96.9     79.2      93.9    90.0         75.5      82.9
+                                                                                     spurious correlations in detections. It also enables a flexi-
+      DSR              98.1     82.6      91.8    90.8         75.0      90.2
+   PatchCore           98.7     80.3      94.3    91.1         75.8      84.8
+                                                                                     ble postprocessing, such as excluding defect segmentations
+  PatchCoreEns         99.3     79.4      97.7    92.1         71.0      87.7        based on their size.
+      AST              98.9     83.4      94.9    92.4         79.7      87.1            Table 2 breaks down the overall anomaly detection per-
+ EfficientAD-S 98.8             90.0      97.5    95.4         85.8      94.1        formance into the three dataset collections. It shows that
+ EfficientAD-M 99.1             90.7      98.1    96.0         86.8      94.7        the lead of EfficientAD on MVTec LOCO is in equal parts
+                                                                                     due to its performance on logical and on structural anoma-
+Table 2. Mean anomaly detection AU-ROC percentages per                               lies. In Table 3, we assess the robustness of EfficientAD to
+dataset collection (left) and on the logical and structural anomalies                varying hyperparameters.
+of MVTec LOCO (right). For EfficientAD, we report the mean of
+five runs. Performing method development solely on MVTec AD
+                                                                                         Furthermore, we measure the computational cost of each
+(MAD) becomes prone to overfitting design choices to the few re-                     method during inference. As explained above, the number
+maining misclassified test images.                                                   of parameters can be a misleading proxy metric for the la-
+                                                                                     tency and throughput of convolutional architectures since
+ a (for qa )    0.5       0.8     0.9        0.95        0.98          0.99          it does not consider the resolution of a convolution’s input
+                                                                                     feature map, i.e., how often a parameter is used in a for-
+ AU-ROC         95.9     95.9     96.0       95.9        95.9          95.8
+                                                                                     ward pass. Similarly, the number of floating point opera-
+  b (for qb )   0.95     0.98     0.99      0.995        0.998         0.999         tions (FLOPs) can be misleading since it does not take into
+ AU-ROC         95.8     95.9     96.0       96.0        95.9          95.9          account how easily computations can be parallelized. For
+                                                                                     transparency, we report the number of parameters, the num-
+    phard        0        0.9     0.99      0.999      0.9999         0.99999
+                                                                                     ber of FLOPs, and the memory footprint of each method in
+ AU-ROC         94.9     94.9     95.7       96.0        95.8          95.7          Appendix E. Here, we focus on the metrics that are most
+                                                                                     relevant in anomaly detection applications: the latency and
+Table 3. Mean anomaly detection AU-ROC of EfficientAD-M on
+MVTec AD, VisA, and MVTec LOCO when varying the loca-
+                                                                                     the throughput. We measure the latency with a batch size of
+tions of quantiles. These are the two sampling points a and b of                     1 and the throughput with a batch size of 16. Table 1 reports
+the quantile-based map normalization and the mining factor phard .                   the measurements for each method on an NVIDIA RTX
+Setting phard to zero disables the proposed hard feature loss. De-                   A6000 GPU. Figure 6 shows the latency of each method on
+fault values used in our experiments are highlighted in bold.                        each of the GPUs in our experimental setup. Appendix E
+                                                                                     contains a detailed description of our timing methodology.
+
+
+                                                                                7
+                                                                                                           Detection            Latency
+                                                                                                                        Diff.
+                                                                                                           AU-ROC                [ms]
+                                                                          PDN                                 93.2                2.2
+                                                                          ,→ with map normalization           94.0      + 0.8     2.2
+                                                                           ,→ with hard feature loss          95.0      + 1.0     2.2
+                                                                            ,→ with pretraining penalty       95.4      + 0.4     2.2
+                                                                          EfficientAD-S                       95.4                2.2
+                                                                          EfficientAD-M                       96.0      + 0.6     4.5
+
+                                                                        Table 4. Cumulative ablation study in which techniques are grad-
+                                                                        ually combined to form EfficientAD. Each AU-ROC percentage
+                                                                        is an average of the mean AU-ROCs on MVTec AD, VisA, and
+                                                                        MVTec LOCO.
+
+                                                                                                           Detection            Latency
+                                                                                                                        Diff.
+                                                                                                           AU-ROC                [ms]
+                                                                          EfficientAD-S                       95.4                2.2
+                                                                          Without map normalization           94.7      - 0.7     2.2
+                                                                          Without hard feature loss           94.7      - 0.7     2.2
+                                                                          Without pretraining penalty         95.0      - 0.4     2.2
+
+Figure 7. Non-cherry-picked qualitative results of EfficientAD on       Table 5. Isolated ablation study in which techniques are separately
+VisA. For each of its 12 scenarios, we show a randomly sam-             removed from EfficientAD-S.
+pled defect image, the ground truth segmentation mask, and the
+anomaly map generated by EfficientAD-M.
+                                                                        5. Conclusion
+                                                                           In this paper, we introduce EfficientAD, a method with
+   In Figure 7, we show randomly sampled qualitative re-                a strong anomaly detection performance and a high com-
+sults of EfficientAD on the VisA dataset collection. Ap-                putational efficiency. It sets new standards for the de-
+pendix F provides qualitative results for the other evaluated           tection of structural as well as logical anomalies. Both
+methods and dataset collections as well.                                EfficientAD-S and EfficientAD-M outperform other meth-
+   We examine the effects of the components of                          ods on the detection and the localization of anomalies by a
+EfficientAD in the ablation study shown in Table 4 and Ta-              large margin. Compared to AST, the second-best method,
+ble 5. For experiments without the proposed quantile-based              EfficientAD-S reduces the latency by a factor of 24 and in-
+map normalization, we use a Gaussian-based map normal-                  creases the throughput by a factor of 15. Its low latency,
+ization as a baseline instead. There, we compute the linear             high throughput, and high detection rate make it suitable
+transformation parameters such that pixel anomaly scores                for real-world applications. For future anomaly detection
+on the validation set have a mean of zero and a variance of             research, EfficientAD is an important baseline and a fruitful
+one. This baseline normalization is sensitive to the distribu-          foundation. Its efficient patch description network, for in-
+tion of validation anomaly scores, which can vary between               stance, can be used as a feature extractor in other anomaly
+scenarios. The quantile-based normalization is independent              detection methods as well to reduce their latency.
+of how the scores between qa and qb are distributed and per-
+forms substantially better than the baseline.                           Limitations. The student–teacher model and the au-
+   We also evaluate the effect of the two proposed loss                 toencoder are designed to detect anomalies of different
+terms for training the student–teacher pair. The hard feature           types. The autoencoder detects logical anomalies, while
+loss increases the anomaly detection AU-ROC by 1.0 % in                 the student–teacher model detects coarse and fine-grained
+Table 4. This improvement alone is greater than or equal                structural anomalies. Fine-grained logical anomalies, how-
+to each of the improvement margins between the consecu-                 ever, remain a challenge – for example a screw that is two
+tive rows of FastFlow, DSR, PatchCore, PatchCoreEns , and               millimeters too long. To detect these, practitioners would
+AST in Table 1. The student’s penalty on pretraining im-                have to use traditional metrology methods [62]. As for the
+ages further improves the anomaly detection performance.                limitations in comparison to other recent anomaly detec-
+Notably, the proposed map normalization, the hard feature               tion methods: In contrast to kNN-based methods, our ap-
+loss, and the pretraining penalty keep the computational re-            proach requires training, especially for the autoencoder to
+quirements of EfficientAD low, while creating a substantial             learn the logical constraints of normal images. This takes
+margin w.r.t. the anomaly detection performance.                        twenty minutes in our experimental setup.
+
+
+                                                                    8
+References
+ [1] Samet Akcay, Dick Ameln, Ashwin Vaidya, Barath Lakshmanan, Nilesh Ahuja, and Utku Genc. Anomalib: A deep learning library
+     for anomaly detection. In 2022 IEEE International Conference on Image Processing (ICIP), pages 1706–1710. IEEE, 2022. 6, 17
+ [2] Samet Akcay, Amir Atapour-Abarghouei, and Toby P Breckon. Ganomaly: Semi-supervised anomaly detection via adversarial
+     training. In Computer Vision–ACCV 2018: 14th Asian Conference on Computer Vision, Perth, Australia, December 2–6, 2018,
+     Revised Selected Papers, Part III 14, pages 622–637. Springer, 2019. 3
+ [3] Samuel G Armato III, Geoffrey McLennan, Luc Bidaut, Michael F McNitt-Gray, Charles R Meyer, Anthony P Reeves, Binsheng
+     Zhao, Denise R Aberle, Claudia I Henschke, Eric A Hoffman, et al. The lung image database consortium (lidc) and image database
+     resource initiative (idri): a completed reference database of lung nodules on ct scans. Medical physics, 38(2):915–931, 2011. 2
+ [4] Donald Bailey. Implementing Machine Vision Systems Using FPGAs, pages 1103–1136 in “Machine Vision Handbook” by Bruce G.
+     Batchelor. Springer London, London, 2012. 1
+ [5] Spyridon Bakas, Hamed Akbari, Aristeidis Sotiras, Michel Bilello, Martin Rozycki, Justin S. Kirby, et al. Advancing the cancer
+     genome atlas glioma MRI collections with expert segmentation labels and radiomic features. Scientific Data, 4(1), 2017. 2
+ [6] Christoph Baur, Benedikt Wiestler, Shadi Albarqouni, and Nassir Navab. Deep autoencoding models for unsupervised anomaly
+     segmentation in brain mr images. In Brainlesion: Glioma, Multiple Sclerosis, Stroke and Traumatic Brain Injuries, pages 161–169.
+     Springer International Publishing, 2019. 3
+ [7] Paul Bergmann, Kilian Batzner, Michael Fauser, David Sattlegger, and Carsten Steger. The MVTec Anomaly Detection Dataset: A
+     Comprehensive Real-World Dataset for Unsupervised Anomaly Detection. International Journal of Computer Vision, 129(4):1038–
+     1059, 2021. 1, 2, 6, 14, 17, 19
+ [8] Paul Bergmann, Kilian Batzner, Michael Fauser, David Sattlegger, and Carsten Steger. Beyond Dents and Scratches: Logical Con-
+     straints in Unsupervised Anomaly Detection and Localization. International Journal of Computer Vision, 130(4):947—-969, 2022.
+     1, 2, 3, 5, 6, 14, 17
+ [9] Paul Bergmann, Michael Fauser, David Sattlegger, and Carsten Steger. MVTec AD — A Comprehensive Real-World Dataset for
+     Unsupervised Anomaly Detection. In IEEE Conference on Computer Vision and Pattern Recognition (CVPR), pages 9584–9592,
+     2019. 1, 2, 14
+[10] Paul Bergmann, Michael Fauser, David Sattlegger, and Carsten Steger. Uninformed Students: Student-Teacher Anomaly Detection
+     With Discriminative Latent Embeddings. In IEEE Conference on Computer Vision and Pattern Recognition (CVPR), pages 4182–
+     4191, 2020. 2, 3, 4, 6, 17
+[11] Paul Bergmann, Xin Jin, David Sattlegger, and Carsten Steger. The MVTec 3D-AD Dataset for Unsupervised 3D Anomaly Detection
+     and Localization. In Proceedings of the 17th International Joint Conference on Computer Vision, Imaging and Computer Graphics
+     Theory and Applications - Volume 5: VISAPP, pages 202–213. INSTICC, SciTePress, 2022. 2
+[12] Paul Bergmann, Sindy Löwe, Michael Fauser, David Sattlegger, and Carsten Steger. Improving Unsupervised Defect Segmentation
+     by Applying Structural Similarity to Autoencoders. In Proceedings of the 14th International Joint Conference on Computer Vision,
+     Imaging and Computer Graphics Theory and Applications - Volume 5: VISAPP, pages 372–380. INSTICC, SciTePress, 2019. 3, 5
+[13] Hermann Blum, Paul-Edouard Sarlin, Juan Nieto, Roland Siegwart, and Cesar Cadena. Fishyscapes: A Benchmark for Safe Semantic
+     Segmentation in Autonomous Driving. In IEEE International Conference on Computer Vision Workshops (ICCVW), pages 2403–
+     2412, 2019. 2
+[14] Niv Cohen and Yedid Hoshen.              Sub-image anomaly detection with deep pyramid correspondences.              arXiv preprint
+     arXiv:2005.02357v1, 2020. 3
+[15] Jesse Davis and Mark Goadrich. The relationship between precision-recall and roc curves. In Proceedings of the 23rd international
+     conference on Machine learning, pages 233–240, 2006. 19
+[16] Thomas Defard, Aleksandr Setkov, Angelique Loesch, and Romaric Audigier. PaDiM: A Patch Distribution Modeling Framework
+     for Anomaly Detection and Localization. In Pattern Recognition. ICPR International Workshops and Challenges, pages 475–489.
+     Springer International Publishing, 2021. 3
+[17] Alexey Dosovitskiy and Thomas Brox. Generating Images with Perceptual Similarity Metrics based on Deep Networks. In Advances
+     in Neural Information Processing Systems, pages 658–666, 2016. 5
+[18] Thibaud Ehret, Axel Davy, Jean-Michel Morel, and Mauricio Delbracio. Image Anomalies: A Review and Synthesis of Detection
+     Methods. Journal of Mathematical Imaging and Vision, 61(5):710–743, 2019. 2
+[19] Tharindu Fernando, Harshala Gammulle, Simon Denman, Sridha Sridharan, and Clinton Fookes. Deep learning for medical anomaly
+     detection – a survey. ACM Computing Surveys, 54(7), 2021. 2
+[20] Dong Gong, Lingqiao Liu, Vuong Le, Budhaditya Saha, Moussa Reda Mansour, Svetha Venkatesh, and Anton Van Den Hengel.
+     Memorizing normality to detect anomaly: Memory-augmented deep autoencoder for unsupervised anomaly detection. In IEEE
+     International Conference on Computer Vision (ICCV), pages 1705–1714, 2019. 3
+[21] Ian Goodfellow, Jean Pouget-Abadie, Mehdi Mirza, Bing Xu, David Warde-Farley, Sherjil Ozair, Aaron Courville, and Yoshua
+     Bengio. Generative Adversarial Nets. In Advances in Neural Information Processing Systems, pages 2672–2680, 2014. 3
+
+
+                                                                   9
+[22] Denis Gudovskiy, Shun Ishizaka, and Kazuki Kozuka. CFLOW-AD: Real-Time Unsupervised Anomaly Detection With Localization
+     via Conditional Normalizing Flows. In Proceedings of the IEEE/CVF Winter Conference on Applications of Computer Vision (WACV),
+     pages 98–107, 2022. 3
+[23] Kaiming He, Xiangyu Zhang, Shaoqing Ren, and Jian Sun. Deep Residual Learning for Image Recognition. In IEEE Conference on
+     Computer Vision and Pattern Recognition (CVPR), pages 770–778, 2016. 3
+[24] Dan Hendrycks, Steven Basart, Mantas Mazeika, Andy Zou, Joseph Kwon, Mohammadreza Mostajabi, Jacob Steinhardt, and Dawn
+     Song. Scaling out-of-distribution detection for real-world settings. In Kamalika Chaudhuri, Stefanie Jegelka, Le Song, Csaba
+     Szepesvari, Gang Niu, and Sivan Sabato, editors, Proceedings of the 39th International Conference on Machine Learning, volume
+     162 of Proceedings of Machine Learning Research, pages 8759–8773. PMLR, 17–23 Jul 2022. 2
+[25] Gao Huang, Zhuang Liu, Laurens Van Der Maaten, and Kilian Q Weinberger. Densely connected convolutional networks. In
+     Proceedings of the IEEE conference on computer vision and pattern recognition, pages 4700–4708, 2017. 4, 17
+[26] Yibin Huang, Congying Qiu, Yue Guo, Xiaonan Wang, and Kui Yuan. Surface defect saliency of magnetic tile. In 2018 IEEE 14th
+     International Conference on Automation Science and Engineering (CASE), pages 612–617, 2018. 2
+[27] Jeremy Irvin, Pranav Rajpurkar, Michael Ko, Yifan Yu, Silviana Ciurea-Ilcus, Chris Chute, Henrik Marklund, Behzad Haghgoo,
+     Robyn Ball, Katie Shpanskaya, et al. Chexpert: A large chest radiograph dataset with uncertainty labels and expert comparison. In
+     Proceedings of the AAAI conference on artificial intelligence, volume 33, pages 590–597, 2019. 2
+[28] Stepan Jezek, Martin Jonak, Radim Burget, Pavel Dvorak, and Milos Skotak. Deep learning-based defect detection of metal parts:
+     evaluating current methods in complex conditions. In 2021 13th International Congress on Ultra Modern Telecommunications and
+     Control Systems and Workshops (ICUMT), pages 66–71. IEEE, 2021. 2
+[29] Diederik P Kingma and Jimmy Ba. Adam: A Method for Stochastic Optimization. International Conference on Learning Represen-
+     tations (ICLR), 2015. 13, 16
+[30] Chun-Liang Li, Kihyuk Sohn, Jinsung Yoon, and Tomas Pfister. Cutpaste: Self-supervised learning for anomaly detection and
+     localization. In Proceedings of the IEEE/CVF Conference on Computer Vision and Pattern Recognition, pages 9664–9674, 2021. 3
+[31] Wei-Xin Li, Vijay Mahadevan, and Nuno Vasconcelos. Anomaly Detection and Localization in Crowded Scenes. IEEE Transactions
+     on Pattern Analysis and Machine Intelligence (TPAMI), 36(1):18–32, 2013. 2
+[32] Krzysztof Lis, Krishna Kanth Nakka, Pascal Fua, and Mathieu Salzmann. Detecting the unexpected via image resynthesis. In IEEE
+     International Conference on Computer Vision (ICCV), pages 2152–2161, 2019. 2
+[33] Wenqian Liu, Runze Li, Meng Zheng, Srikrishna Karanam, Ziyan Wu, Bir Bhanu, Richard J. Radke, and Octavia Camps. Towards
+     visually explaining variational autoencoders. In IEEE Conference on Computer Vision and Pattern Recognition (CVPR), pages
+     8639–8648, 2020. 3
+[34] Ze Liu, Yutong Lin, Yue Cao, Han Hu, Yixuan Wei, Zheng Zhang, Stephen Lin, and Baining Guo. Swin transformer: Hierarchical
+     vision transformer using shifted windows. In Proceedings of the IEEE/CVF international conference on computer vision, pages
+     10012–10022, 2021. 1
+[35] Zhuang Liu, Hanzi Mao, Chao-Yuan Wu, Christoph Feichtenhofer, Trevor Darrell, and Saining Xie. A convnet for the 2020s. In
+     Proceedings of the IEEE/CVF Conference on Computer Vision and Pattern Recognition, pages 11976–11986, 2022. 1
+[36] Zhikang Liu, Yiming Zhou, Yuansheng Xu, and Zilei Wang. Simplenet: A simple network for image anomaly detection and localiza-
+     tion. In Proceedings of the IEEE/CVF Conference on Computer Vision and Pattern Recognition (CVPR), pages 20402–20411, June
+     2023. 3, 6, 17
+[37] Cewu Lu, Jianping Shi, and Jiaya Jia. Abnormal Event Detection at 150 FPS in MATLAB. In IEEE International Conference on
+     Computer Vision (ICCV), pages 2720–2727, 2013. 2
+[38] Bjoern H. Menze, Andras Jakab, Stefan Bauer, Jayashree Kalpathy-Cramer, Keyvan Farahani, Justin Kirby, et al. The Multimodal
+     Brain Tumor Image Segmentation Benchmark (BRATS). IEEE Transactions on Medical Imaging, 34(10):1993–2024, 2015. 2
+[39] Pankaj Mishra, Riccardo Verk, Daniele Fornasier, Claudio Piciarelli, and Gian Luca Foresti. Vt-adl: A vision transformer network
+     for image anomaly detection and localization. In 2021 IEEE 30th International Symposium on Industrial Electronics (ISIE), pages
+     01–06. IEEE, 2021. 2, 3
+[40] Paolo Napoletano, Flavio Piccoli, and Raimondo Schettini. Anomaly Detection in Nanofibrous Materials by CNN-Based Self-
+     Similarity. Sensors, 18(1):209, 2018. 3
+[41] Tiago S Nazare, Rodrigo F de Mello, and Moacir A Ponti. Are pre-trained cnns good feature extractors for anomaly detection in
+     surveillance videos? arXiv preprint arXiv:1811.08495v1, 2018. 3
+[42] Augustus Odena, Vincent Dumoulin, and Chris Olah. Deconvolution and checkerboard artifacts. Distill, 2016.
+[43] Guansong Pang, Chunhua Shen, Longbing Cao, and Anton Van Den Hengel. Deep learning for anomaly detection: A review. ACM
+     Comput. Surv., 54(2), mar 2021. 2
+[44] Hyunjong Park, Jongyoun Noh, and Bumsub Ham. Learning memory-guided normality for anomaly detection. In IEEE Conference
+     on Computer Vision and Pattern Recognition (CVPR), pages 14360–14369, 2020. 3
+[45] Adam Paszke, Sam Gross, Francisco Massa, Adam Lerer, James Bradbury, Gregory Chanan, Trevor Killeen, Zeming Lin, Natalia
+     Gimelshein, Luca Antiga, Alban Desmaison, Andreas Kopf, Edward Yang, Zachary DeVito, Martin Raison, Alykhan Tejani, Sasank
+
+
+                                                                 10
+     Chilamkurthy, Benoit Steiner, Lu Fang, Junjie Bai, and Soumith Chintala. PyTorch: An Imperative Style, High-Performance Deep
+     Learning Library. In Advances in Neural Information Processing Systems, volume 32, 2019. 13, 14, 15, 16, 22
+[46] Pramuditha Perera, Ramesh Nallapati, and Bing Xiang. Ocgan: One-class novelty detection using gans with constrained latent
+     representations. In IEEE Conference on Computer Vision and Pattern Recognition (CVPR), pages 2893–2901, 2019. 3
+[47] Joseph Redmon, Santosh Divvala, Ross Girshick, and Ali Farhadi. You only look once: Unified, real-time object detection. In
+     Proceedings of the IEEE conference on computer vision and pattern recognition, pages 779–788, 2016. 1
+[48] Danilo Rezende and Shakir Mohamed. Variational inference with normalizing flows. In International conference on machine learn-
+     ing, pages 1530–1538. PMLR, 2015. 3
+[49] Oliver Rippel., Arnav Chavan., Chucai Lei., and Dorit Merhof. Transfer learning gaussian anomaly detection by fine-tuning repre-
+     sentations. In Proceedings of the 2nd International Conference on Image Processing and Vision Engineering - IMPROVE,, pages
+     45–56. INSTICC, SciTePress, 2022. 3
+[50] Olaf Ronneberger, Philipp Fischer, and Thomas Brox. U-net: Convolutional networks for biomedical image segmentation. In Medical
+     Image Computing and Computer-Assisted Intervention – MICCAI 2015, pages 234–241. Springer International Publishing, 2015. 3
+[51] Karsten Roth, Latha Pemula, Joaquin Zepeda, Bernhard Schölkopf, Thomas Brox, and Peter Gehler. Towards total recall in industrial
+     anomaly detection. In Proceedings of the IEEE/CVF Conference on Computer Vision and Pattern Recognition, pages 14318–14328,
+     2022. 1, 2, 3, 4, 6, 15, 16, 17
+[52] Marco Rudolph, Bastian Wandt, and Bodo Rosenhahn. Same same but differnet: Semi-supervised defect detection with normalizing
+     flows. In 2021 IEEE Winter Conference on Applications of Computer Vision (WACV), pages 1906–1915, 2021. 3
+[53] Marco Rudolph, Tom Wehrbein, Bodo Rosenhahn, and Bastian Wandt. Fully convolutional cross-scale-flows for image-based defect
+     detection. In 2022 IEEE/CVF Winter Conference on Applications of Computer Vision (WACV), pages 1829–1838, 2022. 3
+[54] Marco Rudolph, Tom Wehrbein, Bodo Rosenhahn, and Bastian Wandt. Asymmetric student-teacher networks for industrial anomaly
+     detection. In Proceedings of the IEEE/CVF Winter Conference on Applications of Computer Vision, pages 2592–2602, 2023. 1, 2, 3,
+     4, 6, 17
+[55] Olga Russakovsky, Jia Deng, Hao Su, Jonathan Krause, Sanjeev Satheesh, Sean Ma, Zhiheng Huang, Andrej Karpathy, Aditya
+     Khosla, Michael Bernstein, Alexander C. Berg, and Li Fei-Fei. Imagenet large scale visual recognition challenge. International
+     Journal of Computer Vision, 115(3):211–252, 2015. 4, 13, 16
+[56] Mayu Sakurada and Takehisa Yairi. Anomaly detection using autoencoders with nonlinear dimensionality reduction. In Proceedings
+     of the MLSDA 2014 2nd Workshop on Machine Learning for Sensory Data Analysis, MLSDA’14, page 4–11, New York, NY, USA,
+     2014. Association for Computing Machinery. 3
+[57] Mohammadreza Salehi, Niousha Sadjadi, Soroosh Baselizadeh, Mohammad H. Rohban, and Hamid R. Rabiee. Multiresolution
+     knowledge distillation for anomaly detection. In IEEE Conference on Computer Vision and Pattern Recognition (CVPR), pages
+     14897–14907, 2021. 3
+[58] Mark Sandler, Andrew Howard, Menglong Zhu, Andrey Zhmoginov, and Liang-Chieh Chen. Mobilenetv2: Inverted residuals and
+     linear bottlenecks. In Proceedings of the IEEE conference on computer vision and pattern recognition, pages 4510–4520, 2018. 1
+[59] Thomas Schlegl, Philipp Seeböck, Sebastian M Waldstein, Ursula Schmidt-Erfurth, and Georg Langs. Unsupervised Anomaly
+     Detection with Generative Adversarial Networks to Guide Marker Discovery. In International Conference on Information Processing
+     in Medical Imaging, pages 146–157. Springer, 2017. 3
+[60] Thomas Schlegl, Philipp Seeböck, Sebastian Waldstein, Georg Langs, and Ursula Schmidt-Erfurth. f-AnoGAN: Fast Unsupervised
+     Anomaly Detection with Generative Adversarial Networks. Medical Image Analysis, 54, 2019. 3
+[61] Abhinav Shrivastava, Abhinav Gupta, and Ross Girshick. Training region-based object detectors with online hard example mining.
+     In Proceedings of the IEEE conference on computer vision and pattern recognition, pages 761–769, 2016. 4
+[62] Carsten Steger, Markus Ulrich, and Christian Wiedemann. Machine Vision Algorithms and Applications. Wiley-VCH, Weinheim,
+     2nd edition, 2018. 2, 8
+[63] Mingxing Tan and Quoc Le. Efficientnet: Rethinking model scaling for convolutional neural networks. In International conference
+     on machine learning, pages 6105–6114. PMLR, 2019. 1
+[64] Mingxing Tan and Quoc Le. Efficientnetv2: Smaller models and faster training. In International conference on machine learning,
+     pages 10096–10106. PMLR, 2021. 1
+[65] Mingxing Tan, Ruoming Pang, and Quoc V Le. Efficientdet: Scalable and efficient object detection. In Proceedings of the IEEE/CVF
+     conference on computer vision and pattern recognition, pages 10781–10790, 2020. 1
+[66] Guodong Wang, Shumin Han, Errui Ding, and Di Huang. Student-teacher feature pyramid matching for anomaly detection. In The
+     British Machine Vision Conference (BMVC), 2021. 2, 3, 4
+[67] Saining Xie, Ross Girshick, Piotr Dollár, Zhuowen Tu, and Kaiming He. Aggregated residual transformations for deep neural
+     networks. In Proceedings of the IEEE conference on computer vision and pattern recognition, pages 1492–1500, 2017. 17
+[68] Hongxu Yin, Arash Vahdat, Jose M Alvarez, Arun Mallya, Jan Kautz, and Pavlo Molchanov. A-vit: Adaptive tokens for efficient
+     vision transformer. In Proceedings of the IEEE/CVF Conference on Computer Vision and Pattern Recognition, pages 10809–10818,
+     2022. 1
+
+
+                                                                  11
+[69] Jiawei Yu, Ye Zheng, Xiang Wang, Wei Li, Yushuang Wu, Rui Zhao, and Liwei Wu. Fastflow: Unsupervised anomaly detection and
+     localization via 2d normalizing flows. arXiv preprint arXiv:2111.07677v1, 2021. 2, 3, 6, 17
+[70] Sergey Zagoruyko and Nikos Komodakis. Wide residual networks. In Edwin R. Hancock Richard C. Wilson and William A. P. Smith,
+     editors, Proceedings of the British Machine Vision Conference (BMVC), pages 87.1–87.12. BMVA Press, September 2016. 3, 15
+[71] Vitjan Zavrtanik, Matej Kristan, and Danijel Skočaj. Dsr–a dual subspace re-projection network for surface anomaly detection. In
+     Computer Vision–ECCV 2022: 17th European Conference, Tel Aviv, Israel, October 23–27, 2022, Proceedings, Part XXXI, pages
+     539–554. Springer, 2022. 3, 6, 17
+[72] Yingying Zhang, Desen Zhou, Siqin Chen, Shenghua Gao, and Yi Ma. Single-image crowd counting via multi-column convolutional
+     neural network. In Proceedings of the IEEE conference on computer vision and pattern recognition, pages 589–597, 2016. 2
+[73] Bo Zong, Qi Song, Martin Renqiang Min, Wei Cheng, Cristian Lumezanu, Daeki Cho, and Haifeng Chen. Deep autoencoding
+     gaussian mixture model for unsupervised anomaly detection. In International conference on learning representations, 2018. 3
+[74] Yang Zou, Jongheon Jeong, Latha Pemula, Dongqing Zhang, and Onkar Dabeer. Spot-the-difference self-supervised pre-training for
+     anomaly detection and segmentation. In Computer Vision–ECCV 2022: 17th European Conference, Tel Aviv, Israel, October 23–27,
+     2022, Proceedings, Part XXX, pages 392–408. Springer, 2022. 1, 2, 14
+
+
+Appendices
+   We provide the following supplementary material:
+   • (A) Implementation details for EfficientAD, including the training and inference procedure of EfficientAD on the dataset
+     of an anomaly detection scenario (A.1) and the distillation training of the patch description network (A.2).
+   • (B) Implementation and configuration details for other evaluated methods.
+   • (C) Evaluation of the anomaly detection performance of EfficientAD for different distillation backbones.
+   • (D) Results for additional anomaly detection metrics, such as the area under the precision recall curve.
+   • (E) Description of our timing methodology and results for additional computational efficiency metrics such as the num-
+     ber of parameters.
+   • (F) Qualitative results in the form of anomaly maps generated by EfficientAD and other methods on the evaluated
+     datasets.
+   • Anomaly detection results for each method on each of the 32 scenarios from MVTec AD, VisA, and MVTec LOCO in
+     the per scenario results.json file 1 .
+
+Appendix A. Implementation Details for EfficientAD
+A.1. Training and Inference
+   Algorithm 1 describes the training of EfficientAD-S and Algorithm 2 explains the inference procedure.                          For
+EfficientAD-M, replace the architecture of Table 6 with that of Table 7.
+
+Algorithm 1 EfficientAD-S Training Algorithm
+Require: A pretrained teacher network T : R3×256×256 → R384×64×64 with an architecture as given in Table 6
+Require: A sequence of training images Itrain with Itrain ∈ R3×256×256 for each Itrain ∈ Itrain
+Require: A sequence of validation images Ival with Ival ∈ R3×256×256 for each Ival ∈ Ival
+ 1: Randomly initialize a student network S : R3×256×256 → R768×64×64 with an architecture as given in Table 6
+ 2: Randomly initialize an autoencoder A : R3×256×256 → R384×64×64 with an architecture as given in Table 8
+ 3: for c ∈ 1, . . . , 384 do                 ▷ Compute teacher channel normalization parameters µ ∈ R384 and σ ∈ R384
+ 4:     Initialize an empty sequence X ← ( )
+ 5:     for Itrain ∈ Itrain do
+ 6:         Y ′ ← T (Itrain )
+ 7:         X ← X ⌢ vec(Yc′ )                                                          ▷ Append the channel output to X
+ 8:     end for
+ 9:     Set µc to the mean and σc to the standard deviation of the elements of X
+
+
+  1 https://www.mydrive.ch/shares/79401/c41dcdb937972fb43d5cdd7bfa7072f8/download/449203483-1690527455/
+
+per_scenario_results.json
+
+
+                                                                 12
+10: end for
+11: Initialize Adam [29] with a learning rate of 10−4 and a weight decay of 10−5 for the parameters of S and A
+12: for iteration = 1, . . . , 70 000 do
+13:     Choose a random training image Itrain from Itrain
+14:     Y ′ ← T (Itrain )                                                       ▷ Forward pass of the student–teacher pair
+15:     Compute the normalized teacher output Ŷ given by Ŷc = (Yc′ − µc )σc−1 for each c ∈ {1, . . . , 384}
+16:     Y S ← S(Itrain )
+17:     Set Y ST ∈ R384×64×64 to the first 384 channels of Y S ∈ R768×64×64
+18:     Compute the squared difference between Ŷ and Y ST for each tuple (c, w, h) as Dc,w,h       ST                  ST
+                                                                                                         = (Ŷc,w,h − Yc,w,h )2
+19:     Compute the 0.999-quantile of the elements of D , denoted by dhard
+                                                                 ST
+
+20:     Compute the loss Lhard as the mean of all Dc,w,h   ST
+                                                                  ≥ dhard
+21:     Choose a random pretraining image P ∈ R          3×256×256
+                                                                   Pfrom    ImageNet [55]
+                                                                      384
+22:     Compute the loss LST = Lhard + (384 · 64 · 64)−1 c=1 ∥S(P )c ∥2F
+23:     Randomly choose an augmentation index iaug ∈ {1, 2, 3}                         ▷ Augment Itrain for A using torchvision [45]
+24:     Sample an augmentation coefficient λ from the uniform distribution U (0.8, 1.2)
+25:     if iaug == 1 then Iaug ← torchvision.transforms.functional pil.adjust brightness(Itrain , λ)
+26:     else if iaug == 2 then Iaug ← torchvision.transforms.functional pil.adjust contrast(Itrain , λ)
+27:     else if iaug == 3 then Iaug ← torchvision.transforms.functional pil.adjust saturation(Itrain , λ)
+28:     end if
+29:     Y A ← A(Iaug )                                                                ▷ Forward pass of the autoencoder–student pair
+30:     Y ′ ← T (Iaug )
+31:     Compute the normalized teacher output Ŷ given by Ŷc = σc−1 (Yc′ − µc ) for each c ∈ {1, . . . , 384}
+32:     Y S ← S(Iaug )
+33:     Set Y STAE ∈ R384×64×64 to the last 384 channels of Y S ∈ R768×64×64
+34:     Compute the squared difference between Ŷ and Y A for each tuple (c, w, h) as Dc,w,h       AE                  A
+                                                                                                        = (Ŷc,w,h − Yc,w,h )2
+35:     Compute the squared difference between Y and Y    A         STAE
+                                                                          for each tuple (c, w, h) as Dc,w,h = (Yc,w,h − Yc,w,h
+                                                                                                        STAE        A         STAE 2
+                                                                                                                                  )
+36:     Compute the loss LAE as the mean of all elements Dc,w,h      AE
+                                                                           of DAE
+37:     Compute the loss LSTAE as the mean of all elements Dc,w,h      STAE
+                                                                              of DSTAE
+38:     Compute the total loss Ltotal = LST + LAE + LSTAE                                                            ▷ Backward pass
+39:     Update the union of the parameters of S and A, denoted by ϕ, using the gradient ∇ϕ Ltotal
+40:     if iteration > 66 500 then
+41:          Decay the learning rate to 10−5
+42:     end if
+43: end for
+44: Initialize empty sequences XST ← ( ) and XAE ← ( )                     ▷ Quantile-based map normalization on validation images
+45: for Ival ∈ Ival do
+46:     Y ′ ← T (Ival ), Y S ← S(Ival ), Y A ← A(Ival )
+47:     Compute the normalized teacher output Ŷ given by Ŷc = (Yc′ − µc )σc−1 for each c ∈ {1, . . . , 384}
+48:     Split the student output into Y ST ∈ R384×64×64 and Y STAE ∈ R384×64×64 as above
+49:     Compute the squared difference Dc,w,h    ST                    ST
+                                                       = (Ŷc,w,h − Yc,w,h  )2 for each tuple (c, w, h)
+50:     Compute the squared difference Dc,w,h = (Yc,w,h − Yc,w,h ) for each tuple (c, w, h)
+                                                 STAE        A         STAE 2
+                                                          P384                               P384
+51:     Compute the anomaly maps MST = 384−1 c=1 DcST and MAE = 384−1 c=1 DcSTAE
+52:     Resize MST and MAE to 256 × 256 pixels using bilinear interpolation
+53:     XST ← XST ⌢ vec(MST )                                                      ▷ Append to the sequence of local anomaly scores
+54:     XAE ← XAE ⌢ vec(MAE )                                                    ▷ Append to the sequence of global anomaly scores
+55: end for
+56: Compute the 0.9-quantile qaST and the 0.995-quantile qbST of the elements of XST .
+57: Compute the 0.9-quantile qaAE and the 0.995-quantile qbAE of the elements of XAE .
+58: return T , S, A, µ, σ, qaST , qbST , qaAE , and qbAE
+
+
+
+
+                                                                13
+Algorithm 2 EfficientAD Inference Procedure
+Require: T , S, A, µ, σ, qaST , qbST , qaAE , and qbAE , as returned by Algorithm 1
+Require: Test image Itest ∈ R3×256×256
+ 1: Y ′ ← T (Itest ), Y S ← S(Itest ), Y A ← A(Itest )
+ 2: Compute the normalized teacher output Ŷ given by Ŷc = (Yc′ − µc )σc−1 for each c ∈ {1, . . . , 384}
+ 3: Split the student output into Y ST ∈ R384×64×64 and Y STAE ∈ R384×64×64 as above
+ 4: Compute the squared difference Dc,w,h  ST                     ST
+                                                 = (Ŷc,w,h − Yc,w,h  )2 for each tuple (c, w, h)
+ 5: Compute the squared difference Dc,w,h = (Yc,w,h − Yc,w,h ) for each tuple (c, w, h)
+                                           STAE          A         STAE 2
+                                                     P384 ST                           P384 STAE
+ 6: Compute the anomaly maps MST = 384−1                 c=1 Dc and MAE = 384
+                                                                                    −1
+                                                                                          c=1 Dc
+ 7: Resize MST and MAE to 256 × 256 pixels using bilinear interpolation
+ 8: Compute the normalized M̂ST = 0.1(MST − qaST )(qbST − qaST )−1
+ 9: Compute the normalized M̂AE = 0.1(MAE − qaAE )(qbAE − qaAE )−1
+10: Compute the combined anomaly map M = 0.5M̂ST + 0.5M̂AE
+11: Compute the image-level score as mimage = maxi,j Mi,j
+12: return M and mimage
+
+
+                       Layer Name       Stride   Kernel Size     Number of Kernels      Padding     Activation
+                         Conv-1          1×1        4×4               128                  3         ReLU
+                        AvgPool-1        2×2        2×2               128                  1            -
+                         Conv-2          1×1        4×4               256                  3         ReLU
+                        AvgPool-2        2×2        2×2               256                  1            -
+                         Conv-3          1×1        3×3               256                  1         ReLU
+                         Conv-4          1×1        4×4               384                  0            -
+
+Table 6. Patch description network architecture of the teacher network for EfficientAD-S. The student network has the same architecture,
+but 768 kernels instead of 384 in the Conv-4 layer. A padding value of 3 means that three rows, or columns respectively, of zeros are
+appended at each border of an input feature map.
+
+                       Layer Name       Stride   Kernel Size     Number of Kernels      Padding     Activation
+                         Conv-1          1×1        4×4               256                  3         ReLU
+                        AvgPool-1        2×2        2×2               256                  1            -
+                         Conv-2          1×1        4×4               512                  3         ReLU
+                        AvgPool-2        2×2        2×2               512                  1            -
+                         Conv-3          1×1        1×1               512                  0         ReLU
+                         Conv-4          1×1        3×3               512                  1         ReLU
+                         Conv-5          1×1        4×4               384                  0         ReLU
+                         Conv-6          1×1        1×1               384                  0            -
+
+Table 7. Patch description network architecture of the teacher network for EfficientAD-M. The student network has the same architecture,
+but 768 kernels instead of 384 in the Conv-5 and Conv-6 layers. A padding value of 3 means that three rows, or columns respectively, of
+zeros are appended at each border of an input feature map.
+
+
+Comments on Algorithm 1 and Algorithm 2:
+
+   • We use the default initialization method of PyTorch [45] (version 1.12.0) for the convolutional layers.
+
+   • We apply the teacher and the student to both the original and the augmented training image. That is necessary because
+     the student–teacher model is trained without augmentation, while the autoencoder is trained with augmentation. During
+     inference, we do not need these second forward passes because images are not augmented at test time.
+
+   • The sizes of the images of MVTec AD [7, 9], VisA [74], and MVTec LOCO [8] differ. We resize each input image to
+     256 × 256 and resize the anomaly map M back to the original image size using bilinear interpolation.
+
+   • We use a batch size of one.
+
+
+                                                                  14
+                      Layer Name     StrideKernel Size Number of Kernels Padding Activation
+                      EncConv-1       2×2      4×4              32               1       ReLU
+                      EncConv-2       2×2      4×4              32               1       ReLU
+                      EncConv-3       2×2      4×4              64               1       ReLU
+                      EncConv-4       2×2      4×4              64               1       ReLU
+                      EncConv-5       2×2      4×4              64               1       ReLU
+                      EncConv-6       1×1      8×8              64               0         -
+                       Bilinear-1            Resizes the 1×1 input features maps to 3×3
+                      DecConv-1       1×1      4×4              64               2       ReLU
+                       Dropout-1                          Dropout rate = 0.2
+                       Bilinear-2            Resizes the 4×4 input features maps to 8×8
+                      DecConv-2       1×1      4×4              64               2       ReLU
+                       Dropout-2                          Dropout rate = 0.2
+                       Bilinear-3           Resizes the 9×9 input features maps to 15×15
+                      DecConv-3       1×1      4×4              64               2       ReLU
+                       Dropout-3                          Dropout rate = 0.2
+                       Bilinear-4          Resizes the 16×16 input features maps to 32×32
+                      DecConv-4       1×1      4×4              64               2       ReLU
+                       Dropout-4                          Dropout rate = 0.2
+                       Bilinear-5          Resizes the 33×33 input features maps to 63×63
+                      DecConv-5       1×1      4×4              64               2       ReLU
+                       Dropout-5                          Dropout rate = 0.2
+                       Bilinear-6         Resizes the 64×64 input features maps to 127×127
+                      DecConv-6       1×1      4×4              64               2       ReLU
+                       Dropout-6                          Dropout rate = 0.2
+                       Bilinear-7         Resizes the 128×128 input features maps to 64×64
+                      DecConv-7       1×1      3×3              64               1       ReLU
+                      DecConv-8       1×1      3×3              384              1         -
+
+Table 8. Network architecture of the autoencoder for EfficientAD-S and EfficientAD-M. Layers named “EncConv” and “DecConv” are
+standard 2D convolutional layers.
+
+
+  • We use the image normalization of the pretrained models of torchvision [45]. That means we subtract 0.485, 0.456,
+    and 0.406 from the R, G, and B channel, respectively, for each input image and divide the channels by 0.229, 0.224,
+    and 0.225, respectively. We perform this normalization directly before applying a network to an image, i.e., after
+    augmentation. At test time, this can also be done by adjusting the weights and bias of the first convolutional layer of a
+    network accordingly.
+  • The parameters of the autoencoder A are not only affected by the gradient of LAE , but also by the gradient of LSTAE .
+  • We obtain an image P ∈ R3×256×256 from ImageNet by choosing a random image, resizing it to 512 × 512, converting
+    it to gray scale with a probability of 0.3, and cropping the center 256 × 256 pixels.
+A.2. Distillation
+   In the following, we describe how to distill the WideResNet-101 [70] features used by PatchCore [51] into the teacher
+network T . The distillation training algorithm is presented in Algorithm 3. The process in analogous for other pretrained
+feature extractors.
+   There are only few requirements regarding the output shape of the feature extractor. The feature extractors used by
+PatchCore output features of shape 384 × 64 × 64 for an input image size of 512 × 512 pixels. Therefore, the teacher and
+the autoencoder also output 384 channels (as described in Tables 6 to 8). If a pretrained feature extractor outputs a different
+number of channels, this default of 384 output channels of the teacher and the autoencoder can be adjusted flexibly. During
+distillation, we resize input images to 512 × 512 for the pretrained feature extractor and to 256 × 256 for the teacher network
+that is being trained. This results in an output shape of 384 × 64 × 64 for the teacher network as well. If a feature extractor
+outputs feature maps of a size other than 64 × 64, we can adjust its input image size to achieve an output feature map size
+
+
+                                                              15
+of 64 × 64. Alternatively, we can adjust the input image size of the teacher network because it is fully convolutional and
+operates separately on patches of size 33 × 33. A feature map size of 53 × 71, for example, can be achieved by applying the
+teacher network to images of size 212 × 284.
+   We use a batch size of 16 for the distillation training and use ImageNet [55] as the pretraining dataset. We use the official
+implementation of PatchCore 2 and its default values if not stated otherwise. We use the feature postprocessing of PatchCore
+as well, which includes pooling features from two layers and projecting each feature vector to a reduced dimensionality of 384
+dimensions, as described in [51]. The features used for our distillation training are the final features used by PatchCore, i.e.,
+those given to the coreset subsampling algorithm when training PatchCore. We denote the WideResNet-101-based feature
+extractor, including the feature postprocessing, as Ψ : R3×512×512 → R384×64×64 .
+
+Algorithm 3 Distillation Training Algorithm
+Require: A pretrained feature extractor Ψ : R3×W ×H → R384×64×64 .
+Require: A sequence of distillation training images Idist
+ 1: Randomly initialize a teacher network T : R3×256×256 → R384×64×64 with an architecture as given in Table 6 or 7
+ 2: for c ∈ 1, . . . , 384 do          ▷ Compute feature extractor channel normalization parameters µΨ ∈ R384 and σ Ψ ∈ R384
+ 3:     Initialize an empty sequence X ← ( )
+ 4:     for iteration = 1, 2, . . . , 10 000 do
+ 5:          Choose a random training image Idist from Idist
+ 6:          Convert Idist to gray scale with a probability of 0.1
+ 7:          Compute Idist Ψ
+                               by resizing Idist to 3 × W × H using bilinear interpolation
+               Ψ             Ψ
+ 8:          Y ← Ψ(Idist       )
+ 9:          X ← X ⌢ vec(YcΨ )                                                                 ▷ Append the channel output to X
+10:     end for
+11:     Set µΨc to the mean and σc to the standard deviation of the elements of X
+                                       Ψ
+
+12: end for
+13: Initialize the Adam [29] optimizer with a learning rate of 10−4 and a weight decay of 10−5 for the parameters of T
+14: for iteration = 1, . . . , 60 000 do
+15:     Lbatch ← 0
+16:     for batch index = 1, . . . , 16 do
+17:          Choose a random training image Idist from Idist
+18:          Convert Idist to gray scale with a probability of 0.1
+19:          Compute Idist Ψ
+                               by resizing Idist to 3 × W × H using bilinear interpolation
+20:          Compute Idist by resizing Idist to 3 × 256 × 256 using bilinear interpolation
+                           ′
+
+21:          Y Ψ ← Ψ(Idist   Ψ
+                               )
+22:          Compute the normalized features Ŷ Ψ given by ŶcΨ = (YcΨ − µΨ          Ψ −1
+                                                                               c )(σc )    for each c ∈ {1, . . . , 384}
+               ′          ′
+23:          Y ← T (Idist )
+24:          Compute the squared difference between Ŷ Ψ and Y ′ for each tuple (c, w, h) as Dc,w,h
+                                                                                                  dist         Ψ
+                                                                                                        = (Ŷc,w,h        ′
+                                                                                                                      − Yc,w,h )2
+25:          Compute the loss Ldist as the mean of all elements Dc,w,h of D
+                                                                     dist       dist
+
+26:          Lbatch ← Lbatch + Ldist
+27:     end for
+28:     Lbatch ← 16−1 Lbatch
+29:     Update the parameters of T , denoted by θ, using the gradient ∇θ Lbatch
+30: end for
+31: return T
+
+
+
+
+Comments on Algorithm 3: We use the image normalization of the pretrained models of torchvision [45]. That means we
+subtract 0.485, 0.456, and 0.406 from the R, G, and B channel, respectively, for each input image and divide the channels
+by 0.229, 0.224, and 0.225, respectively. We perform this normalization directly before applying a network to an image, i.e.,
+after augmentation.
+  2 https://github.com/amazon-science/patchcore-inspection/tree/6a9a281fc34cb1b13c54b318f71e6f1f371536bb
+
+
+
+
+                                                               16
+Appendix B. Implementation Details for Other Evaluated Methods
+  In the following, we provide the implementation and configuration details for Asymmetric Student–Teacher (AST) [54],
+DSR [71], FastFlow [69], GCAD [8], PatchCore [51], SimpleNet [36], and Student–Teacher [10].
+B.1. AST
+   We use the official implementation of Rudolph et al. [54] 3 . We use the default configuration without modifications, but
+are not able to fully reproduce the results reported in the AST paper. The AST paper reports a mean image-level detection
+AU-ROC of 99.2 % on MVTec AD, averaged across five runs. We obtain an AU-ROC of 98.9 % across five runs.
+B.2. DSR
+    We use the official implementation of Zavrtanik et al. [71] 4 . We use the default configuration without modifications for
+reproducing the results on MVTec AD. We obtain a mean image-level detection AU-ROC of 98.1 % on MVTec AD, which
+is close to the 98.2 % reported by the authors. On the scenarios from VisA, which contain more training images than those
+of MVTec AD, we change the number of epochs to 50 to keep the total number of training iterations in a similar range.
+B.3. FastFlow
+   We use the implementation of Akcay et al. [1] 5 . We use the FastFlow version based on the WideResNet-50-2 feature
+extractor, as it is similar to the WideResNet used by PatchCore, SimpleNet and our method. We use the default configuration,
+but disable early stopping, i.e., the scenario-specific tuning of the training duration on test images. Instead, we choose a
+constant training duration (200 steps) that works well on average for all evaluated datasets.
+B.4. GCAD
+   We implement GCAD as described by Bergmann et al. [8]. We are able to reproduce the results reported by the authors,
+but adapt GCAD to a configuration that performs better in our experiments. GCAD consists of an ensemble of two anomaly
+detection models that use different feature extractors. The first member uses a feature extractor that operates on patches of
+size 17 × 17 while the feature extractor used by the second member operates on patches of size 33 × 33. We find that the
+second member performs better on average than the combined ensemble and therefore report the results for this member in
+the main paper. On the logical anomalies of MVTec LOCO, the single model scores an image-level detection AU-ROC of
+83.9 %, while the AU-ROC of the ensemble model used by the authors is 86.0 %. The overall anomaly detection performance
+on MVTec LOCO, however, stays the same.
+B.5. PatchCore
+   We use the official implementation of Roth et al. [51] 6 and are able to reproduce the results reported for MVTec AD.
+As described in the main paper, we disable the cropping of the center 76.6 % of input images for a fair comparison. For the
+single model variant of PatchCore, we use the configuration of PatchCore for which the authors report the lowest latency.
+Specifically, this means setting the coreset subsampling ratio to 1 %, the image size to 224 × 224 pixels, and the feature
+extraction backbone to a WideResNet-101. For the ensemble variant, we use the configuration for which the authors report
+the best detection AU-ROC on MVTec AD. We use a WideResNet-101, a ResNeXT-101 [67], and a DenseNet-201 [25] as
+backbones, set the coreset subsampling ratio to 1 %, and use images of size 320 × 320 pixels.
+B.6. SimpleNet
+  We use the official implementation of Liu et al. [36] 7 and are able to reproduce the reported results. As explained in the
+main paper, we disable the scenario-specific tuning of the training duration on test images for a fair comparison.
+B.7. Student–Teacher
+   We implement the original multi-scale Student–Teacher (S–T) method as described by Bergmann et al. [10]. We use the
+default hyperparameter settings without modification. Our implementation achieves better anomaly localization results on
+MVTec AD than those reported by the authors but matches those reported in [7].
+  3 https://github.com/marco-rudolph/AST/tree/1a157973a0e2cb23b6fbb853db8ae43537ab2568
+  4 https://github.com/VitjanZ/DSR_anomaly_detection/tree/672bfb81434fd2a6c5ef00db858cef8834c54f28
+  5 https://github.com/openvinotoolkit/anomalib/tree/e66a17c86489486f6bbd5099366383e8660923fd
+  6 https://github.com/amazon-science/patchcore-inspection/tree/6a9a281fc34cb1b13c54b318f71e6f1f371536bb
+  7 https://github.com/DonaldRR/SimpleNet/tree/35bf32292995842a4277a7c93431430129efccb5
+
+
+
+
+                                                             17
+Appendix C. Robustness to the Distillation Backbone Architecture
+   In the main paper, we use the features from a WideResNet-101 for training a teacher network in Algorithm 3. The
+default configuration of PatchCore uses the same features. In Table 9, we evaluate the anomaly detection performance for
+other backbones. Specifically, we evaluate the two additional backbones that PatchCoreEns uses, i.e., a ResNeXt-101 and a
+DenseNet-201. On the three evaluated dataset collections, the anomaly detection performance of EfficientAD is similarly
+robust to the choice of the backbone in comparison to the robustness of PatchCore. On MVTec AD, both methods perform
+very similarly across backbones, while their performance on MVTec LOCO varies more. On VisA, the gap between the
+structural anomaly detection performance of PatchCore and that of EfficientAD becomes evident.
+
+                                      Method    WideResNet-101            ResNeXt-101      DenseNet-201
+                         MVTec      PatchCore        98.7                     98.8             98.7
+                                  EfficientAD-S      98.8                     98.9             98.8
+                          AD      EfficientAD-M      99.1                     99.0             99.2
+
+                         MVTec      PatchCore              80.3                78.9             76.5
+                                  EfficientAD-S            90.0                90.1             90.6
+                         LOCO     EfficientAD-M            90.7                89.9             88.3
+
+                                    PatchCore              94.3                95.2             94.8
+                          VisA    EfficientAD-S            97.5                97.3             97.1
+                                  EfficientAD-M            98.1                98.0             97.7
+
+Table 9. Mean anomaly detection AU-ROC percentages for different backbones. For EfficientAD, each listed architecture is used as the
+distillation backbone in Algorithm 3. The “WideResNet-101” column contains the results reported in Table 2 in the main paper.
+
+
+
+
+                                                                  18
+Appendix D. Additional Anomaly Detection Metrics
+   In this section, we report the results for additional anomaly detection metrics. Section D.1 evaluates image-level anomaly
+detection metrics. Section D.2 evaluates pixel-level anomaly localization metrics.
+   For per-scenario evaluation results, see the per scenario results.json file 8 .
+   Following the official MVTec LOCO evaluation script 9 , we evaluate each performance metric separately on the structural
+and on the logical anomalies of MVTec LOCO. Then, we compute the mean of the two scores to compute the overall
+performance of a method on a scenario of MVTec LOCO.
+D.1. Anomaly Detection
+   In the main paper, we evaluate the image-level anomaly detection performance with the area under the ROC curve (AU-
+ROC). Here, we report the results for the area under the precision recall curve (AU-PRC) as well. For information on the
+differences between the AU-ROC and the AU-PRC, we refer to Davis and Goadrich [15].
+   Table 10 shows the anomaly detection performance of each method measured with the AU-ROC. This table contains the
+results reported in the main paper. Table 11 shows the results for the image-level AU-PRC.
+
+                                             MAD      VisA      LOCO      LOCO         LOCO       Overall
+                              Method
+                                             Mean     Mean     Structural Logical      Mean       Mean
+                              GCAD           89.1     83.7        82.7     83.9         83.3       85.4
+                            SimpleNet        98.2     87.9        83.7     71.5         77.6       87.9
+                                S–T          93.2     94.6        88.3     66.5         77.4       88.4
+                             FastFlow        96.9     93.9        82.9     75.5         79.2       90.0
+                                DSR          98.1     91.8        90.2     75.0         82.6       90.8
+                            PatchCore        98.7     94.3        84.8     75.8         80.3       91.1
+                           PatchCoreEns      99.3     97.7        87.7     71.0         79.4       92.1
+                                AST          98.9     94.9        87.1     79.7         83.4       92.4
+                          EfficientAD-S      98.8     97.5        94.1     85.8         90.0       95.4
+                          EfficientAD-M      99.1     98.1        94.7     86.8         90.7       96.0
+
+   Table 10. Mean anomaly detection AU-ROC percentages per dataset collection. For EfficientAD, we report the mean of five runs.
+
+                                             MAD      VisA      LOCO      LOCO         LOCO       Overall
+                              Method
+                                             Mean     Mean     Structural Logical      Mean       Mean
+                              GCAD           95.7     87.1        81.0     84.9         83.0       88.6
+                            SimpleNet        98.5     90.1        82.5     73.5         78.0       88.9
+                                S–T          95.7     94.6        87.9     70.7         79.3       89.9
+                             FastFlow        95.3     94.7        79.5     76.2         77.9       89.3
+                                DSR          98.1     93.8        88.2     76.6         82.4       91.4
+                            PatchCore        98.9     95.2        84.6     77.7         81.2       91.8
+                           PatchCoreEns      99.0     97.8        88.3     74.7         81.5       92.8
+                                AST          98.9     95.3        84.5     80.5         82.5       92.2
+                          EfficientAD-S      98.7     97.5        93.6     86.2         89.9       95.4
+                          EfficientAD-M      98.9     98.0        93.9     86.8         90.3       95.7
+
+    Table 11. Mean anomaly detection AU-PRC percentages per dataset collection. For EfficientAD, we report the mean of five runs.
+D.2. Anomaly Localization
+   To evaluate the anomaly localization performance, we use the area under the PRO curve (AU-PRO) up to a false positive
+rate (FPR) of 30 % in the main paper, as recommended by [7]. The AU-PRO metric [7] is similar to the pixel-wise AU-ROC.
+The difference is that the pixel-wise AU-ROC gives each ground truth defect pixel the same weight in its computation. The
+AU-PRO gives each ground truth defect region the same weight. The FPR limit of 30 % is due to the fact that a method that
+segments, on average, more than 30 % of defect-free pixels as anomalous is of limited use.
+  8 https://www.mydrive.ch/shares/79401/c41dcdb937972fb43d5cdd7bfa7072f8/download/449203483-1690527455/
+
+per_scenario_results.json
+  9 https://www.mvtec.com/company/research/datasets/mvtec-loco
+
+
+
+
+                                                                 19
+   Table 12 contains the results reported in the main paper. Here, we report the AU-PRO for an FPR limit of 5 % as well
+in Table 13. For comparison, we also report the pixel-wise AU-ROC for an FPR limit of 5 % in Table 14. Furthermore, we
+evaluate the pixel-wise AU-PRC as an additional segmentation, and thus, localization performance metric in Table 15. The
+per scenario results.json file 10 also contains the AU-PRO and pixel-wise AU-ROC results for an FPR limit of
+100 %.
+
+                                             MAD     VisA      LOCO      LOCO         LOCO      Overall
+                              Method
+                                             Mean    Mean     Structural Logical      Mean      Mean
+                              GCAD           91.0    83.7        89.5     89.4         89.5      88.0
+                            SimpleNet        89.6    68.9        60.6     68.6         64.6      74.4
+                                S–T          92.4    93.0        90.8     76.4         83.6      89.7
+                             FastFlow        92.5    86.8        84.2     76.5         80.3      86.5
+                                DSR          90.8    68.1        81.3     72.3         76.8      78.6
+                            PatchCore        92.7    79.7        64.3     76.6         70.4      80.9
+                           PatchCoreEns      95.6    79.3        62.0     72.6         67.3      80.7
+                                AST          81.2    81.5        75.4     62.6         69.0      77.2
+                          EfficientAD-S      93.1    93.1        92.6     90.1         91.3      92.5
+                          EfficientAD-M      93.5    94.0        93.7     91.3         92.5      93.3
+
+Table 12. Mean anomaly localization performance per method and dataset collection, measured with the AU-PRO up to a FPR of 30 %.
+For EfficientAD, we report the mean of five runs.
+
+                                             MAD     VisA      LOCO      LOCO         LOCO      Overall
+                              Method
+                                             Mean    Mean     Structural Logical      Mean      Mean
+                              GCAD           68.8    52.6        68.8     67.1         68.0      63.1
+                            SimpleNet        61.8    37.7        36.6     36.1         36.3      45.3
+                                S–T          73.4    75.0        75.6     49.7         62.6      70.4
+                             FastFlow        71.6    63.4        64.5     49.1         56.8      63.9
+                                DSR          78.9    49.5        67.1     49.8         58.5      62.3
+                            PatchCore        68.6    49.4        37.9     41.5         39.7      52.6
+                           PatchCoreEns      79.5    55.1        37.8     35.3         36.5      57.1
+                                AST          42.1    48.0        50.1     35.3         42.7      44.3
+                          EfficientAD-S      78.2    73.4        80.8     74.8         77.8      76.5
+                          EfficientAD-M      78.4    75.9        83.2     76.5         79.8      78.0
+
+Table 13. Mean anomaly localization performance per method and dataset collection, measured with the AU-PRO up to a FPR of 5 %. For
+EfficientAD, we report the mean of five runs.
+
+                                             MAD     VisA      LOCO      LOCO         LOCO      Overall
+                              Method
+                                             Mean    Mean     Structural Logical      Mean      Mean
+                              GCAD           72.1    73.1        73.1     32.0         52.5      65.9
+                            SimpleNet        67.9    57.1        36.4     22.1         29.2      51.4
+                                S–T          74.3    82.7        69.8     20.6         45.2      67.4
+                             FastFlow        72.1    78.9        63.4     33.7         48.6      66.5
+                                DSR          76.1    66.5        66.0     25.5         45.7      62.8
+                            PatchCore        74.1    65.0        43.5     24.1         33.8      57.6
+                           PatchCoreEns      79.4    65.7        38.7     20.4         29.6      58.2
+                                AST          41.1    67.4        52.4     30.9         41.7      50.1
+                          EfficientAD-S      79.7    86.3        80.6     33.8         57.2      74.4
+                          EfficientAD-M      79.4    86.9        82.1     35.3         58.7      75.0
+
+Table 14. Mean anomaly localization performance per method and dataset collection, measured with the AU-ROC up to a FPR of 5 %. For
+EfficientAD, we report the mean of five runs.
+  10 https://www.mydrive.ch/shares/79401/c41dcdb937972fb43d5cdd7bfa7072f8/download/449203483-1690527455/
+
+per_scenario_results.json
+
+
+                                                                20
+                                                MAD    VisA     LOCO      LOCO           LOCO     Overall
+                              Method
+                                                Mean   Mean    Structural Logical        Mean     Mean
+                              GCAD              59.3   27.8       41.4     38.7           40.1     42.4
+                            SimpleNet           51.5   22.6       11.9     29.3           20.6     31.6
+                                S–T             59.9   36.2       43.5     27.4           35.4     43.8
+                             FastFlow           57.6   33.4       35.1     41.3           38.2     43.1
+                                DSR             69.2   41.1       50.4     32.7           41.5     50.6
+                            PatchCore           57.6   27.8       17.8     32.5           25.2     36.8
+                           PatchCoreEns         64.1   28.3       15.1     28.9           22.0     38.2
+                                AST             29.7   22.9       17.0     35.6           26.3     26.3
+                          EfficientAD-S         65.9   40.4       54.0     40.2           47.1     51.1
+                          EfficientAD-M         63.8   40.8       51.9     42.0           46.9     50.5
+
+Table 15. Mean anomaly localization performance per method and dataset collection, measured with the pixel-wise AU-PRC. For
+EfficientAD, we report the mean of five runs.
+
+
+Appendix E. Timing Methodology and Additional Computational Efficiency Metrics
+
+                        Detect.     Segment.      Latency Throughput           Number of        FLOPs            GPU Memory
+        Method
+                       AU-ROC       AU-PRO         [ms]    [img / s]       Parameters [×106 ]   [×109 ]             [MB]
+        GCAD             85.4         88.0          11       121                   65             416                555
+      SimpleNet          87.9         74.4          12       194                   73              38                 508
+         S–T             88.4         89.7           75       16                   26            4468                1077
+       FastFlow          90.0         86.5          17       120                   92              85                404
+         DSR             90.8         78.6           17      104                   40             267                314
+      PatchCore          91.1         80.9           32       76                 83 + 3        41 + kNN           637 + kNN
+     PatchCoreEns        92.1         80.7          148       13                150 + 8       159 + kNN          1335 + kNN
+         AST             92.4         77.2           53       41                  154             199                618
+     EfficientAD-S       95.4         92.5          2.2      614                    8              76                 100
+                        (± 0.06)     (± 0.05)     (± 0.01)      (± 2)              (± 0)              (± 0)           (± 0)
+
+    EfficientAD-M         96.0        93.3          4.5         269                 21                235             161
+                        (± 0.09)     (± 0.04)     (± 0.01)      (± 1)              (± 0)              (± 0)           (± 0)
+
+Table 16. Extension of Table 1 in the main paper by additional computational efficiency metrics measured on an NVIDIA RTX A6000
+GPU. For EfficientAD, we report the mean and standard deviation of five runs. For PatchCore, we report the computational requirements
+of the feature extraction during inference separately from the nearest neighbor search.
+
+    In the following, we describe how we measure the latency and the throughput of each anomaly detection method. Latency
+refers to the inference runtime, i.e., how long it takes a method to generate the anomaly detection result for a single image.
+Throughput refers to how many images can be processed per second when allowing a batched processing of images. In set-
+tings in which latency constraints are fulfilled or not present, a high throughput is relevant for using computational resources
+efficiently and thus for reducing the economic cost of an application.
+    All evaluated methods are implemented in PyTorch. All of them, including the nearest neighbor search of PatchCore, run
+faster on each of the GPUs in our experimental setup than on a CPU. We therefore execute each method on a GPU. For a test
+image, our timing begins with the transfer of the image from the CPU to the GPU. We include the transfer to regard the benefit
+of a method that would run exclusively on a CPU. Our timing stops when the anomaly detection result, which for all evaluated
+methods is an anomaly map, is available on the CPU. For each method, we remove unnecessary parts for the timing, such as
+the computation of losses during inference, and use float16 precision for all networks. Switching from float32 to float16 for
+the inference of EfficientAD does not change the anomaly detection results for the 32 anomaly detection scenarios evaluated
+in this paper. In latency-critical applications, padding in the PDN architecture of EfficientAD can be disabled. This speeds
+up the forward pass of the PDN architecture by 80 µs without impairing the detection of anomalies. We time EfficientAD
+without padding and therefore report the anomaly detection results for this setting in the experimental results of this paper. We
+perform 1000 forward passes as warm up and report the mean runtime of the following 1000 forward passes. For the latency,
+we report the average runtime of 1000 forward passes with a batch size of 1. We compute the throughput by dividing 16 000
+
+
+                                                                 21
+by the sum of the runtimes of 1000 forward passes with a batch size of 16. In addition to the latency and the throughput,
+we report the number of parameters, the number of floating point operations (FLOPs), and the GPU memory consumption
+for each method in Table 16. Analogously to the latency, we measure these metrics for the processing of one image during
+inference and report the mean of 1000 forward passes. The number of parameters and the FLOPs remain constant across
+forward passes, while the GPU memory consumption varies slightly (less than one MB difference between forward passes).
+
+Technical Details For methods that use features from hidden layers of a pretrained network, we exclude the layers that
+are not required for computing these features, i.e., classification heads etc. We measure the number of FLOPs using the
+official profiling framework of PyTorch [45] (version 1.12.0). Specifically, we wrap the inference function of a method into
+a call of with torch.profiler.profile(with flops=True) as prof:. For measuring the GPU memory
+consumption, we also use the official profiling framework of PyTorch. We obtain the peak of the reserved GPU memory
+during inference with torch.cuda.memory stats()[’reserved bytes.all.peak’].
+
+Interpretability of Efficiency Metrics In the main paper, we focus on the latency and the throughput of the evaluated
+anomaly detection methods. The number of parameters and the number of FLOPs are often used as proxy metrics for the
+runtime, but can be misleading. For example, the number of parameters of FastFlow in Table 16 is roughly 2.5 times larger
+than that of S–T. Yet, the latency of FastFlow is substantially lower and its throughput is 6.5 times higher.
+   With 4.5 trillion FLOPs, S–T exceeds the FLOPs of other methods by a large margin. The high number of FLOPs, however,
+comes from the fact that S–T uses convolutions that operate on large feature maps. This means that these convolutions can
+be parallelized well on a GPU, while implementing them naively on a CPU would indeed cause a prohibitively long runtime.
+FLOPs measurements do not account for this, because they do not consider how well operations can be parallelized. The
+number of FLOPs can therefore be an unreliable metric for efficiency. For example, the number of FLOPs of S–T is more
+than 2000 % higher than that of AST, but the latency is only 42 % higher.
+   The GPU memory footprint of a method can theoretically be reduced drastically by freeing obsolete GPU memory seg-
+ments after each layer’s execution during a forward pass. In the extreme case, one could even directly free the memory of
+individual input activation values directly after the output activation of a neuron in a convolutional layer has been computed.
+This, however, would worsen the runtime of a forward pass, which generally improves when reserved GPU memory segments
+can be reused. Therefore, the GPU memory footprint of a method needs to be reported and analyzed jointly with the latency
+and throughput. We focus on the GPU memory required for achieving the reported latency and throughput and therefore
+measure the peak of the reserved GPU memory during a forward pass.
+
+PatchCore For PatchCore, we distinguish between the backbones used to compute features and the kNN algorithm itself.
+For example, the part of the WideResNet-101 backbone until the layer used for computing features has 83 million parameters.
+During training, PatchCore computes the feature vectors of all training images. The coreset subsampling phase of PatchCore
+reduces the number of feature vectors to 1 % of the computed feature vectors. These are then indexed and stored in GPU
+memory to enable a fast search for nearest neighbors during inference. This, however, means that the number of parameters,
+the FLOPs, and the GPU memory footprint of PatchCore depend on the training images. We therefore benchmark PatchCore
+on the “cashew” scenario of VisA, which contains 450 training images and is thus closest to the average 439 training images
+of the 32 scenarios of MVTec AD, VisA, and MVTec LOCO. We do not report the FLOPs and the GPU memory consumption
+of the kNN search, as we were not able to measure it with the kNN library used by the official PatchCore implementation.
+The number of parameters of the kNN search is given by the number of values stored in the GPU memory during inference.
+In the case of PatchCoreEns , for example, the search database contains 8 million values.
+
+
+
+
+                                                              22
+Anomaly Detection and Throughput Figure 8 shows the anomaly detection performance together with the throughput of
+each evaluated method, analogous to Figure 1 in the main paper. Apart from EfficientAD, the ranking of methods changes
+drastically between the image-level and the pixel-level detection of anomalies.
+
+
+             96                    EfficientAD-M                                               94
+                                                                                                                        EfficientAD-M
+                                                         EfficientAD-S                                                                    EfficientAD-S
+                                                                                               92
+
+             94                                                                                90       S-T
+                                                                                               88             GCAD
+                       AST
+                                                                                                              FastFlow
+
+
+AU-ROC [%]
+                      PatchCoreEns
+
+
+                                                                                  AU-PRO [%]
+             92                                                                                86
+                         PatchCore
+                           DSR                                                                 84
+             90             FastFlow                                                           82
+                                                                                                            PatchCore
+                                                                                               80       PatchCoreEns
+                      S-T
+             88                SimpleNet                                                                   DSR
+                                                                                               78
+                                                                                                         AST
+                                                                                               76
+             86
+                            GCAD                                                               74                 SimpleNet
+                  0          200       400        600         800          1000                     0          200       400        600         800       1000
+                                Throughput [images per second]                                                    Throughput [images per second]
+                                   (a) Anomaly detection                                                            (b) Anomaly localization
+Figure 8. Anomaly detection performance vs. throughput on an NVIDIA RTX A6000 GPU. We report the image-level anomaly detection
+performance on the left using the image-level AU-ROC. On the right, we report the anomaly localization performance using the pixel-level
+AU-PRO segmentation metric up to a FPR of 30 %. Each AU-ROC and AU-PRO value is an average of the values on MVTec AD, VisA,
+and MVTec LOCO. We measure the throughput using a batch size of 16.
+
+
+
+Latency per GPU In Table 17, we provide the values for Figure 6 in the main paper.
+
+                                   Method    RTX A6000               RTX A5000                 Tesla V100       RTX 3080        RTX 2080 Ti
+                               EfficientAD-S     2.2                     2.5                       3.9             3.8              4.5
+                               EfficientAD-M     4.5                     5.3                       6.3              7.0             7.6
+                                   GCAD         10.7                    11.7                      12.9             13.7            18.0
+                                 SimpleNet      12.0                    13.3                      19.2            18.1             21.9
+                                  FastFlow      16.5                    17.1                      26.1             27.5            31.0
+                                     DSR        17.2                    18.0                      24.8            24.6             34.5
+                                 PatchCore      32.0                    31.5                      47.1             41.1            53.2
+                                     AST        53.1                    53.4                      75.6            82.3             87.1
+                                     S–T        74.7                    81.0                      82.2            99.6            121.7
+                                PatchCoreEns   147.6                   145.0                     229.2            189.0           216.9
+
+                                       Table 17. Latency in milliseconds per GPU, as plotted in Figure 6 in the main paper.
+
+
+
+
+                                                                                23
+Appendix F. Qualitative Results
+   In Figures 9 to 11, we display anomaly maps for each of the 32 scenarios of MVTec AD, VisA, and MVTec LOCO. For
+MVTec LOCO, we show both logical and structural anomalies. We visualize the anomaly maps using a different scale for
+each method, since the anomaly score scales differ between methods. Across scenarios, however, we use the same color
+scale per anomaly detection method. A consistent anomaly score scale across applications is an important requirement for a
+method. Otherwise, the scale of scores on anomalies is hard to forecast if no or only few defect images are present during
+the development of the anomaly detection system. Knowing the scale is important for choosing a robust threshold value
+that ultimately determines whether an image or a pixel is anomalous or not. Furthermore, a consistent scale facilitates the
+interpretation of anomaly maps. For the evaluated methods, we choose the start and end values of the color scales so that true
+positive and true negative detections become clearly visible. For example, the color scale of AST ranges from 2 to 10. Scores
+outside of this range are visualized with the minimum and maximum color value, respectively. For PatchCore, choosing the
+range of the color scale is difficult. On the one hand, scores of true positive detections are low, such as the contamination
+of the banana juice bottle in Figure 9. On the other hand, scores of false positive detections are similarly high, such as the
+predictions on the breakfast box in Figure 9.
+   Overall, the evaluated anomaly detection methods succeed on the anomalies of MVTec AD, but leave room for improve-
+ment on MVTec LOCO and VisA.
+  • EfficientAD responds to both logical and structural anomalies in the images. The strength of its response sometimes
+    leaves room for improvement, for example, on the logical anomalies of the breakfast box and the box of pushpins in
+    Figure 9.
+  • AST detects some logical anomalies, but lacks an approach that detects logical anomalies by design. For example,
+    it detects that the additional blue cable connecting two splicing connectors in Figure 9 causes unseen features. Yet,
+    the missing pushpin in the box of pushpins in Figure 9 is also an unseen feature and does not cause a response in the
+    anomaly map of AST. This highlights the importance of a reliable approach to logical anomalies. Furthermore, it shows
+    the dependence of anomaly detection methods on the choice of the feature extractor. As shown in Table 9, EfficientAD
+    is robust to this choice.
+  • DSR produces very precise segmentations, but also suffers from false positives, for example on the grid and the wood
+    image of MVTec AD in Figure 10. At times, it furthermore shows no response at all to defects.
+
+  • FastFlow’s anomaly maps contain a large amount of noise, i.e. false positive detections. This hinders the interpretability
+    of its detection results.
+  • GCAD succeeds at detecting logical anomalies, but has difficulty with some structural anomalies that other methods
+    detect reliably, such as the scratches on the metal nut in Figure 10 or the green capsules in Figure 11.
+
+  • PatchCoreEns struggles with very small defects such as those of the printed circuit boards in Figure 11. Small defects are
+    challenging, but highly relevant for practical applications. A small contamination can cause a high economic damage if
+    it goes unnoticed, for example, in a pharmaceutical application.
+  • SimpleNet performs similar to other methods on MVTec AD, but struggles with the more challenging anomalies of
+    MVTec LOCO and VisA, for example the defective capsules and PCBs in Figure 11.
+  • S–T is a patch-based anomaly detection approach and therefore can only detect anomalies if they involve patches that are
+    anomalous per se, i.e., without putting them in the global context of the respective image. While AST’s feature vectors
+    have a receptive field that spans across the entire image, S–T’s receptive field is limited to 65×65 pixels. Therefore, it
+    does not detect anomalies such as the missing transistor in Figure 10.
+   The qualitative results show tendencies of each method regarding the behavior on anomalous images. While these results
+are informative, they should not be used exclusively for evaluating the anomaly detection performance of a method or for
+comparing methods. For that, metrics such as the AU-ROC and the AU-PRO are well-suited, since they are evaluated
+objectively on thousands of test images across dataset collections.
+
+
+
+
+                                                             24
+   Input    Ground Truth EfficientAD-S EfficientAD-M   AST       DSR        FastFlow     GCAD     PatchCoreEns SimpleNet        S-T
+
+
+
+
+Figure 9. Anomaly maps on anomalous images from MVTec LOCO and MVTec AD. For MVTec LOCO, we show a logical anomaly
+(upper row) and a structural anomaly (lower row) for each scenario. The receptive field of AST’s features is large enough to detect some
+logical anomalies, while PatchCoreEns and S–T struggle with logical anomalies.
+
+
+
+                                                                  25
+   Input    Ground Truth EfficientAD-S EfficientAD-M   AST      DSR       FastFlow     GCAD     PatchCoreEns SimpleNet       S-T
+
+
+
+
+Figure 10. Anomaly maps on anomalous images from MVTec AD. Almost all anomalies are detected by every method, but the separability
+of pixel anomaly scores varies between methods. For example, PatchCoreEns detects the anomaly on the capsule in the first row but the
+pixel anomaly scores are in a similar range as the false positive detections in the background of the screw image.
+
+
+
+                                                                 26
+   Input   Ground Truth EfficientAD-S EfficientAD-M   AST   DSR      FastFlow    GCAD    PatchCoreEns SimpleNet    S-T
+
+
+
+
+Figure 11. Anomaly maps on anomalous images from MVTec AD and VisA. VisA contains challenging, small anomalies, such as the
+defect on the non-aligned macaronis or the defect on the fryum two rows above.
+
+
+
+
+                                                            27
+

@@ -1,0 +1,807 @@
+                                        Noname manuscript No.
+                                        (will be inserted by the editor)
+
+
+
+
+                                        Learning to Prompt for Vision-Language Models
+                                        Kaiyang Zhou · Jingkang Yang · Chen Change Loy · Ziwei Liu
+
+
+
+
+arXiv:2109.01134v6 [cs.CV] 6 Oct 2022
+                                        Received: date / Accepted: date
+
+
+                                        Abstract Large pre-trained vision-language models          implementations of CoOp: unified context and class-
+                                        like CLIP have shown great potential in learning repre-    specific context. Through extensive experiments on 11
+                                        sentations that are transferable across a wide range of    datasets, we demonstrate that CoOp requires as few as
+                                        downstream tasks. Different from the traditional repre-    one or two shots to beat hand-crafted prompts with a
+                                        sentation learning that is based mostly on discretized     decent margin and is able to gain significant improve-
+                                        labels, vision-language pre-training aligns images and     ments over prompt engineering with more shots, e.g.,
+                                        texts in a common feature space, which allows zero-        with 16 shots the average gain is around 15% (with the
+                                        shot transfer to a downstream task via prompting, i.e.,    highest reaching over 45%). Despite being a learning-
+                                        classification weights are synthesized from natural lan-   based approach, CoOp achieves superb domain general-
+                                        guage describing classes of interest. In this work, we     ization performance compared with the zero-shot model
+                                        show that a major challenge for deploying such mod-        using hand-crafted prompts.
+                                        els in practice is prompt engineering, which requires
+                                        domain expertise and is extremely time-consuming—
+                                        one needs to spend a significant amount of time on         1 Introduction
+                                        words tuning since a slight change in wording could
+                                        have a huge impact on performance. Inspired by re-         A common approach for building state-of-the-art visual
+                                        cent advances in prompt learning research in natural       recognition systems is to train vision models to predict
+                                        language processing (NLP), we propose Context Op-          for a fixed set of object categories using discrete la-
+                                        timization (CoOp), a simple approach specifically for      bels (He et al., 2016; Dosovitskiy et al., 2021). From
+                                        adapting CLIP-like vision-language models for down-        a technical point of view, this is achieved by match-
+                                        stream image recognition. Concretely, CoOp models a        ing image features—produced by a vision model like
+                                        prompt’s context words with learnable vectors while the    ResNet (He et al., 2016) or ViT (Dosovitskiy et al.,
+                                        entire pre-trained parameters are kept fixed. To han-      2021)—with a fixed set of weights that are seen as visual
+                                        dle different image recognition tasks, we provide two      concepts and initialized randomly. Although training
+                                                                                                   categories often have a textual form, such as “goldfish”
+                                        Kaiyang Zhou                                               or “toilet paper,” they will be converted into discrete la-
+                                        S-Lab, Nanyang Technological University, Singapore
+                                                                                                   bels just for easing the computation of the cross-entropy
+                                        E-mail: kaiyang.zhou@ntu.edu.sg
+                                                                                                   loss, leaving the semantics encapsulated in texts largely
+                                        Jingkang Yang
+                                                                                                   unexploited. Such a learning paradigm limits visual
+                                        S-Lab, Nanyang Technological University, Singapore
+                                        E-mail: jingkang001@ntu.edu.sg                             recognition systems to closed-set visual concepts, mak-
+                                                                                                   ing them unable to deal with new categories since ad-
+                                        Chen Change Loy
+                                        S-Lab, Nanyang Technological University, Singapore         ditional data are required for learning a new classifier.
+                                        E-mail: ccloy@ntu.edu.sg                                       Recently, vision-language pre-training such as
+                                        Ziwei Liu                                                  CLIP (Radford et al., 2021) and ALIGN (Jia et al.,
+                                        S-Lab, Nanyang Technological University, Singapore         2021) has emerged as a promising alternative for vi-
+                                        E-mail: ziwei.liu@ntu.edu.sg                               sual representation learning. The main idea is to align
+2                                                                                                                                Kaiyang Zhou et al.
+
+              Caltech101                        Prompt             Accuracy        Flowers102                   Prompt                    Accuracy
+                                   a [CLASS].                       82.68                       a photo of a [CLASS].                      60.86
+
+                                   a photo of [CLASS].              80.81                       a flower photo of a [CLASS].               65.81
+
+                                   a photo of a [CLASS].            86.29                       a photo of a [CLASS], a type of flower.    66.14
+
+                                   [V]1 [V]2 … [V]M [CLASS].        91.83                       [V]1 [V]2 … [V]M [CLASS].                  94.51
+                                                (a)                                                              (b)
+      Describable Textures (DTD)                Prompt             Accuracy         EuroSAT                     Prompt                    Accuracy
+                                   a photo of a [CLASS].            39.83                       a photo of a [CLASS].                      24.17
+
+                                   a photo of a [CLASS] texture.    40.25                       a satellite photo of [CLASS].              37.46
+
+                                   [CLASS] texture.                 42.32                       a centered satellite photo of [CLASS].     37.56
+
+                                   [V]1 [V]2 … [V]M [CLASS].        63.58                       [V]1 [V]2 … [V]M [CLASS].                  83.53
+                                                (c)                                                              (d)
+Fig. 1 Prompt engineering vs Context Optimization (CoOp). The former needs to use a held-out validation set for
+words tuning, which is inefficient; the latter automates the process and requires only a few labeled images for learning.
+
+
+images and raw texts using two separate encoders—one                          resulting prompts are by no means guaranteed to be
+for each modality. For instance, both CLIP and ALIGN                          optimal for these downstream tasks.
+formulate the learning objective as a contrastive loss,                           Inspired by recent prompt learning research in natu-
+which pulls together images and their textual descrip-                        ral language processing (NLP) (Shin et al., 2020; Jiang
+tions while pushes away unmatched pairs in the feature                        et al., 2020; Zhong et al., 2021), we propose a simple
+space. By pre-training at a large scale, models can learn                     approach called Context Optimization (CoOp) 1 to au-
+diverse visual concepts and can readily be transferred                        tomate prompt engineering, specifically for pre-trained
+to any downstream task through prompting (Radford                             vision-language models. Concretely, CoOp models a
+et al., 2021; Jia et al., 2021; Fürst et al., 2021; Li et al.,               prompt’s context words with learnable vectors, which
+2021; Singh et al., 2021; Yuan et al., 2021). In particu-                     could be initialized with either random values or pre-
+lar, for any new classification task one can first synthe-                    trained word embeddings (see Figure 2). Two imple-
+size the classification weights by giving sentences de-                       mentations are provided to handle tasks of different na-
+scribing task-relevant categories to the text encoder,                        tures: one is based on unified context, which shares the
+and then compare with image features produced by the                          same context with all classes and works well on most
+image encoder.                                                                categories; while the other is based on class-specific con-
+                                                                              text, which learns a specific set of context tokens for
+    We observe that for pre-trained vision-language                           each class and is found to be more suitable for some
+models, the text input, known as prompt, plays a key                          fine-grained categories. During training, we simply min-
+role in downstream datasets. However, identifying the                         imize prediction errors using the cross-entropy loss with
+right prompt is a non-trivial task, which often takes a                       respect to the learnable context vectors while keeping
+significant amount of time for words tuning—a slight                          the entire pre-trained parameters fixed. The gradients
+change in wording could make a huge difference in per-                        can be back-propagated all the way through the text
+formance. For instance, for Caltech101 (Figure 1(a),                          encoder, distilling the rich knowledge encoded in the
+2nd vs 3rd prompt), adding “a” before the class to-                           parameters for learning task-relevant context.
+ken brings more than 5% increase in accuracy. More-                               To demonstrate the effectiveness of CoOp, we
+over, prompt engineering also requires prior knowledge                        benchmark on 11 datasets, which cover a diverse set
+about the task and ideally the language model’s under-                        of visual recognition tasks including classification on
+lying mechanism. This is exemplified in Figure 1(b-d)                         generic objects, scenes, actions and fine-grained cate-
+where adding task-relevant context can lead to signifi-                       gories, as well as specialized tasks like recognizing tex-
+cant improvements, i.e., “flower” for Flowers102, “tex-                       tures and satellite imagery. The results show that CoOp
+ture” for DTD and “satellite” for EuroSAT. Tuning the                         effectively turns pre-trained vision-language models
+sentence structure could bring further improvements,                          into data-efficient visual learners, requiring as few as
+e.g., putting “a type of flower” after the class token for                    one or two shots to beat hand-crafted prompts with a
+Flowers102, keeping only “texture” in the context for                         decent margin. The performance can be further boosted
+DTD, and adding “centered” before “satellite photo”
+                                                                               1
+for EuroSAT. However, even with extensive tuning, the                              CoOp is pronounced as /ku:p/.
+Learning to Prompt for Vision-Language Models                                                                       3
+
+
+by using more shots, e.g., with 16 shots the margin        et al., 2017), ii) large-minibatch contrastive representa-
+over hand-crafted prompts averages at around 15% and       tion learning (Chen et al., 2020; He et al., 2020; Hénaff
+reaches over 45% for the highest. CoOp also outper-        et al., 2020), and iii) web-scale training datasets—CLIP
+forms the linear probe model, which is known as a          benefits from 400 million curated image-text pairs while
+strong few-shot learning baseline (Tian et al., 2020).     ALIGN exploits 1.8 billion noisy image-text pairs.
+Furthermore, CoOp demonstrates much stronger ro-               The idea of mapping images and text onto a com-
+bustness than the zero-shot model (which uses manual       mon embedding space has been studied since nearly
+prompts) to domain shifts, despite being a learning-       a decade ago (Socher et al., 2013; Frome et al., 2013;
+based approach.                                            Elhoseiny et al., 2013), but with drastically different
+    In summary, we make the following contributions:       technologies. For text features extraction, early work
+                                                           has mainly utilized pre-trained word vectors (Socher
+1. We present a timely study on the adaptation of re-      et al., 2013; Frome et al., 2013) or the hand-crafted
+   cently proposed vision-language models in down-         TF-IDF features (Elhoseiny et al., 2013; Lei Ba et al.,
+   stream applications and identify a critical prob-       2015). Matching images and text features has been for-
+   lem associated with the deployment efficiency, i.e.,    mulated as metric learning (Frome et al., 2013), multi-
+   prompt engineering.                                     label classification (Joulin et al., 2016; Gomez et al.,
+2. To automate prompt engineering specifically for         2017), n-gram language learning (Li et al., 2017), and
+   pre-trained vision-language models, we propose a        the recently proposed captioning (Desai and Johnson,
+   simple approach based on continuous prompt learn-       2021).
+   ing and provide two implementations that can han-           Our work is orthogonal to recent research in vision-
+   dle different recognition tasks.                        language models, aiming to facilitate the adaptation
+3. We for the first time show that the proposed prompt     and deployment of such models in downstream datasets.
+   learning-based approach outperforms both hand-
+   crafted prompts and the linear probe model in terms
+   of downstream transfer learning performance and         2.2 Prompt Learning in NLP
+   robustness under domain shifts for large vision-
+   language models.                                        Knowledge probing for large pre-trained language mod-
+4. We open-source our project at https://github.           els, formally defined by Petroni et al. (2019) as “fill-in-
+   com/KaiyangZhou/CoOp.                                   the-blank” cloze tests, has recently sparked interest in
+                                                           prompt learning research in NLP (Shin et al., 2020;
+     We hope the findings together with the open-source    Jiang et al., 2020; Li and Liang, 2021; Zhong et al.,
+code can inspire and facilitate future research on ef-     2021; Lester et al., 2021; Gao et al., 2020; Liu et al.,
+ficient adaptation methods for large vision-language       2021b).
+models—an emerging topic related to democratization            The basic idea of knowledge probing is to induce
+of foundation models (Bommasani et al., 2021) i.e.,        pre-trained language models to generate answers given
+making them easier and cheaper to adapt for the wider      cloze-style prompts, which can benefit a number of
+community.                                                 downstream tasks, such as sentiment analysis. Jiang
+                                                           et al. (2020) propose to generate candidate prompts
+                                                           through text mining and paraphrasing, and identify
+2 Related Work                                             the optimal ones that give the highest training accu-
+                                                           racy. Shin et al. (2020) introduce a gradient-based ap-
+2.1 Vision-Language Models                                 proach, which searches for tokens with the largest gra-
+                                                           dient changes in the label likelihood.
+Vision-language models have recently demonstrated              Most related to our work are continuous prompt
+great potential in learning generic visual representa-     learning methods (Zhong et al., 2021; Li and Liang,
+tions and allowing zero-shot transfer to a variety of      2021; Lester et al., 2021) which optimize continuous
+downstream classification tasks via prompting (Rad-        vectors in the word embedding space. A drawback of
+ford et al., 2021; Jia et al., 2021; Zhang et al., 2020;   such methods compared to searching discrete tokens
+Singh et al., 2021; Yuan et al., 2021).                    is the lack of a clear way to visualize what “words”
+    To our knowledge, the recent developments in           are learned for the vectors. We refer readers to Liu
+vision-language learning, particularly CLIP (Radford       et al. (2021a) for a comprehensive survey in the topic
+et al., 2021) and ALIGN (Jia et al., 2021), are largely    of prompt learning in NLP.
+driven by advances in the following three areas: i) text       It is worth noting that we are the first to ap-
+representation learning with Transformers (Vaswani         ply prompt learning to the adaptation of large vision-
+4                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                           Kaiyang Zhou et al.
+
+
+
+                learnable context
+
+         [V]1      [V]2   ...
+                          <latexit sha1_base64="i4zpmuRm7l6oli4lXwkT2OQ8Jsk=">AAACFXicbVC7TgJBFJ31ifhCLW02ggkV2aVQSxIbS0zkkcCGzM7OwoR5bGbuasiGn7Cx0F+xM7bW/omlA2wh4ElucnLOvbn3njDhzIDnfTsbm1vbO7uFveL+weHRcenktG1UqgltEcWV7obYUM4kbQEDTruJpliEnHbC8e3M7zxSbZiSDzBJaCDwULKYEQxW6lb6o0iBqQxKZa/mzeGuEz8nZZSjOSj99CNFUkElEI6N6fleAkGGNTDC6bTYTw1NMBnjIe1ZKrGgJsjm907dS6tEbqy0LQnuXP07kWFhzESEtlNgGJlVbyb+5/VSiG+CjMkkBSrJYlGccheUO3vejZimBPjEEkw0s7e6ZIQ1JmAjWtoSiqUfMpFyYFo9TYs2Kn81mHXSrtf8q5p3Xy83qnloBXSOLlAV+egaNdAdaqIWIoijZ/SK3pwX5935cD4XrRtOPnOGluB8/QImmZ+d</latexit>
+
+
+
+
+                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                               [V]M          [CLASS]                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                   .     text encoder
+
+                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                      ...
+                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                       <latexit sha1_base64="i4zpmuRm7l6oli4lXwkT2OQ8Jsk=">AAACFXicbVC7TgJBFJ31ifhCLW02ggkV2aVQSxIbS0zkkcCGzM7OwoR5bGbuasiGn7Cx0F+xM7bW/omlA2wh4ElucnLOvbn3njDhzIDnfTsbm1vbO7uFveL+weHRcenktG1UqgltEcWV7obYUM4kbQEDTruJpliEnHbC8e3M7zxSbZiSDzBJaCDwULKYEQxW6lb6o0iBqQxKZa/mzeGuEz8nZZSjOSj99CNFUkElEI6N6fleAkGGNTDC6bTYTw1NMBnjIe1ZKrGgJsjm907dS6tEbqy0LQnuXP07kWFhzESEtlNgGJlVbyb+5/VSiG+CjMkkBSrJYlGccheUO3vejZimBPjEEkw0s7e6ZIQ1JmAjWtoSiqUfMpFyYFo9TYs2Kn81mHXSrtf8q5p3Xy83qnloBXSOLlAV+egaNdAdaqIWIoijZ/SK3pwX5935cD4XrRtOPnOGluB8/QImmZ+d</latexit>
+
+
+
+
+                     airplane                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                    butterfly      ...
+                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                <latexit sha1_base64="i4zpmuRm7l6oli4lXwkT2OQ8Jsk=">AAACFXicbVC7TgJBFJ31ifhCLW02ggkV2aVQSxIbS0zkkcCGzM7OwoR5bGbuasiGn7Cx0F+xM7bW/omlA2wh4ElucnLOvbn3njDhzIDnfTsbm1vbO7uFveL+weHRcenktG1UqgltEcWV7obYUM4kbQEDTruJpliEnHbC8e3M7zxSbZiSDzBJaCDwULKYEQxW6lb6o0iBqQxKZa/mzeGuEz8nZZSjOSj99CNFUkElEI6N6fleAkGGNTDC6bTYTw1NMBnjIe1ZKrGgJsjm907dS6tEbqy0LQnuXP07kWFhzESEtlNgGJlVbyb+5/VSiG+CjMkkBSrJYlGccheUO3vejZimBPjEEkw0s7e6ZIQ1JmAjWtoSiqUfMpFyYFo9TYs2Kn81mHXSrtf8q5p3Xy83qnloBXSOLlAV+egaNdAdaqIWIoijZ/SK3pwX5935cD4XrRtOPnOGluB8/QImmZ+d</latexit>
+
+
+
+
+                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                     pizza
+
+
+                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                      ...
+                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                       <latexit sha1_base64="i4zpmuRm7l6oli4lXwkT2OQ8Jsk=">AAACFXicbVC7TgJBFJ31ifhCLW02ggkV2aVQSxIbS0zkkcCGzM7OwoR5bGbuasiGn7Cx0F+xM7bW/omlA2wh4ElucnLOvbn3njDhzIDnfTsbm1vbO7uFveL+weHRcenktG1UqgltEcWV7obYUM4kbQEDTruJpliEnHbC8e3M7zxSbZiSDzBJaCDwULKYEQxW6lb6o0iBqQxKZa/mzeGuEz8nZZSjOSj99CNFUkElEI6N6fleAkGGNTDC6bTYTw1NMBnjIe1ZKrGgJsjm907dS6tEbqy0LQnuXP07kWFhzESEtlNgGJlVbyb+5/VSiG+CjMkkBSrJYlGccheUO3vejZimBPjEEkw0s7e6ZIQ1JmAjWtoSiqUfMpFyYFo9TYs2Kn81mHXSrtf8q5p3Xy83qnloBXSOLlAV+egaNdAdaqIWIoijZ/SK3pwX5935cD4XrRtOPnOGluB8/QImmZ+d</latexit>
+                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                    text
+                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                  features
+
+                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                  similarity
+                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                             image encoder                            ...
+                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                    scores
+                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                       <latexit sha1_base64="i4zpmuRm7l6oli4lXwkT2OQ8Jsk=">AAACFXicbVC7TgJBFJ31ifhCLW02ggkV2aVQSxIbS0zkkcCGzM7OwoR5bGbuasiGn7Cx0F+xM7bW/omlA2wh4ElucnLOvbn3njDhzIDnfTsbm1vbO7uFveL+weHRcenktG1UqgltEcWV7obYUM4kbQEDTruJpliEnHbC8e3M7zxSbZiSDzBJaCDwULKYEQxW6lb6o0iBqQxKZa/mzeGuEz8nZZSjOSj99CNFUkElEI6N6fleAkGGNTDC6bTYTw1NMBnjIe1ZKrGgJsjm907dS6tEbqy0LQnuXP07kWFhzESEtlNgGJlVbyb+5/VSiG+CjMkkBSrJYlGccheUO3vejZimBPjEEkw0s7e6ZIQ1JmAjWtoSiqUfMpFyYFo9TYs2Kn81mHXSrtf8q5p3Xy83qnloBXSOLlAV+egaNdAdaqIWIoijZ/SK3pwX5935cD4XrRtOPnOGluB8/QImmZ+d</latexit>
+
+
+
+
+                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                  image
+                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                 features      maximize the score for the
+                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                  ground-truth class
+
+Fig. 2 Overview of Context Optimization (CoOp). The main idea is to model a prompt’s context using a set of learnable
+vectors, which can be optimized through minimizing the classification loss. Two designs are proposed: one is unified context,
+which shares the same context vectors with all classes; and the other is class-specific context, which learns for each class a
+specific set of context vectors.
+
+
+language models in computer vision—which we view as                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                facilitate minibatch processing, each text sequence is
+an important topic for democratizing foundation mod-                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                               encompassed with the [SOS] and [EOS] tokens and
+els (Bommasani et al., 2021)—and justify that prompt                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                               capped at a fixed length of 77. After that, the IDs are
+learning not only brings significant improvements to                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                               mapped to 512-D word embedding vectors, which are
+computer vision tasks in terms of transfer learning per-                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                           then passed on to the Transformer. Finally, the features
+formance but also produces robust models that can han-                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                             at the [EOS] token position are layer normalized and
+dle domain shifts.                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                 further processed by a linear projection layer.
+
+                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                   Training CLIP is trained to align the two embedding
+3 Methodology                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                      spaces learned for images and text respectively. Specif-
+                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                   ically, the learning objective is formulated as a con-
+3.1 Vision-Language Pre-training                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                   trastive loss. Given a batch of image-text pairs, CLIP
+                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                   maximizes the cosine similarity for matched pairs while
+We briefly introduce vision-language pre-training with                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                             minimizes the cosine similarity for all other unmatched
+a particular focus on CLIP (Radford et al., 2021).                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                 pairs. To learn diverse visual concepts that are more
+Our approach is applicable to broader CLIP-like vision-                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                            transferable to downstream tasks, CLIP’s team collects
+language models.                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                   a large training dataset consisting of 400 million image-
+Models CLIP consists of two encoders, one for im-                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                  text pairs.
+ages and the other for text. The image encoder aims to
+map high-dimensional images into a low-dimensional                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                 Zero-Shot Inference Since CLIP is pre-trained to
+embedding space. The architecture of the image en-                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                 predict whether an image matches a textual descrip-
+coder can take the form of a CNN like ResNet-50 (He                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                tion, it naturally fits zero-shot recognition. This is
+et al., 2016) or a ViT (Dosovitskiy et al., 2021). On the                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                          achieved by comparing image features with the classi-
+other hand, the text encoder is built on top of a Trans-                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                           fication weights synthesized by the text encoder, which
+former (Vaswani et al., 2017) and aims to generate text                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                            takes as input textual descriptions specifying classes of
+representations from natural language.                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                             interest. Formally, let f be image features extracted
+    Specifically, given a sequence of words (tokens),                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                              by the image encoder for an image x and {wi }K     i=1 a
+such as “a photo of a dog,” CLIP first converts each                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                               set of weight vectors generated by the text encoder. K
+one of the token (including punctuation) into a lower-                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                             denotes the number of classes and each wi is derived
+cased byte pair encoding (BPE) representation (Sen-                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                from a prompt that could have the form of “a photo of
+nrich et al., 2016), which is essentially a unique nu-                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                             a [CLASS].” where the class token is replaced by the
+meric ID. The vocabulary size in CLIP is 49,152. To                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                specific class name, such as “cat,” “dog” or “car.” The
+Learning to Prompt for Vision-Language Models                                                                              5
+
+
+prediction probability is then computed as                   Class-Specific Context Another option is to de-
+                                                             sign class-specific context (CSC) where context vectors
+               exp(cos(wi , f )/τ )
+p(y = i|x) = PK                        ,              (1)    are independent to each class, i.e., [V]i1 [V]i2 . . . [V]iM 6=
+              j=1 exp(cos(wj , f )/τ )                       [V]j1 [V]j2 . . . [V]jM for i 6= j and i, j ∈ {1, . . . , K}. As
+where τ is a temperature parameter learned by CLIP           an alternative to unified context, we find that CSC is
+and cos(·, ·) denotes cosine similarity.                     particularly useful for some fine-grained classification
+    Compared with the traditional classifier learning        tasks.
+approach where closed-set visual concepts are learned        Training is performed to minimize the standard clas-
+from random vectors, vision-language pre-training al-        sification loss based on the cross-entropy, and the gra-
+lows open-set visual concepts to be explored through         dients can be back-propagated all the way through the
+a high-capacity text encoder, leading to a broader se-       text encoder g(·), making use of the rich knowledge en-
+mantic space and in turn making the learned represen-        coded in the parameters to optimize the context. The
+tations more transferable to downstream tasks.               design of continuous representations also allows full ex-
+                                                             ploration in the word embedding space, which facili-
+                                                             tates the learning of task-relevant context.
+3.2 Context Optimization
+
+We propose Context Optimization (CoOp), which                3.3 Discussion
+avoids manual prompt tuning by modeling context
+words with continuous vectors that are end-to-end            Our approach specifically addresses the emerging prob-
+learned from data while the massive pre-trained pa-          lem of the adaptation of recently proposed large vision-
+rameters are frozen. An overview is shown in Figure 2.       language models such as CLIP (Radford et al., 2021).
+Below we provide several different implementations.          There are some differences that distinguish our ap-
+                                                             proach from the prompt learning methods developed in
+Unified Context We first introduce the unified con-
+                                                             NLP for language models (e.g., GPT-3 (Brown et al.,
+text version, which shares the same context with all
+                                                             2020)). First, the backbone architectures are clearly dif-
+classes. Specifically, the prompt given to the text en-
+                                                             ferent for CLIP-like models and language models—the
+coder g(·) is designed with the following form,
+                                                             former take both visual and textual data as input and
+t = [V]1 [V]2 . . . [V]M [CLASS],                     (2)    produce alignment scores used for image recognition,
+                                                             while the latter are tailored to handle textual data only.
+where each [V]m (m ∈ {1, . . . , M }) is a vector with       Second, the pre-training objectives are different: con-
+the same dimension as word embeddings (i.e., 512 for         trastive learning vs autoregressive learning. This would
+CLIP), and M is a hyperparameter specifying the num-         lead to different model behaviors and thus require dif-
+ber of context tokens.                                       ferent module designs.
+   By forwarding a prompt t to the text encoder g(·),
+we can obtain a classification weight vector representing
+a visual concept (still from the [EOS] token position).      4 Experiments
+The prediction probability is computed as
+                                                             4.1 Few-Shot Learning
+                     exp(cos(g(ti ), f )/τ )
+p(y = i|x) = PK                                 ,     (3)
+                  j=1 exp(cos(g(tj ), f )/τ )                Datasets We select 11 publicly available image clas-
+                                                             sification datasets used in CLIP: ImageNet (Deng
+where the class token within each prompt ti is replaced      et al., 2009), Caltech101 (Fei-Fei et al., 2004), Oxford-
+by the corresponding word embedding vector(s) of the         Pets (Parkhi et al., 2012), StanfordCars (Krause et al.,
+i-th class name.                                             2013), Flowers102 (Nilsback and Zisserman, 2008),
+    Other than placing the class token at the end of a       Food101 (Bossard et al., 2014), FGVCAircraft (Maji
+sequence as in Equation (2), we can also put it in the       et al., 2013), SUN397 (Xiao et al., 2010), DTD (Cim-
+middle like                                                  poi et al., 2014), EuroSAT (Helber et al., 2019) and
+t = [V]1 . . . [V] M [CLASS][V] M +1 . . . [V]M ,     (4)    UCF101 (Soomro et al., 2012) (see Appendix A for their
+                 2                 2
+                                                             statistics). These datasets constitute a comprehensive
+which increases flexibility for learning—the prompt is       benchmark, which covers a diverse set of vision tasks
+allowed to either fill the latter cells with supplementary   including classification on generic objects, scenes, ac-
+descriptions or cut off the sentence earlier by using a      tions and fine-grained categories, as well as specialized
+termination signal such as full stop.                        tasks like recognizing textures and satellite imagery.
+6                                                                                                         Kaiyang Zhou et al.
+
+
+
+
+Fig. 3 Main results of few-shot learning on the 11 datasets. Overall, CoOp effectively turns CLIP into a strong
+few-shot learner (solid lines), achieving significant improvements over zero-shot CLIP (stars) and performing favorably against
+the linear probe alternative (dashed lines). M denotes the context length. “end” or “mid” means putting the class token in
+the end or middle. CSC means class-specific context.
+
+
+We follow the few-shot evaluation protocol adopted in            Training Details CoOp has four versions: position-
+CLIP (Radford et al., 2021), using 1, 2, 4, 8 and 16             ing the class token in the end or middle; unified con-
+shots for training respectively and deploying models in          text vs CSC. Unless otherwise stated, ResNet-50 (He
+the full test sets. The average results over three runs          et al., 2016) is used as the image encoder’s backbone
+are reported for comparison.                                     and the number of context tokens M is set to 16. In-
+                                                                 vestigations on other design choices are discussed in
+Learning to Prompt for Vision-Language Models                                                                                     7
+
+
+Section 4.3. All models are built on top of CLIP’s open-                        CLIP + CoOp (M=16, end) vs. Zero-Shot CLIP
+source code.2 CoOp’s context vectors are randomly ini-           EuroSAT                                                      +45.97
+tialized by drawing from a zero-mean Gaussian distri-         Flowers102                                        +28.37
+bution with standard deviation equal to 0.02. Training               DTD                               +21.26
+is done with SGD and an initial learning rate of 0.002,      StanfordCars                          +17.75
+which is decayed by the cosine annealing rule. The max-           UCF101                       +14.25
+imum epoch is set to 200 for 16/8 shots, 100 for 4/2         FGVCAircraft                     +13.98
+shots, and 50 for 1 shot (except for ImageNet where               SUN397                   +10.74
+                                                              Caltech101           +5.54
+the maximum epoch is fixed to 50). To mitigate explo-
+                                                                ImageNet          +4.77
+sive gradients observed in the early training iterations,
+                                                               OxfordPets    +1.24
+we use the warmup trick by fixing the learning rate to
+                                                                 Food101    -2.64
+1e−5, only during the first epoch.
+                                                                            0          10             20         30      40
+                                                                                            Absolute improvement (%)
+Baseline Methods We compare CoOp with two
+baseline methods. The first is zero-shot CLIP, which         Fig. 4 Comparison with hand-crafted prompts.
+is based on hand-crafted prompts. We follow the guide-
+line of prompt engineering introduced by Radford et al.      10%) on most fine-grained datasets including Flow-
+(2021). For generic objects and scenes, “a photo of a        ers102, StanfordCars and FGVCAircraft, as well as
+[CLASS].” is adopted. For fine-grained categories, task-     on scene and action recognition datasets (i.e., SUN397
+relevant context is added like “a type of pet” for Ox-       & UCF101). Since ImageNet is a challenging dataset
+fordPets and “a type of food” for Food101. When it           that contains 1,000 classes, the 4.77% improvement is
+comes to specialized tasks such as recognizing textures      also noteworthy. In contrast, the increases on the two
+in DTD, the prompt is customized as “[CLASS] tex-            fine-grained datasets, OxfordPets and Food101, are less
+ture.” where the class names are adjectives like “bub-       appealing.3 By digging into CLIP+CoOp’s curves on
+bly” and “dotted.” See Appendix A for the details. The       these two datasets in Figure 3, we find there is a loss
+second baseline is the linear probe model. As suggested      of momentum in performance improvements even with
+by Radford et al. (2021) and a recent study on few-shot      more shots used, seemingly an overfitting problem. A
+learning (Tian et al., 2020), training a linear classifier   potential solution is to impose higher regularization like
+on top of high-quality pre-trained models’ features (like    increasing the weight decay. Nonetheless, the overall re-
+CLIP) can easily achieve performance that is on a par        sults are strong enough to serve as evidence of CoOp’s
+with that of state-of-the-art few-shot learning methods,     capability of learning task-relevant prompts in a data-
+which are often much more sophisticated. We follow the       efficient manner.
+same training method used by Radford et al. (2021) to
+train the linear probe model.                                Comparison with Linear Probe CLIP In terms
+                                                             of the overall performance (Figure 3, top-left),
+Comparison with Hand-Crafted Prompts Fig-                    CLIP+CoOp demonstrates clear advantages over the
+ure 3 summarizes the results. Our default model is           linear probe model. The latter requires more than 4
+CLIP+CoOp with the class token positioned in the             shots on average to match the zero-shot’s performance
+end. The two different ways of positioning the class to-     while CoOp’s average gain at 4 shots is already im-
+ken achieve similar performance as their curves highly       pressive. It is also clear that the gaps in the extreme
+overlap. From the average performance displayed in the       low-data regime such as one or two shots are much
+top-left corner, we observe that CLIP+CoOp is a strong       larger, suggesting that CoOp is much more effective
+few-shot learner, requiring only two shots on average to     than learning a linear classifier from scratch for few-shot
+obtain a decent margin over zero-shot CLIP. Given 16         learning. We also observe that the linear probe model
+shots for training, the average gap brought by CoOp          is comparable to CLIP+CoOp on the two specialized
+can be further increased to around 15%.                      tasks (DTD & EuroSAT) as well as on a couple of fine-
+   Figure 4 ranks the absolute improvements obtained         grained datasets (Flowers102 & FGVCAircraft)—this
+by CoOp at 16 shots over hand-crafted prompts. Huge          is not too surprising as the pre-trained CLIP space has
+improvements are observed on specialized tasks namely        been proved powerful, making the linear probe model
+EuroSAT and DTD where the increase in performance            a strong competitor. Nevertheless, CoOp’s CSC version
+reaches over 45% and 20% respectively. The jumps               3
+                                                                 We find that the negative results on Food101, for learning-
+in performance are also significant (those more than         based models including CoOp and linear probe, are caused by
+                                                             the noisy training data with “intense colors and sometimes
+ 2
+     https://github.com/openai/CLIP.                         wrong labels” (Bossard et al., 2014).
+8                                                                                                   Kaiyang Zhou et al.
+
+
+Table 1 Comparison with zero-shot CLIP on robustness to distribution shift using different vision backbones. M : CoOp’s
+context length.
+
+                                                  Source                   Target
+                       Method                    ImageNet     -V2     -Sketch       -A     -R
+                       ResNet-50
+                       Zero-Shot CLIP              58.18     51.34     33.32     21.65    56.00
+                       Linear Probe CLIP           55.87     45.97     19.07     12.74    34.86
+                       CLIP + CoOp (M = 16)        62.95     55.11     32.74     22.12    54.96
+                       CLIP + CoOp (M = 4)         63.33     55.40     34.67     23.06    56.60
+                       ResNet-101
+                       Zero-Shot CLIP              61.62     54.81     38.71     28.05    64.38
+                       Linear Probe CLIP           59.75     50.05     26.80     19.44    47.19
+                       CLIP + CoOp (M = 16)        66.60     58.66     39.08     28.89    63.00
+                       CLIP + CoOp (M = 4)         65.98     58.60     40.40     29.60    64.98
+                       ViT-B/32
+                       Zero-Shot CLIP              62.05     54.79     40.82     29.57    65.99
+                       Linear Probe CLIP           59.58     49.73     28.06     19.67    47.20
+                       CLIP + CoOp (M = 16)        66.85     58.08     40.44     30.62    64.45
+                       CLIP + CoOp (M = 4)         66.34     58.24     41.48     31.34    65.78
+                       ViT-B/16
+                       Zero-Shot CLIP              66.73     60.83     46.15     47.77    73.96
+                       Linear Probe CLIP           65.85     56.26     34.77     35.68    58.43
+                       CLIP + CoOp (M = 16)        71.92     64.18     46.71     48.41    74.32
+                       CLIP + CoOp (M = 4)         71.73     64.56     47.89     49.93    75.14
+
+
+
+can beat the linear probe CLIP on the aforementioned         detrimental to generalization in unseen distributions
+datasets, and moreover, shows much better potential          (domains), as suggested in recent studies (Taori et al.,
+when more shots become available. We later show that         2020; Zhou et al., 2021). On the contrary, zero-shot
+CoOp obtains much stronger performance than the lin-         CLIP is not tied to a specific data distribution and has
+ear probe model in domain generalization.                    exhibited strong robustness to distribution shifts (Rad-
+                                                             ford et al., 2021). In this section, we aim to unveil how
+Unified vs Class-Specific Context On average,                robust CoOp is to distribution shifts, in comparison to
+using unified context leads to better performance. In        zero-shot CLIP and the linear probe model.
+terms of when to apply CSC and when not to, we
+have the following suggestions. For generic objects (Im-
+ageNet & Caltech101), scenes (SUN397) and actions            Datasets The source dataset is ImageNet. The
+(UCF101), using unified context is clearly better. Uni-      target datasets are ImageNetV2 (Recht et al.,
+fied context also works better on some fine-grained          2019), ImageNet-Sketch (Wang et al., 2019),
+datasets including OxfordPets and Food101, but on            ImageNet-A (Hendrycks et al., 2021b) and ImageNet-
+others like StanfordCars, Flowers102 and FGVCAir-            R (Hendrycks et al., 2021a), all of which have
+craft the CSC version is preferred. CSC also yields          compatible class names with ImageNet allowing
+better performance on the two specialized tasks, DTD         seamless transfer for the prompts learned by CoOp.
+and EuroSAT, at 16 shots in particular. However, CSC         ImageNetV2 is a reproduced test set using different
+mostly underperforms unified context in challenging          sources while following ImageNet’s data collection
+low-data scenarios (fewer than 8 shots), which makes         process. ImageNet-Sketch contains sketch images
+sense because CSC has more parameters than unified           belonging to the same 1,000 ImageNet classes. Both
+context and needs more data for training.                    ImageNet-A and -R contain 200 classes derived from a
+                                                             subset of ImageNet’s 1,000 classes. The former consists
+                                                             of real-world adversarially filtered images that cause
+4.2 Domain Generalization                                    current ImageNet classifiers to produce low results,
+                                                             whereas the latter features a rendition of the ImageNet
+Since CoOp requires training on a specific data distri-      classes in diverse image styles such as paintings,
+bution, it risks learning spurious correlations that are     cartoons and sculptures.
+Learning to Prompt for Vision-Language Models                                                                         9
+
+
+
+
+                                (a) Context length                               (b) Vision backbones
+Fig. 5 Investigations on CoOp’s context length and various vision backbones.
+
+Table 2 Comparison with prompt engineering and prompt ensembling on ImageNet using different vision backbones.
+
+                       Method                   ResNet-50    ResNet-101    ViT-B/32      ViT-B/16
+                       Prompt engineering            58.18     61.26           62.05       66.73
+                       Prompt ensembling             60.41     62.54           63.71       68.74
+                       CoOp                          62.95     66.60           66.85       71.92
+
+
+
+Table 3 Random vs manual initialization.                       by varying the context length from 4 to 8 to 16. The
+                                                               average results are shown in Figure 5(a), which indicate
+                                      Avg %
+                                                               that having more context tokens leads to better perfor-
+                [V]1 [V]2 [V]3 [V]4   72.65                    mance and that positioning the class token in the mid-
+                “a photo of a”        72.65
+                                                               dle gains more momentum with longer context length.
+                                                               To sum up, there is no golden rule for selecting per-
+                                                               fect context length since one needs to balance between
+Results Table 1 summarizes the results (with a va-
+                                                               performance and robustness to distribution shift.
+riety of vision backbones). It is surprising that CoOp
+enhances CLIP’s robustness to distribution shifts, de-         Vision Backbones Figure 5(b) summarizes the re-
+spite the exposure to the source dataset. This suggests        sults on the 11 datasets using a variety of vision back-
+that the learned prompts are also generalizable. More-         bones covering both CNNs and ViTs. The results are
+over, it is interesting to see that using fewer context        expected: the more advanced the backbone, the better
+tokens leads to better robustness. In contrast, the lin-       the performance. The gap between CoOp and hand-
+ear probe model obtains much worse results on these            crafted prompts is significant across all architectures.
+target datasets, exposing its weakness in domain gen-
+eralization. In Appendix B, we provide the domain gen-         Comparison with Prompt Ensembling The au-
+eralization results on DOSCO-2k (Zhou et al., 2022b),          thors of CLIP (Radford et al., 2021) have suggested
+a recently proposed benchmark focusing on contextual           that additional improvements can be obtained by
+domain shift.                                                  ensembling over multiple zero-shot classifiers gener-
+                                                               ated using different hand-crafted prompts, such as “a
+                                                               photo of the large [CLASS].”, “a bad photo of the
+4.3 Further Analysis                                           [CLASS].” and “a origami [CLASS].”, which reflect a
+                                                               different scale, view and abstraction respectively for an
+Context Length How many context tokens should                  image. We are interested to know whether the prompts
+be used? And is it better to have more context tokens?         learned by CoOp can still maintain advantages when
+The results in Section 4.2 suggest having a shorter con-       compared with prompt ensembling. For fair compar-
+text length benefits domain generalization (probably           ison, we use the select prompts from Radford et al.
+due to less overfitting as fewer parameters are learned).      (2021), which have been extensively tuned on Ima-
+Here we study this hyperparameter for source datasets.         geNet, to construct the ensemble classifier. Table 2
+Specifically, we repeat experiments on the 11 datasets         shows the comparison and justifies the superiority of
+10                                                                                                    Kaiyang Zhou et al.
+
+
+CoOp. Given the potential of prompt ensembling, fu-          5 Conclusion, Limitations and Future Work
+ture work could investigate how to improve CoOp from
+the ensembling perspective.                                  Large pre-trained vision-language models have shown
+                                                             surprisingly powerful capabilities in diverse down-
+                                                             stream applications. However, these models, also called
+Comparison with Other Fine-tuning Methods
+                                                             vision foundation models given their “critically central
+We further compare CoOp with other fine-tuning meth-
+                                                             yet incomplete” nature (Bommasani et al., 2021), need
+ods: i) fine-tuning CLIP’s image encoder; ii) optimizing
+                                                             to be adapted using automated techniques for better
+a transformation layer added to the text encoder’s out-
+                                                             downstream performance and efficiency.
+put; iii) optimizing a bias term added to the text en-
+                                                                 Our research provides timely insights on how CLIP-
+coder’s output. The results are shown in Table 5. Obvi-
+                                                             like models can be turned into a data-efficient learner
+ously, fine-tuning the image encoder does not work well.
+                                                             by using prompt learning, and reveals that despite be-
+Adding a transformation layer slightly improves upon
+                                                             ing a learning-based approach, CoOp performs much
+the zero-shot model. Adding a bias term shows promis-
+                                                             better in domain generalization than manual prompts.
+ing results, but still largely underperforms CoOp, which
+                                                             The results serve as strong evidence that prompt learn-
+suggests that the gradients that went through the text
+                                                             ing has potential for large vision models. It is worth
+encoder provide more useful information.
+                                                             noting that our paper presents the first comprehensive
+                                                             study about adapting large vision models with prompt
+Initialization We compare random initialization              learning.
+with manual initialization. The latter uses the embed-           Though the performance is excellent, the results of
+dings of “a photo of a” to initialize the context vectors    CoOp are relatively difficult to interpret, like other con-
+for the 11 datasets. For fair comparison, we also set the    tinuous prompt learning methods in NLP. The experi-
+context length to 4 when using random initialization.        ments also reveal that CoOp is sensitive to noisy labels
+Table 3 suggests a “good” initialization does not make       given the weak performance on Food101.
+much difference. Though further tuning of the initial-           Nevertheless, the simplicity of CoOp allows easy ex-
+ization words might help, in practice we suggest using       tension for future work and there remain many inter-
+the simple random initialization method.                     esting questions to explore, such as cross-dataset trans-
+                                                             fer (Zhou et al., 2022a) and test-time adaptation (Wang
+                                                             et al., 2020). It would also be interesting to investi-
+Interpreting the Learned Prompts is difficult be-
+                                                             gate more generic adaptation methods for mega-size vi-
+cause the context vectors are optimized in a continu-
+                                                             sion models (Jia et al., 2022; Bahng et al., 2022; Gao
+ous space. We resort to an indirect way by searching
+                                                             et al., 2021). In summary, we hope the empirical find-
+within the vocabulary for words that are closest to the
+                                                             ings and insights presented in this work could pave the
+learned vectors based on the Euclidean distance. Note
+                                                             way for future research on efficient adaptation methods
+that CLIP (Radford et al., 2021) uses the BPE rep-
+                                                             for emerging foundation models, which is still a nascent
+resentation (Sennrich et al., 2016) for tokenization, so
+                                                             research topic.
+the vocabulary includes subwords that frequently ap-
+pear in text, such as “hu” (subsumed by many words
+                                                             Acknowledgements This work is supported by NTU NAP,
+like “hug” and “human”). Table 4 shows the searched          MOE AcRF Tier 2 (T2EP20221-0033), and under the
+results on some datasets. We observe that a few words        RIE2020 Industry Alignment Fund – Industry Collaboration
+are somewhat relevant to the tasks, such as “enjoyed”        Projects (IAF-ICP) Funding Initiative, as well as cash and in-
+for Food101, “fluffy” and “paw” for OxfordPets, and          kind contribution from the industry partner(s). Correspond-
+                                                             ing author: Ziwei Liu (ziwei.liu@ntu.edu.sg).
+“pretty” for DTD. But when connecting all the near-
+est words together, the prompts do not make much
+sense. We also observe that when using manual initial-
+ization (like “a photo of a”), the nearest words for the     Appendix
+converged vectors are mostly the ones used for initial-
+                                                             A Datasets Details
+ization. We conjecture that the learned vectors might
+encode meanings that are beyond the existing vocabu-         The detailed statistics of the 11 datasets, as well as the
+lary. Overall, we are unable to draw any firm conclusion     four variants of ImageNet, are shown in Table 6. The hand-
+based on the observations because using nearest words        crafted prompts used for zero-shot CLIP are also detailed
+                                                             in the table. For Caltech101, the “BACKGROUND Google”
+to interpret the learned prompts could be inaccurate—
+                                                             and “Faces easy” classes are discarded. For the video dataset,
+the semantics of the vectors is not necessarily correlated   UCF101, the middle frame of each video is used as input to
+with the nearest words.                                      the image encoder.
+Learning to Prompt for Vision-Language Models                                                                                11
+
+
+Table 4 The nearest words for each of the 16 context vectors learned by CoOp, with their distances shown in parentheses.
+N/A means non-Latin characters.
+
+          #               ImageNet             Food101            OxfordPets              DTD                 UCF101
+          1           potd (1.7136)          lc (0.6752)        tosc (2.5952)    boxed (0.9433) meteorologist (1.5377)
+          2            that (1.4015) enjoyed (0.5305)         judge (1.2635)        seed (1.0498)         exe (0.9807)
+          3         filmed (1.2275)        beh (0.5390)       fluffy (1.6099)      anna (0.8127)     parents (1.0654)
+          4            fruit (1.4864) matches (0.5646)          cart (1.3958) mountain (0.9509)    masterful (0.9528)
+          5              ,... (1.5863) nytimes (0.6993)      harlan (2.2948)     eldest (0.7111)            fe (1.3574)
+          6                 ° (1.7502)    prou (0.5905)         paw (1.3055)     pretty (0.8762)         thof (1.2841)
+          7      excluded (1.2355)       lower (0.5390)      incase (1.2215)       faces (0.7872)      where (0.9705)
+          8            cold (1.4654)                N/A          bie (1.5454)    honey (1.8414)       kristen (1.1921)
+          9           stery (1.6085) minute (0.5672)        snuggle (1.1578)      series (1.6680)      imam (1.1297)
+          10          warri (1.3055)         ∼ (0.5529)       along (1.8298)        coca (1.5571)        near (0.8942)
+          11 marvelcomics (1.5638)         well (0.5659) enjoyment (2.3495)      moon (1.2775)       tummy (1.4303)
+          12               .: (1.7387)    ends (0.6113)           jt (1.3726)         lh (1.0382)         hel (0.7644)
+          13                      N/A      mis (0.5826) improving (1.3198)          won (0.9314)        boop (1.0491)
+          14         lation (1.5015) somethin (0.6041)         srsly (1.6759)   replied (1.1429)                   N/A
+          15           muh (1.4985) seminar (0.5274) asteroid (1.3395)              sent (1.3173)       facial (1.4452)
+          16             .# (1.9340)                N/A                  N/A piedmont (1.5198)        during (1.1755)
+
+
+
+Table 5 CoOp vs other fine-tuning methods on ImageNet               CoCoOp have great potential in tackling transfer learning
+(w/ 16 shots). ∆: difference with the zero-shot model.              problems.
+
+                                           ImageNet      ∆
+ Zero-shot CLIP                              58.18        -         References
+ Linear probe                                55.87     -2.31
+ Fine-tuning CLIP’s image encoder            18.28    -39.90        Bahng H, Jahanian A, Sankaranarayanan S, Isola P (2022)
+ Optimizing transformation layer (text)      58.86      0.68          Visual prompting: Modifying pixel space to adapt pre-
+ Optimizing bias (text)                      60.93    +2.75           trained models. arXiv preprint arXiv:220317274
+ CoOp                                        62.95    +4.77         Bommasani R, Hudson DA, Adeli E, Altman R, Arora S, von
+                                                                      Arx S, Bernstein MS, Bohg J, Bosselut A, Brunskill E,
+                                                                      et al. (2021) On the opportunities and risks of foundation
+                                                                      models. arXiv preprint arXiv:210807258
+B Results on DOSCO-2k                                               Bossard L, Guillaumin M, Van Gool L (2014) Food-101–
+                                                                      mining discriminative components with random forests. In:
+                                                                      ECCV
+DOSCO-2k The DOSCO (DOmain Shift in COntext)                        Brown TB, Mann B, Ryder N, Subbiah M, Kaplan J, Dhari-
+benchmark (Zhou et al., 2022b) contains 7 image recogni-
+                                                                      wal P, Neelakantan A, Shyam P, Sastry G, Askell A,
+tion datasets, which cover a wide range of classification prob-
+                                                                      et al. (2020) Language models are few-shot learners. arXiv
+lems, such as generic object recognition, fine-grained recog-
+                                                                      preprint arXiv:200514165
+nition on aircraft models, and action recognition. Unlike ex-
+                                                                    Chen T, Kornblith S, Norouzi M, Hinton G (2020) A sim-
+isting domain generalization datasets where the domain la-
+                                                                      ple framework for contrastive learning of visual represen-
+bels are manually defined and often limited to image style
+                                                                      tations. In: ICML
+variations, DOSCO-2k focuses on broader contextual domain
+                                                                    Cimpoi M, Maji S, Kokkinos I, Mohamed S, Vedaldi A (2014)
+shift, which is automatically detected by a neural network
+                                                                      Describing textures in the wild. In: CVPR
+pre-trained on the Places dataset (Zhou et al., 2017). Fol-
+                                                                    Deng J, Dong W, Socher R, Li LJ, Li K, Fei-Fei L (2009)
+lowing Zhou et al. (2022b), we use the 2k version where the
+                                                                      Imagenet: A large-scale hierarchical image database. In:
+training and validation splits in each dataset have 2,000 im-
+                                                                      CVPR
+ages in total (1,600 for training and 400 for validation).
+                                                                    Desai K, Johnson J (2021) Virtex: Learning visual represen-
+                                                                      tations from textual annotations. In: CVPR
+Results We study three methods’ domain generalization               Dosovitskiy A, Beyer L, Kolesnikov A, Weissenborn D, Zhai
+performance on DOSCO-2k: CLIP, CoOp and CoCoOp (Zhou                  X, Unterthiner T, Dehghani M, Minderer M, Heigold G,
+et al., 2022a). All models are trained on the training set and        Gelly S, et al. (2021) An image is worth 16x16 words:
+the checkpoints with the best validation performance are used         Transformers for image recognition at scale. In: ICLR
+for final test in unseen domains. Table 7 shows the results of      Elhoseiny M, Saleh B, Elgammal A (2013) Write a classifier:
+four different architectures. It is clear that the two learn-         Zero-shot learning using purely textual descriptions. In:
+able methods outperform the zero-shot method with a large             ICCV
+margin, despite having only a small number of parameters            Fei-Fei L, Fergus R, Perona P (2004) Learning generative
+to tune. CoCoOp beats CoOp on 4 out of 7 datasets but                 visual models from few training examples: An incremen-
+CoOp’s average performance is higher. In summary, the re-             tal bayesian approach tested on 101 object categories. In:
+sults suggest that efficient adaptation methods like CoOp and         CVPR-W
+12                                                                                                           Kaiyang Zhou et al.
+
+
+Table 6 Datasets statistics.
+
+            Dataset              Classes     Train      Val      Test                Hand-crafted prompt
+            ImageNet              1,000      1.28M      N/A     50,000              “a photo of a [CLASS].”
+            Caltech101              100       4,128    1,649     2,465              “a photo of a [CLASS].”
+            OxfordPets               37       2,944      736     3,669       “a photo of a [CLASS], a type of pet.”
+            StanfordCars            196       6,509    1,635     8,041              “a photo of a [CLASS].”
+            Flowers102              102       4,093    1,633     2,463     “a photo of a [CLASS], a type of flower.”
+            Food101                 101      50,500   20,200    30,300       “a photo of [CLASS], a type of food.”
+            FGVCAircraft            100       3,334    3,333     3,333    “a photo of a [CLASS], a type of aircraft.”
+            SUN397                  397      15,880    3,970    19,850              “a photo of a [CLASS].”
+            DTD                      47       2,820    1,128     1,692                “[CLASS] texture.”
+            EuroSAT                  10      13,500    5,400     8,100      “a centered satellite photo of [CLASS].”
+            UCF101                  101       7,639    1,898     3,783       “a photo of a person doing [CLASS].”
+            ImageNetV2            1,000       N/A      N/A      10,000             “a photo of a [CLASS].”
+            ImageNet-Sketch       1,000       N/A      N/A      50,889             “a photo of a [CLASS].”
+            ImageNet-A              200       N/A      N/A       7,500             “a photo of a [CLASS].”
+            ImageNet-R              200       N/A      N/A      30,000             “a photo of a [CLASS].”
+
+
+Table 7 Domain generalization results on DOSCO-2k, a recently proposed benchmark focusing on broader contextual domain
+shift. Among the three approaches, CoOp and its follow-up, CoCoOp, contain learnable components while CLIP here denotes
+the zero-shot model. Both CoOp and CoCoOp use four learnable context tokens initialized with the word embeddings of “a
+photo of a”. Bold denotes the best performance on each dataset for a specific architecture.
+
+                               P-Air       P-Cars     P-Ctech     P-Ins      P-Mam       P-Pets     P-UCF       Avg
+           ResNet-50
+           CLIP                16.1        56.1        86.7        62.7       59.7        84.0       60.6       60.9
+           CoOp                22.1        60.7        89.4        66.3       61.6        83.8       69.2       64.7
+           CoCoOp              20.1        59.8        90.4        67.9       63.8        87.6       69.1       65.5
+           ResNet-101
+           CLIP                17.5        63.2        89.5        62.4       62.2        84.2       61.3       62.9
+           CoOp                24.6        68.2        92.0        68.3       65.4        88.2       72.7       68.5
+           CoCoOp              22.5        65.2        93.3        69.9       67.5        88.6       71.5       68.4
+           ViT-B/32
+           CLIP                18.2        60.1        91.6        61.3       61.8        85.5       61.3       62.8
+           CoOp                24.0        63.0        93.6        67.3       65.7        88.5       74.5       68.1
+           CoCoOp              19.5        60.4        93.8        69.8       67.3        88.5       72.7       67.4
+           ViT-B/16
+           CLIP                24.4        64.9        92.6        67.5       67.9        87.4       66.1       67.2
+           CoOp                32.4        72.4        94.7        73.2       72.1        90.1       78.2       73.3
+           CoCoOp              30.4        68.7        94.8        73.5       73.6        91.6       76.3       72.7
+
+
+
+Frome A, Corrado G, Shlens J, Bengio S, Dean J, Ranzato            He K, Zhang X, Ren S, Sun J (2016) Deep residual learning
+   M, Mikolov T (2013) Devise: A deep visual-semantic em-             for image recognition. In: CVPR
+   bedding model. In: NeurIPS                                      He K, Fan H, Wu Y, Xie S, Girshick R (2020) Momentum
+Fürst A, Rumetshofer E, Tran V, Ramsauer H, Tang F,                  contrast for unsupervised visual representation learning.
+   Lehner J, Kreil D, Kopp M, Klambauer G, Bitto-Nemling              In: CVPR
+   A, et al. (2021) Cloob: Modern hopfield networks with in-       Helber P, Bischke B, Dengel A, Borth D (2019) Eurosat: A
+   foloob outperform clip. arXiv preprint arXiv:211011316             novel dataset and deep learning benchmark for land use
+Gao P, Geng S, Zhang R, Ma T, Fang R, Zhang Y, Li H, Qiao             and land cover classification. IEEE Journal of Selected
+   Y (2021) Clip-adapter: Better vision-language models with          Topics in Applied Earth Observations and Remote Sensing
+   feature adapters. arXiv preprint arXiv:211004544                Hénaff OJ, Srinivas A, Fauw JD, Razavi A, Doersch C, Es-
+Gao T, Fisch A, Chen D (2020) Making pre-trained lan-                 lami SMA, van den Oord A (2020) Data-efficient image
+   guage models better few-shot learners. arXiv preprint              recognition with contrastive predictive coding. In: ICML
+   arXiv:201215723                                                 Hendrycks D, Basart S, Mu N, Kadavath S, Wang F, Dorundo
+Gomez L, Patel Y, Rusiñol M, Karatzas D, Jawahar C (2017)            E, Desai R, Zhu T, Parajuli S, Guo M, Song D, Steinhardt
+   Self-supervised learning of visual features through embed-         J, Gilmer J (2021a) The many faces of robustness: A crit-
+   ding images into text topic spaces. In: CVPR                       ical analysis of out-of-distribution generalization. ICCV
+Learning to Prompt for Vision-Language Models                                                                                  13
+
+
+Hendrycks D, Zhao K, Basart S, Steinhardt J, Song D (2021b)         Soomro K, Zamir AR, Shah M (2012) Ucf101: A dataset of
+   Natural adversarial examples. In: CVPR                             101 human actions classes from videos in the wild. arXiv
+Jia C, Yang Y, Xia Y, Chen YT, Parekh Z, Pham H, Le                   preprint arXiv:12120402
+   QV, Sung Y, Li Z, Duerig T (2021) Scaling up visual and          Taori R, Dave A, Shankar V, Carlini N, Recht B, Schmidt L
+   vision-language representation learning with noisy text su-        (2020) Measuring robustness to natural distribution shifts
+   pervision. In: ICML                                                in image classification. In: NeurIPS
+Jia M, Tang L, Chen BC, Cardie C, Belongie S, Hariharan             Tian Y, Wang Y, Krishnan D, Tenenbaum JB, Isola P (2020)
+   B, Lim SN (2022) Visual prompt tuning. arXiv preprint              Rethinking few-shot image classification: a good embed-
+   arXiv:220312119                                                    ding is all you need? In: ECCV
+Jiang Z, Xu FF, Araki J, Neubig G (2020) How can we know            Vaswani A, Shazeer N, Parmar N, Uszkoreit J, Jones L,
+   what language models know? ACL                                     Gomez AN, Kaiser L, Polosukhin I (2017) Attention is all
+Joulin A, Van Der Maaten L, Jabri A, Vasilache N (2016)               you need. In: NeurIPS
+   Learning visual features from large weakly supervised data.      Wang D, Shelhamer E, Liu S, Olshausen B, Darrell T (2020)
+   In: ECCV                                                           Tent: Fully test-time adaptation by entropy minimization.
+Krause J, Stark M, Deng J, Fei-Fei L (2013) 3d object repre-          arXiv preprint arXiv:200610726
+   sentations for fine-grained categorization. In: ICCV-W           Wang H, Ge S, Lipton Z, Xing EP (2019) Learning robust
+Lei Ba J, Swersky K, Fidler S, et al. (2015) Predicting deep          global representations by penalizing local predictive power.
+   zero-shot convolutional neural networks using textual de-          In: NeurIPS
+   scriptions. In: ICCV                                             Xiao J, Hays J, Ehinger KA, Oliva A, Torralba A (2010) Sun
+Lester B, Al-Rfou R, Constant N (2021) The power of                   database: Large-scale scene recognition from abbey to zoo.
+   scale for parameter-efficient prompt tuning. arXiv preprint        In: CVPR
+   arXiv:210408691                                                  Yuan L, Chen D, Chen YL, Codella N, Dai X, Gao J,
+Li A, Jabri A, Joulin A, van der Maaten L (2017) Learning             Hu H, Huang X, Li B, Li C, et al. (2021) Florence: A
+   visual n-grams from web data. In: ICCV                             new foundation model for computer vision. arXiv preprint
+Li XL, Liang P (2021) Prefix-tuning: Optimizing continuous            arXiv:211111432
+   prompts for generation. arXiv preprint arXiv:210100190           Zhang Y, Jiang H, Miura Y, Manning CD, Langlotz CP
+Li Y, Liang F, Zhao L, Cui Y, Ouyang W, Shao J, Yu F, Yan             (2020) Contrastive learning of medical visual represen-
+   J (2021) Supervision exists everywhere: A data efficient           tations from paired images and text. arXiv preprint
+   contrastive language-image pre-training paradigm. arXiv            arXiv:201000747
+   preprint arXiv:211005208                                         Zhong Z, Friedman D, Chen D (2021) Factual probing is
+Liu P, Yuan W, Fu J, Jiang Z, Hayashi H, Neubig G (2021a)             [mask]: Learning vs. learning to recall. In: NAACL
+   Pre-train, prompt, and predict: A systematic survey of           Zhou B, Lapedriza A, Khosla A, Oliva A, Torralba A (2017)
+   prompting methods in natural language processing. arXiv            Places: A 10 million image database for scene recognition.
+   preprint arXiv:210713586                                           IEEE transactions on pattern analysis and machine intel-
+Liu X, Zheng Y, Du Z, Ding M, Qian Y, Yang Z,                         ligence 40(6):1452–1464
+   Tang J (2021b) Gpt understands, too. arXiv preprint              Zhou K, Liu Z, Qiao Y, Xiang T, Loy CC (2021) Domain
+   arXiv:210310385                                                    generalization: A survey. arXiv preprint arXiv:210302503
+Maji S, Rahtu E, Kannala J, Blaschko M, Vedaldi A (2013)            Zhou K, Yang J, Loy CC, Liu Z (2022a) Conditional
+   Fine-grained visual classification of aircraft. arXiv preprint     prompt learning for vision-language models. arXiv preprint
+   arXiv:13065151                                                     arXiv:220305557
+Nilsback ME, Zisserman A (2008) Automated flower classifi-          Zhou K, Zhang Y, Zang Y, Yang J, Loy CC, Liu Z
+   cation over a large number of classes. In: ICVGIP                  (2022b) On-device domain generalization. arXiv preprint
+Parkhi OM, Vedaldi A, Zisserman A, Jawahar C (2012) Cats              arXiv:220907521
+   and dogs. In: CVPR
+Petroni F, Rocktäschel T, Lewis P, Bakhtin A, Wu Y, Miller
+   AH, Riedel S (2019) Language models as knowledge bases?
+   In: EMNLP
+Radford A, Kim JW, Hallacy C, Ramesh A, Goh G, Agarwal
+   S, Sastry G, Askell A, Mishkin P, Clark J, et al. (2021)
+   Learning transferable visual models from natural language
+   supervision. In: ICML
+Recht B, Roelofs R, Schmidt L, Shankar V (2019) Do ima-
+   genet classifiers generalize to imagenet? In: ICML
+Sennrich R, Haddow B, Birch A (2016) Neural machine trans-
+   lation of rare words with subword units. In: ACL
+Shin T, Razeghi Y, Logan IV RL, Wallace E, Singh S (2020)
+   Autoprompt: Eliciting knowledge from language models
+   with automatically generated prompts. In: EMNLP
+Singh A, Hu R, Goswami V, Couairon G, Galuba W,
+   Rohrbach M, Kiela D (2021) Flava: A foundational
+   language and vision alignment model. arXiv preprint
+   arXiv:211204482
+Socher R, Ganjoo M, Sridhar H, Bastani O, Manning CD, Ng
+   AY (2013) Zero-shot learning through cross-modal trans-
+   fer. In: NeurIPS
+

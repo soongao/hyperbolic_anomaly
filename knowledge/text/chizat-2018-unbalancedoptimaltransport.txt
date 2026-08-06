@@ -1,0 +1,2662 @@
+                                           MATHEMATICS OF COMPUTATION
+                                           Volume 00, Number 0, Pages 000–000
+                                           S 0025-5718(XX)0000-0
+
+
+
+
+                                                           SCALING ALGORITHMS FOR
+                                                    UNBALANCED OPTIMAL TRANSPORT PROBLEMS
+
+
+
+
+arXiv:1607.05816v2 [math.OC] 22 May 2017
+                                                        LÉNAÏC CHIZAT, GABRIEL PEYRÉ, BERNHARD SCHMITZER,
+                                                                     AND FRANÇOIS-XAVIER VIALARD
+
+
+                                                    Abstract. This article introduces a new class of fast algorithms to approx-
+                                                    imate variational problems involving unbalanced optimal transport. While
+                                                    classical optimal transport considers only normalized probability distributions,
+                                                    it is important for many applications to be able to compute some sort of re-
+                                                    laxed transportation between arbitrary positive measures. A generic class of
+                                                    such “unbalanced” optimal transport problems has been recently proposed by
+                                                    several authors. In this paper, we show how to extend the, now classical,
+                                                    entropic regularization scheme to these unbalanced problems. This gives rise
+                                                    to fast, highly parallelizable algorithms that operate by performing only di-
+                                                    agonal scaling (i.e. pointwise multiplications) of the transportation couplings.
+                                                    They are generalizations of the celebrated Sinkhorn algorithm. We show how
+                                                    these methods can be used to solve unbalanced transport, unbalanced gradient
+                                                    flows, and to compute unbalanced barycenters. We showcase applications to
+                                                    2-D shape modification, color transfer, and growth models.
+
+
+
+
+                                                                                1. Introduction
+                                              Optimal transport (OT) is a standard way to lift a metric defined on some
+                                           “ground” space X to a metric on probability distributions (positive Radon mea-
+                                           sures with unit mass) M+ (X). Initially formulated by Monge [53] as a non-convex
+                                           optimization problem over transport maps, its modern formulation as a linear pro-
+                                           gram is due to Kantorovitch [40], and it has been revitalized thanks to the ground-
+                                           breaking work of Brenier [15]. We refer to the monographs [76, 67] for a more
+                                           detailed background on the theory of OT.
+                                              While initially developed by theoreticians, OT is now becoming popular in ap-
+                                           plied fields, and we refer for instance to application for color manipulation in image
+                                           processing [61], reflectance interpolation in computer graphics [12], image retrieval
+                                           in computer vision [66] and statistical inference in machine learning [74]. A key lim-
+                                           itation of classical OT is that it requires the input measures to be normalized to unit
+                                           mass, which is a problematic assumption for many applications that require either
+                                           to handle arbitrary positive measures and/or to allow for only partial displacement
+                                           of mass. All these applications might indeed benefit from OT algorithms that can
+                                           handle mass variation (creation or destruction) as well as mass transportation.
+                                              While many proposals have been made to account for these “unbalanced” optimal
+                                           transport problems, they used to be tailored for specific applications. There have
+                                           been several recent works (reviewed below) that try to put all these proposals (and
+                                           some new ones) into a common generic framework. These emerging theoretical
+
+                                              2010 Mathematics Subject Classification. Primary: 90C25, secondary: 65K10, 68U10.
+
+                                                                                                         c XXXX American Mathematical Society
+                                                                                           1
+2              L. CHIZAT, G. PEYRÉ, B. SCHMITZER, AND F-X. VIALARD
+
+
+advances call for algorithms that extend existing fast OT methods to these new
+unbalanced problems. It is precisely the goal of this paper to show how a popular
+numerical approach to OT – namely entropic regularization – does extend in a
+very natural and efficient way to solve a variety of unbalanced problems, including
+unbalanced OT, barycenters and gradient flows.
+
+1.1. Previous Works.
+
+1.1.1. Algorithms for optimal transport. The Kantorovitch formulation of OT as a
+linear program, when restricted to sums of Diracs, can be directly tackled using
+simplex or interior point methods. For the special case of optimal linear assign-
+ment (i.e. for sums of the same number of uniform-mass Diracs) one can also use
+combinatorial algorithms such as the Hungarian method [18] or the auction algo-
+rithm [11]. The time complexity of these algorithms is roughly cubic in the number
+of Diracs, and hence they do not scale to very large problems.
+   In the specific case of the squared Euclidean cost, it is possible to make use
+of the geodesic structure of the OT distance, and reparametrize this as a convex
+optimization problem, as proposed by Benamou and Brenier [7], see also [56] for
+a discussion on the use of first order non-smooth optimization schemes. In [68]
+a multi-scale algorithm is developed that consistently leverages the structure of
+geometric transport problems to accelerate linear program solvers.
+   A last class of approaches deals with semi-discrete problems, when one measure
+has a density, and the second one is a weighted sum of Dirac masses. This problem,
+introduced by Alexandrov and Pogorelov as a theoretical tool, can be solved with
+geometric tools when using the squared Euclidean cost [4] (see also [52] for the
+development of efficient algorithms using methods from computational geometry
+and [46] for 3-D computations).
+
+1.1.2. Entropic transport. These computational methods thus cannot cope with
+large scale problems with arbitrary transportation costs. A recent class of ap-
+proaches, initiated and revitalized by the paper of Marco Cuturi [26], proposes to
+compute an approximate transport coupling using entropic regularization. This
+idea has its origins in many different fields, most notably it is connected with
+Schrödinger’s problem in statistical physics [70, 45] and with the iterative scaling
+algorithm by Sinkhorn [72] (also known as IPFP [29]) which, given a square matrix
+with positive entries, aims at finding two vectors of positive numbers—so-called
+scalings—that makes it a bistochastic matrix after multiplying rows and columns
+by these vectors. This entropic smoothing can be interpreted as a strictly con-
+vex barrier for positivity, but its main computational advantage is that it leads
+to very simple closed form expressions for all steps of the algorithm, which would
+not be possible when using different regularization functionals. Several follow-up
+articles [27, 8] to [26] have shown that the same strategy can also be used to tackle
+the computation of barycenters for the Wasserstein distance (as initially formu-
+lated by [2]), and for solving OT problems on geometric domains (such as regular
+grids or triangulated meshes) using convolution and the heat diffusion kernel [73].
+Some theoretical properties of this regularization are studied in [20], including the
+Γ-convergence of the regularized problem toward classical transport when regular-
+ization vanishes.
+    SCALING ALGORITHMS FOR UNBALANCED OPTIMAL TRANSPORT PROBLEMS                   3
+
+
+1.1.3. Optimization with Bregman divergences. The success of this entropic regu-
+larization scheme is tightly linked with use of the Kullback-Leibler (KL) divergence
+as a natural Bregman divergence [14] for the optimization on the space of posi-
+tive Radon measures. Not only is this divergence quite natural, but it also leads
+to simple formulas for the computation of projectors and so-called proximal op-
+erators (see below for a definition) for many functions typically involved in OT.
+The most simple algorithm, which is actually at the heart of Sinkhorn’s iterations,
+is the iterative projection on affine subspaces for the KL divergence. A refined
+version of these iterations, which works for arbitrary convex sets (not just affine
+spaces) is the so-called Dykstra’s algorithm [30], which can be interpreted (just
+like iterative projections) as an iterative block-coordinates minimization on a dual
+problem. Dykstra’s algorithm is known to converge when used in conjunction with
+Bregman divergences [5, 22] (see [58] for details on the underlying idea for sums
+of two arbitrary functions). Many other first order proximal methods for Bregman
+divergences exists. The most simple one is the proximal point algorithm [31], but
+most proximal splitting schemes have been extended to this setting, such as for
+instance ADMM [78], primal-dual schemes [23] and forward-backward [54].
+   The algorithm we propose in this article can be seen as special instance of Dyk-
+stra’s iterations, but with an extremely simple (both conceptually and algorithmi-
+cally) structure, which we refer to as a “scaling” algorithm. It extends Sinkhorn’s
+iterations to more complex problems. This structure is due to the fact that the
+functions involved in OT problems make use of the marginals of the couplings that
+are being optimized.
+
+1.1.4. Unbalanced transport: from theory to numerics. There has been a large
+number of proposals to extend OT methods to arbitrary “unbalanced” positive
+measures. Let us for instance quote the Kantorovitch-Rubinstein dual-Lipschitz
+norms [38], optimal partial transport [33] and geodesic computations with source
+terms [59, 49]. Most of these approaches, and much more, can be seen as special
+instances of a generic class of OT-like problems, that have been proposed indepen-
+dently in [47] and [24]. These unbalanced problems can be formulated in several
+ways, that are equivalent (under some restrictive conditions on the cost): a geo-
+desic (dynamic) formulation with a source term [41, 25, 48], a static formulation
+with two semi-couplings [24] and a static formulation with approximate marginal
+constraints [47]. From a numerical perspective, the last formulation (approximate
+marginals constraints) is the most simple to handle, since, as we show in the fol-
+lowing section, it only involves a minor modification of the initial linear program,
+that has to be turned into a convex problem involving ϕ-divergences (see Definition
+2.2). This is the one that we consider in this article. Note that the use of such a
+relaxed formulation, in conjunction with entropic smoothing has been introduced,
+without proof of convergence, in [35] for application in machine learning.
+
+1.1.5. Gradient flows. Beyond OT problems and barycenter problems, a popular
+use of Wasserstein distances is to study gradient flows, following the formalism
+of “minimizing movements” detailed in [3]. This corresponds to discrete implicit
+stepping (i.e. proximal maps) for the Wasserstein distance (instead of more common
+Euclidean or Hilbertian metrics). In some cases, these time-discrete flows can be
+shown to converge to continuous flows that solve a suitable PDE, as the temporal
+stepsize tends to 0. The most famous example is the gradient flow of the entropy for
+4               L. CHIZAT, G. PEYRÉ, B. SCHMITZER, AND F-X. VIALARD
+
+
+the Wasserstein metric, which solves the diffusion equation [39]. Non-linear PDEs
+are considered for example in [55]. An application to imaging can be found in [17].
+Another use of these implicit steps is to construct minimizing flows of non-smooth
+functionals, for instance to model crowd motions [50].
+   A large variety of dedicated numerical schemes has been proposed for spatial
+discretization and solving of these time-discrete flows, such as for instance finite
+differences [16], finite volumes [21] and Lagrangian schemes [9, 10]. A bottleneck
+of these schemes is the high computational complexity due to the resolution of an
+OT-like problem at each time step. The use of entropic regularization has been
+proposed recently in [58] and studied theoretically in [20]. A chief advantage of
+this approach is that each step can be solved efficiently on a regular grid with
+fast Sinkhorn iterations involving only Gaussian convolutions, but this comes at
+the price of additional diffusivity introduced by the approximation, which makes it
+unsuitable to capture sharp features of solutions.
+   It is possible to extend these gradient flows by replacing the Wasserstein distance
+by more general unbalanced distances. This allows to define flows over arbitrary
+positive measures, hence involving creation and destruction of mass, which is crucial
+to model growth phenomena, such as for instance the Hele-Shaw model of tumor
+evolution [57]. An analysis of such flows based on a splitting scheme has been
+recently provided in [37]. It is one of the goals of this article to propose a versatile
+algorithm, based on iterative scalings, to approximate numerically these unbalanced
+flows.
+
+1.2. Contributions and Outline. The main contribution of this article is to de-
+fine a class of iterative scaling algorithms to solve the entropic approximation of a
+variety of unbalanced optimal transport problems. First, in Section 2, we exhibit a
+common structure to most optimization problems related to OT: a nonnegativity
+constraint, a linear transport cost and convex functions acting on the marginals of
+the optimized couplings. For solving the entropic regularization of these problems,
+we then introduce in Section 3 a generic “scaling” algorithm which is a direct gen-
+eralization of Sinkhorn’s algorithm. In a continuous setting, we show under some
+assumptions that the iterates are well defined and correspond to alternating opti-
+mization on the dual and we prove linear convergence in a particular key case. In
+a discrete setting, we show in Section 4 that this algorithm converges as soon as
+the dual problem is well-posed. We also give a simple description of the algorithm,
+introduce a stabilization scheme to reach very small values of the regularization
+parameter and sketch a generalization of this algorithm. Finally, in Section 5,
+we showcase the application of these methods to 1-D and 2-D unbalanced opti-
+mal transport, generalizations of Wasserstein barycenters and gradient flows with
+growth. The main advantages of our approach are that it is simple (it only involves
+matrix multiplication and pointwise elementary operations), quite generic (it ap-
+plies to most known OT-like problems), enjoys fast convergence (linear convergence
+is observed, and show in particular cases) and is highly parallelizable. The code
+to reproduce the results of this article is available online1. Note also that an effi-
+cient numerical implementation of the scaling algorithm developed in this paper is
+studied further in [69], see Section 4.4.4 for a discussion.
+
+    1https://github.com/lchizat/optimal-transport
+        SCALING ALGORITHMS FOR UNBALANCED OPTIMAL TRANSPORT PROBLEMS                                   5
+
+
+1.3. Notation. The space of nonnegative finite Radon measures2 on a (Hausdorff)
+topological space T is denoted by M+ (T ), and the vector space it generates by
+                                                                         X
+M(T ). For a measure on a product space µ ∈ M(X × Y ), P#                  µ (or sometimes
+  1                                                   Y          2
+P# µ if X = Y ) denotes its first marginal and P# µ (or P# µ) its second marginal.
+    We denote by dt, dx, . . . the reference measures on some measurable spaces
+T, X, . . . . They are not assumed to be the Lebesgue measure (but most of the
+time, they are probability measures). If (T, dt) is a measured space, we denote by
+L1 (T ) and L∞ (T ) the usual spaces of equivalence classes of measurable functions
+from T to R which are, respectively, absolutely integrable and essentially bounded.
+When there is a subscript + appended to the name of a space of functions, it refers
+to the cone of nonnegative functions in that space.
+    Divergence functionals (or ϕ-divergences) are denoted by a calligraphic letter
+D when they act on measures (as defined in Definition 2.2), by straight letters D
+when they act on functions (as defined in (5.2)) and with an overline D when they
+act on two real numbers (as in (5.2)). More generally, functionals on measures are
+denoted by calligraphic letters (F, G, . . . ) and functionals on functions by straight
+capital letters (F, G, . . . ).
+    The same convention holds for the Kullback-Leibler divergence (which is just a
+particular case of divergence functionals) thus denoted by KL, KL or KL depending
+on the nature of its arguments. Moreover, we generalize the definition of KL to
+families of functions as follows: if (X, dx) and (Y, dy) are two measured spaces and
+r, s : X ×Y → Rn are families of measurable functions, the KL-divergence is defined
+as
+                       XZ                                                        
+                  def.                 ri (x, y)
+(1.1) KL(r|s) =                    log             ri (x, y) − ri (x, y) + si (x, y) dxdy
+                        i     X×Y      si (x, y)
+(with 0 log(0/0) = 0) if r, s ⩾ 0 a.e. and (si (x, y) = 0) ⇒ (ri (x, y) = 0) a.e., and ∞
+otherwise.
+   The generalization of some notations to families of functions is often implicit.
+For instance, if (ri )ni=1 and (si )ni=1 are two families of functions, we write
+                                      n
+                                      XZ
+                                 def.
+                          hr, si =             ri (x, y) si (x, y)dxdy
+                                       i=1   X×Y
+
+and the projection operators are defined componentwise, for i ∈ {1, . . . , n}, as
+                        Z                               Z
+             X                                Y
+(1.2)     (P# r)i (x) =   ri (x, y)dy and (P# r)i (y) =     ri (x, y)dx .
+                                Y                                        X
+   If X and Y are finite spaces (i.e. contain only a finite number of points), we
+represent functions on X by vectors denoted by bold letters a and functions on
+X × Y by matrices denoted by capital bold letters A. In this context the notations
+a b and a b denote, respectively entrywise multiplication and entrywise division
+with convention 0/0 = 0 between vectors.
+   The conjugate of a convex function f is denoted by f ∗ and its subdifferential
+is denoted by ∂f . Some reminders on convex analysis are given in Appendix A.1.
+The indicator of some convex set C is
+                                   
+                                      0 if a ∈ C,
+                          ιC (a) =
+                                      +∞ otherwise.
+   2
+       Borel measures which are inner regular. If T is Polish, all Borel measures are inner regular.
+6                L. CHIZAT, G. PEYRÉ, B. SCHMITZER, AND F-X. VIALARD
+
+
+   Finally, the proximal operator plays a central role in this article. In full general-
+ity, if E a set, D : E × E → R+ ∪ {∞} is a divergence which measures “closeness”
+between points in E, it is defined for F : E → R ∪ {∞} and x ∈ E as
+                           proxD
+                               F (x) = argmin F (y) + D(y|x) .
+                                           y∈E
+
+           2. Unifying Formulation of Transport-like Problems
+   We review below a variety of variational problems related to optimal transport
+that can all be recast as a generic variational problem, involving transport and
+functions on the marginals. The notion of “divergence” functionals, introduced
+in optimal transport by [47], makes this unification possible and is defined in the
+following.
+2.1. Divergence Functionals. Divergences are functionals which, by looking at
+the pointwise “ratio” between two measures, give a sense of how close they are.
+They have nice analytical and computational properties and are built from entropy
+functions.
+Definition 2.1 (Entropy function). A function ϕ : R → R ∪ {∞} is an entropy
+function if it is lower semicontinuous, convex, dom ϕ ⊂ [0, ∞[ and satisfies the
+following feasibility condition: dom ϕ ∩ ]0, ∞[ 6= ∅. The speed of growth of ϕ at ∞
+is described by
+                           ϕ0∞ = lim ϕ(x)/x ∈ R ∪ {∞} .
+                                    x↑+∞
+
+    If ϕ0∞ = ∞, then ϕ grows faster than any linear function and ϕ is said superlinear.
+Any entropy function ϕ induces a ϕ-divergence (also known as Csiszár divergence)
+as follows.
+Definition 2.2 (Divergences). Let ϕ be an entropy function. For µ, ν ∈ M(T ), let
+dµ        ⊥                                3
+ dν ν + µ be the Lebesgue decomposition of µ with respect to ν. The divergence
+Dϕ is defined by                    Z     
+                               def.       dµ
+                      Dϕ (µ|ν) =       ϕ     dν + ϕ0∞ µ⊥ (T )
+                                     T    dν
+if µ, ν are nonnegative and ∞ otherwise.
+    The proof of the following Proposition can be found in [47, Thm 2.7].
+Proposition 2.3. If ϕ is an entropy function, then Dϕ is jointly 1-homogeneous,
+convex and weakly* lower semicontinuous in (µ, ν).
+   The Kullback-Leibler divergence, also known as the relative entropy, plays a
+central role in this article.
+                                                              def.
+Example 2.4. The Kullback-Leibler divergence KL = DϕKL is the divergence
+associated to the entropy function ϕKL , given by
+                               
+                               s log(s) − s + 1 for s > 0,
+                               
+(2.1)                 ϕKL (s) = 1                 for s = 0,
+                               
+                                 +∞               otherwise.
+                               
+
+   3The Lebesgue decomposition Theorem asserts that, given ν, µ admits a unique decomposition
+as the sum of two measures µs + µ⊥ such that µs is absolutely continuous with respect to ν and
+µ⊥ and ν are singular.
+     SCALING ALGORITHMS FOR UNBALANCED OPTIMAL TRANSPORT PROBLEMS                      7
+
+
+When restricted to densities on a measured space, it is also the Bregman diver-
+gence [14] associated to (minus) the entropy.
+  The following divergences will also be considered as examples.
+                                                        def.
+Example 2.5. The total variation distance TV(µ|ν) = |µ − ν|TV is the divergence
+associated to:
+                                  (
+                                    |s − 1| for s ⩾ 0,
+(2.2)                  ϕTV (s) =
+                                    +∞      otherwise.
+Example 2.6. The equality constraint ι{=} (µ|ν) which is 0 if µ = ν and ∞ other-
+wise, is the divergence associated to ϕ = ι{1} .
+Example 2.7. One can generalize the latter and define a “range constraint”,
+denoted RG[α,β] (µ|ν), as the divergence which is zero if α ν ⩽ µ ⩽ β ν with
+0 ⩽ α ⩽ β ⩽ ∞, and ∞ else. This is the divergence associated to ϕ = ι[α,β] .
+2.2. Balanced Optimal Transport. Using divergences, the classical “balanced”
+optimal transport problem can be defined as follows.
+Definition 2.8 (Balanced Optimal Transport). Let X and Y be Hausdorff topo-
+logical spaces, let c : X × Y → R ∪ {∞} be a lower semi-continuous function. The
+optimal transport problem between µ ∈ M+ (X) and ν ∈ M+ (Y ) is
+                             Z
+                                               X               Y
+(2.3)                inf         c dγ + ι{=} (P# γ|µ) + ι{=} (P# γ|ν).
+               γ∈M+ (X×Y )    X×Y
+
+Proposition 2.9. If c is lower bounded and (2.3) is feasible, then the infimum is
+attained.
+   The proof of this result, as well as a general theory of optimal transport can
+be found in [77]. If one interprets c(x, y) as the cost of transporting a unit mass
+from x to y, the problem is then to find the cheapest way to move a mass initially
+distributed according to µ toward the distribution ν. If γ is additionally constrained
+to be of the form (id × T )# µ for some map T : X → Y , then (2.3) is called the
+Monge problem.
+Example 2.10. An important special case is when X = Y and c is the power of a
+distance on X. Then, the optimal cost (i.e. the value of (2.3)) is itself the power of a
+distance on the space of probability measures on X. This distance is often referred
+to as “Wasserstein” distance and denoted by W, although this denomination is
+disputed. We refer to [77, Chap. 6, Bibliographical Notes] for a discussion of the
+historical context.
+2.3. Unbalanced Optimal Transport. Standard optimal transport only allows
+meaningful comparison of measures with the same total mass: whenever µ(X) 6=
+ν(Y ), there is no feasible γ in (2.3). Several propositions have been made to cir-
+cumvent this limitation by defining “unbalanced” transport problems in various
+dynamic and static formulations (see Section 1.1). The following formulation with
+relaxed marginal constraints is best suited for the numerical schemes presented in
+this article.
+Definition 2.11 (Unbalanced Optimal Transport [47, Problem 3.1]). Let X and Y
+be Hausdorff topological spaces, let c : X × Y → [0, ∞] be a lower semi-continuous
+8              L. CHIZAT, G. PEYRÉ, B. SCHMITZER, AND F-X. VIALARD
+
+
+function and let Dϕ1 , Dϕ2 be two divergences over X and Y , as in Definition 2.2.
+For µ ∈ M+ (X) and ν ∈ M+ (Y ), the unbalanced soft-marginal transport problem
+is
+                           Z
+                                            X              Y
+(2.4)             inf          c dγ + Dϕ1 (P# γ|µ) + Dϕ2 (P# γ|ν) .
+               γ∈M+ (X×Y )   X×Y
+
+Proposition 2.12. Assume that (2.4) is feasible. If ϕ1 and ϕ2 are superlinear,
+then the infimum is attained. This is also the case if c has compact sublevel sets
+and ϕ01∞ + ϕ02∞ + inf c > 0.
+   The proof of this result as well as a thorough study of duality properties of this
+problem can be found in [47]. Note that (2.3) is a particular case of (2.4) when the
+domains of the entropy functions ϕi are the singleton {1}. More generally, if the
+functions ϕi admit unique minima at 1, (2.4) can be viewed as a relaxation of the
+initial problem (2.3) where the “hard” marginal constraints are replaced by “soft”
+constraints, penalizing the deviation of the marginals of γ from µ and ν. Now we
+discuss a specific case of particular interest.
+Definition 2.13 (Wasserstein-Fisher-Rao Distance). Take X = Y , let d be a
+distance on X and λ ⩾ 0. For the cost
+                         c(x, y) = − log cos2+ (d(x, y))
+                                                        
+(2.5)
+with cos+ : z 7→ cos(z ∧ π2 ) and Dϕ1 = Dϕ2 = λ KL, we define WFRλ (µ, ν) as
+the square root of the minimum in (2.4) (as a function of the measures (µ, ν) ∈
+                                  def.
+M+ (X)2 ). We simply write WFR = WFR1 for λ = 1.
+   As shown in [47], WFR defines a distance on M+ (X), which is equal to the
+Wasserstein-Fisher-Rao geodesic distance introduced simultaneously and indepen-
+dently in [47, 41, 25] (it is named Hellinger-Kantorovich in [47]). An alternative
+static formulation is given in [24]. Other important cases include:
+      • The Gaussian Hellinger-Kantorovich distance GHK is obtained by taking
+         the cost c = d2 (d still a metric) and Dϕi = λ KL with λ > 0. It has been
+         introduced in [47] where it is also shown that when X is a geodesic space,
+         WFR is the geodesic distance generated by GHK.
+      • The optimal partial transport problem, which is obtained by taking a cost
+         function bounded from below by −2λ and Dϕi = λ TV, with λ > 0. Orig-
+         inally, optimal partial transport refers to a problem where the marginal
+         constraints are replaced by a constraint on the total mass of the marginals
+         (and domination constraints); here λ is the Lagrange multiplier associated
+         to the mass constraint (see [19]).
+      • With the divergence RG as in example 2.7, one imposes a range constraint
+         on the marginal:
+                     X                                  X
+                 RG(P# γ|µ) < +∞          ⇔       αµ ⩽ P# γ ⩽ βµ
+                            Y
+       (and similarly for P#  γ).
+  The following result is a minor extension of results from [47, 24] and is useful if
+one wishes to vary the parameter λ in numerical applications.
+Proposition 2.14. WFRλ defines a distance if 0 ⩽ λ ⩽ 1 (degenerate if λ = 0).
+The upper bound on λ is necessary when X is a geodesic space of diameter greater
+than π/2.
+     SCALING ALGORITHMS FOR UNBALANCED OPTIMAL TRANSPORT PROBLEMS                              9
+
+
+Proof. The case λ = 0 is trivial. If λ > 0, when dividing (2.4) by λ, one obtains the
+                      1/λ                                                   1
+new cost −2 log(cos+ (d(x, y))). But the function f : d 7→ arccos(cos λ (d)) defined
+on [0, π/2] is increasing, positive, satisfies {0} = f −1 (0) and for x ∈]0, π/2[ it holds
+                                      1
+                              1 cos λ −2
+                                                                   
+                                                     1            2
+                       f 00 =                    1 −   sin2
+                                                            − cos λ   .
+                              λ (1 − cos λ2 )2       λ
+                                                1
+From the convexity inequality sign[(1 − X) λ − 1 + λ1 X] = sign( λ1 − 1) it follows
+that f is strictly concave on [0, π/2] if λ < 1 and strictly convex if λ > 1. Thus if
+λ ⩽ 1, f ◦ d still defines a distance on X and consequently WFRλ too.
+   If X is a geodesic space of diameter greater than π/2, take (x1 , x2 ) ∈ X 2 such
+that d(x1 , x2 ) = π/2. From [47, Corollary 8.3], (M(X), WFR1 ) is itself a geodesic
+space. Consequently, there exists a midpoint µ ∈ M+ (X), i.e. such that
+                                                     1
+                 WFR1 (δx1 , µ) = WFR1 (δx2 , µ) =     WFR1 (δx1 , δx2 ) .
+                                                     2
+From [47, Theorem 8.6] and the characterization of geodesics in Cone(X) it holds
+0 < d(x, xi ) < π/2 for µ a.e. x ∈ X. This implies, for λ > 1, and µ a.e. x,
+         1/λ
+− log(cos+ (d(xi , x))) < − log(cos+ (d(xi , x))). Thus (WFR2λ /λ)(δxi , µ) < WFR21 (δxi , µ).
+But, for λ ⩾ 1, (WFR2λ /λ)(δx1 , δx2 ) = 2 KL(0|1) = 2 this leads to
+                   WFRλ (δx1 , µ) + WFRλ (δx2 , µ) < WFRλ (δx1 , δx2 )
+and the triangle inequality property is lost.                                              
+
+2.4. Barycenter Problem and Extensions. The problem of finding an “aver-
+age” measure σ ∈ M+ (Y ) which minimizes the sum of the (possibly unbalanced)
+transport cost toward every measure of a family (µk )nk=1 ∈ M+ (X)n is of theoretical
+and practical interest (see Section 1.1). To formalize this problem, consider a family
+of costs functions (ck )nk=1 on X × Y and a family of divergences (Dϕk,1 , Dϕk,2 )nk=1 .
+The problem is to solve
+                           n
+                          X Z                                                     
+                                                      X                    Y
+      inf        inf
+                  n
+                                     ck dγi + Dϕk,1 (P# γi |µi ) + Dϕk,2 (P# γi |σ) .
+   σ∈M+ (Y )    (γk )k=1 ∈      X×Y
+               M+ (X×Y )n k=1
+
+By exchanging the infima, this is equivalent to
+(2.6)
+            n Z
+            X                  n
+                               X                                    n
+                                                                    X
+                                          X                                       Y
+      inf
+       n
+                    c k dγ k +    Dϕi,1 (P# γk |µk ) +      inf           Dϕk,2 (P# γk |σ) .
+   (γk )k=1 ∈       X×Y                                 σ∈M+ (Y )
+  M+ (X×Y )n k=1                 k=1                                k=1
+
+
+Note that while the object of interest is the minimizer σ and not the family of
+couplings, we will see in Section 5.2 that the computation of σ is a byproduct of
+the “scaling” algorithm defined below.
+   The two following examples are specific instances of so-called Fréchet means,
+defined in any complete metric space (E, d) as solutions to
+                                      X
+                              argmin     αk d(µk , σ)2
+                                  σ∈E
+                                         k
+
+where (αk )nk=1 is a family of nonnegative weights and (µk )nk=1 ∈ E n .
+10              L. CHIZAT, G. PEYRÉ, B. SCHMITZER, AND F-X. VIALARD
+
+
+Example 2.15 (Wasserstein barycenters). Let X = Y and let c be the quadratic
+cost (x, y) 7→ d(x, y)2 for a metric d and define ck = αk c. Let all the divergences
+be the equality constraints. Then (2.6) is a formulation of the Fréchet means in the
+Wasserstein space, also known as Wasserstein barycenters (see [1]).
+Example 2.16 (WFR barycenters). Let c be as in (2.5), define ck = αk c and let
+Dϕk,1 = Dϕk,1 = αi KL for all k ∈ {1, . . . , n}. Then (2.6) is a formulation of Fréchet
+means for the WFR distance.
+2.5. Gradient Flows.
+2.5.1. General outline. Given a metric space (T, d) and some lower-semicontinuous
+function G : T → R ∪ {∞} with compact sublevel sets, a time-discrete gradient
+flow with step size τ > 0 starting from an initial point µ0 ∈ T corresponds to the
+computation of a sequence (µτk )k∈N via
+                 def.                                               d2 (µτk , µ)
+              µτ0 = µ0 ,                  µτk+1 ∈ argmin G(µ) +                  .
+                                                    µ∈T                 2τ
+This scheme, which is a particular case of De Giorgi’s minimizing movements, gen-
+eralizes the notion of implicit Euler steps to approximate gradient flows in Euclidean
+spaces, which are recovered when (T, d) = (Rn , | · |). From a theoretical point of
+view, the object of interest is the limit trajectory when τ → 0 of the piecewise
+constant interpolation
+                                 def.
+                           µτ (t) = µτk for all t ∈ [kτ, (k + 1)τ [ .
+Initiated by [39], the study of such flows when T is the space of probability measures
+endowed with the Wasserstein metric d = W (see Section 2.2) has led to consider-
+able advances in the theoretical study of PDEs and their numerical resolution (see
+Section 1.1). The recent introduction of “unbalanced transport” metrics paves the
+way for further applications, since it is now possible to consider the whole space of
+nonnegative measures, endowed for instance with the metric WFR, as considered
+in [37].
+2.5.2. Minimization problem. For gradient flows based on an optimal transport
+metric, such as W, WFR or GHK, each step requires to solve, after swapping the
+two infima, a problem of the form
+                    Z
+                                     1
+                                       γ|µτk ) + inf        2
+                                                                            
+(2.7)       inf         c dγ + Dϕ1 (P#                Dϕ2 (P# γ|µ) + 2τ G(µ)
+        γ∈M+ (X×X)      X×Y                           µ∈M+ (X)
+
+where ϕ1 , ϕ2 are entropy functions and G is a lower semicontinuous functional
+which we also assume convex. This problem, as well as variants, involving so-
+called “splitting” techniques (see [37]) fit into the framework developed below. In
+particular, we show in Section 5.3 that the computation of µk+1 is a byproduct of
+the minimization of (2.7) with the algorithm defined below.
+2.5.3. Flows associated to WFR. The distance WFR was only introduced recently,
+so a sound theoretical analysis of the corresponding gradient flows and their limit
+PDEs is not yet available (and is not the subject of the present article). Meanwhile,
+we present here heuristic arguments in a smooth setting (see also [41, Section 3.2])
+which lead to the evolution equation
+(2.8)                         ∂t µ = div(µ∇G 0 (µ)) − 4µG 0 (µ)
+    SCALING ALGORITHMS FOR UNBALANCED OPTIMAL TRANSPORT PROBLEMS                    11
+
+                                                     0
+for the limit trajectory of µτ (t) as τ →
+                                        R 0, 0where G (µ) is, if it exists, the unique
+                     d
+function such that dε G(µ + εχ)|ε=0 = X G (µ)dχ for all perturbations admissible
+perturbation χ.
+Heuristic argument. When restricted to measures µ with positive density of Sobolev
+regularity, WFR is the weak Riemannian metric associated to the tensor
+                                 Z                     Z
+                         def.                        1
+            g(µ)(δµ, δµ) = inf      |v(x)|2 µ(x)dx +     |α(x)|2 µ(x)dx
+                              v,α X                  4 X
+where, for a small variation δµ, one searches over the decompositions δµ = − div(vµ)+
+αµ into displacement (given by the velocity field v ∈ L2 (X, µ)d ) and growth (given
+by the rate of growth α ∈ L2 (X, µ)) (see [24]). A new step µτk+1 is given from µτk
+through the resolution of
+                                                1
+                     µτk+1 ∈ argmin G(µ) +         WFR2 (µ, µτk ) .
+                              µ∈M+ (X)         2τ
+Searching the minimizer in the form µ = µτk + τ (− div(vµτk ) + αµτk ) with unknown
+(v, α), this can be rewritten, in first order of (τ v, τ α), as
+                                                  τ2
+               Z                                                           
+          τ            0 τ      τ          τ                    2 1   2   τ
+ inf G(µk ) +       τ G (µk )(αµk − div(vµk )) +         |v(x)| + α(x) µk (x) dx .
+ v, α           X                                 2τ              4
+The first order optimality conditions yield v = −∇G 0 (µ) and α = −4G 0 (µ). One
+thus obtains
+                        1
+                          (µ − µτk ) = div(µ∇G 0 (µ)) − 4µG 0 (µ)
+                        τ
+which yields (2.8) as τ → 0.                                                  
+2.6. Generic Formulation. Consider two convex and lower semicontinuous func-
+tions F1 and F2 defined on M+ (X)n and M+ (Y )n respectively. The variety of
+problems reviewed above can be seen as special cases of
+                                                   def.          X           Y
+(2.9)          min
+               n
+                         J (γ)    where    J (γ) = hc, γi + F1 (P# γ) + F2 (P# γ)
+           γ∈M+ (X×Y )
+                Pn R
+where hc, γi =     k=1 ck dγi is a short notation for the total transport cost of
+a family of couplings (γk )nk=1 w.r.t. a family of cost functions (ck )nk=1 and the
+projection operators act elementwise. More precisely, they are recovered with the
+following choices of functions:
+      • Balanced OT (2.3): F(σ) = ι{=} (σ|µ);
+      • Unbalanced OT (2.4): F(σ) = Dϕ (σ|µ);P
+                                                   n
+      • Barycenters (2.6): F(σ) = inf ω∈Mn (X) { k=1 Dϕk (σk |ωk ) + ιD (ω)}, where
+        D is the set of families of measures for which all components are equal,
+              def.
+           D = {(ω1 , . . . , ωn ) ∈ Mn (X) : ωi = ωj for i, j = 1, . . . , n} ;
+       • Gradient flows (2.7): F(σ) = inf ω∈M(X) {Dϕ (σ|ω) + 2τ G(ω)}.
+It is remarkable that, even if F is sometimes defined through an auxiliary mini-
+mization problem, it can still be handled efficiently in some cases by the scaling
+algorithm detailed below. For instance, functions of the form
+                                           n
+                                           X
+(2.10)               F(σ) =        infn          Dϕk (σk |ωk ) + G(ω) ,
+                                 ω∈M (X)
+                                           k=1
+12                      L. CHIZAT, G. PEYRÉ, B. SCHMITZER, AND F-X. VIALARD
+
+
+
+              ◦         ◦         ...         ◦ GX
+                                                                                                 •µ    ρ1k •           • ρ2k
+ X      ϕX
+         1        ϕX
+                   2                    ϕX
+                                         n                                                  ϕX        ϕKL                  ϕKL
+              ◦         ◦         ...         ◦              • µ1        • µ2        • µ3        ◦           ◦         ◦
+
+         c1        c2                    cn             c1          c2          c3           c           c                 c
+
+              ◦         ◦         ...         ◦              ◦ = ◦ = ◦                           ◦           ◦         ◦
+                                                                                            ϕY        ϕKL                  ϕKL
+ Y      ϕY1       ϕY2                   ϕYn
+                                                                                                 •ν     ρ1 ◦           ◦ ρ2 G
+              ◦         ◦         ...         ◦ GY
+                                                                     (b)                     (c)                 (d)
+                            (a)
+
+          Figure 1. Representation of some problems of the form (2.9).
+          Each circle represents a measure (filled with black if is fixed by
+          an equality constraint); the terms in the functional J , see (2.9),
+          are represented by arrows (for transport terms), dotted lines (for
+          divergence terms) and rectangles (for the G terms). (A) With F1
+          and F2 of the form (2.10) (B) Balanced barycenter (C) Unbal-
+          anced optimal transport (D) WFR gradient flow of 2 species with
+          interaction.
+
+
+where G is convex and (ϕk )n is a family of entropy functions, are still convex and
+can model a great variety of problems. A graphical interpretation of these problems
+is suggested in Figure 1 along with some examples.
+
+
+        3. Entropic Regularization and Iterative Scaling Algorithm
+   In this section, we introduce and describe an iterative scaling algorithm which
+solves a regularized version of the generic variational problem (2.9). This analysis
+is carried out in a continuous setting.
+
+3.1. Entropic Regularization. Following several recent articles, discussed in Sec-
+tion 1.1, we consider an approximation of problem (2.9) where an entropy term is
+used in place of the nonnegativity constraint on γ. Let dx and dy be reference
+probability measures on X and Y and assume that the product measure dxdy is
+the reference measure on X × Y (one could consider more general reference mea-
+sures on X × Y but this would require to invoke the concept of disintegration of
+measures). We define (minus) the entropy of a family of couplings (γk )nk=1 as
+                                n Z
+                                X
+                           def.
+                      H(γ) =           rk (log(rk ) − 1)dxdy .
+                                          k=1     X×Y
+
+if each γk admits a nonnegative density rk w.r.t. dxdy (with the convention 0 log 0 =
+0) and ∞ otherwise. Note that each term is, up to a constant, the Kullback-Leibler
+divergence KL of γi with respect to dxdy, as defined in Example 2.4. Given a small
+regularization parameter ε > 0, we consider
+
+(3.1)                                         min       J (γ) + ε H(γ).
+                                        γ∈Mn (X×Y )
+    SCALING ALGORITHMS FOR UNBALANCED OPTIMAL TRANSPORT PROBLEMS                    13
+
+                                     X           Y
+Recalling that J (γ) = hc, γi + F1 (P# γ) + F2 (P# γ) , this can be rewritten, up to
+a constant, as
+                                                    n
+                                                    X
+(3.2)          min
+               n
+                            X
+                       F1 (P#           Y
+                              γ) + F2 (P# γ) + ε          KL(γk |e−ck /ε dxdy).
+          γ∈M (X×Y )
+                                                    k=1
+
+Adding the entropy term can be interpreted in the following ways, detailed for
+n = 1 for simplicity.
+
+3.1.1. Interpretation 1. The resolution of (3.1) can be understood as a regulariza-
+tion scheme, since the term ε H(γ) makes the problem strictly convex. In the limit
+ε → 0, the unique solution to (3.1) should converge to a solution of the original
+problem. This is shown in the case of balanced transport (2.3) in [20, 44]. In our
+setting, a general result is beyond the scope of this article. Nevertheless, the fi-
+nite dimensional case is insightful: if dxdy has full support, then one recovers the
+minimizer of J of minimal entropy.
+
+Proposition 3.1. Consider the case where n = 1 (one coupling) and X and Y
+                                                                                 def.
+are finite spaces. Assume that J is convex, lower semicontinuous and that A =
+argminγdxdy J (γ) is nonempty. Let (εk )k∈N be a sequence of strictly positive real
+numbers converging to 0. Then the sequence (γk )k∈N of minimizers of (3.1) is well
+defined and converges to argminγ∈A H(γ).
+
+Proof. Since the objective function in (3.1) is coercive, strictly convex, lower semi-
+continuous and its domain is nonempty, there exists a unique minimizer γk of (3.1)
+associated to εk for all k ∈ N. Now, let γ̄ ∈ A. For all k ∈ N, the optimality of γk
+implies
+                      γk ∈ {γ ∈ M+ (X × Y ) ; H(γ) ⩽ H(γ̄)}
+where H(γ̄) is finite since it is a finite sum of real numbers. As H is coercive and
+lower semicontinuous, this set is compact. This implies the existence of cluster
+points for (γk ): let γ ∗ be one of them. One has that γ ∗ belongs to A since for all
+k, |J (γk ) − J (γ̄)| ⩽ 2εk H(γ̄) → 0 and J (γ ∗ ) ⩽ lim inf k→∞ J (γk ). Moreover, as
+H(γ ∗ ) ⩽ H(γ̄) and γ̄ is arbitrarily chosen in A, it holds γ ∗ ∈ argminγ∈A H(γ). By
+strict convexity, this cluster point is unique and γk → γ ∗ .                       
+
+3.1.2. Interpretation 2. A second way to interpret (3.1) is as a proximal step for
+                                                             def.
+the Kullback-Leibler divergence. Indeed, by denoting γ (0) = dxdy and γ (1) the
+                            (1)     KL    (0)
+solution to (3.1), one has γ = proxJ /ε (γ ). It is possible to iterate this relation
+and define
+                                     def.
+                              γ (`+1) = proxKL
+                                            J /ε (γ
+                                                    (`)
+                                                        ).
+which is the so-called proximal-point algorithm for the KL divergence, known to
+converge to the solution of (2.9) under the same conditions as in Proposition 3.1 (see
+[31]). It is a simple exercise to show, that for balanced optimal transport performing
+` proximal steps with stepsize ε corresponds to a single step with stepsize ε/`. While
+this precise relation is not true for the more general transport problems discussed
+here, we still find in practice that with small enough ε a single iteration yields
+sufficient accuracy (see Section 4.3 for numerical handling of small ε values).
+14              L. CHIZAT, G. PEYRÉ, B. SCHMITZER, AND F-X. VIALARD
+
+
+3.1.3. Interpretation 3. Beyond computational aspects, for the specific case of stan-
+dard OT with quadratic cost, the entropic regularization admits several interpre-
+tations as a stochastic version of OT. For instance, it is obtained by considering
+an optimal matching problem where there is (a specific model of) unknown hetero-
+geneity in the preferences within each class to be matched [36]. What is more, it
+amounts to computing the law of motion of the (indistinguishable) particules of a
+gaz which follow a Brownian motion, conditionally to the observation of its density
+at times t = 0 and t = 1, the so-called Schrödinger bridge problem [45].
+
+3.1.4. Choice of the reference measure. The choice of dx and dy is critical for ob-
+taining the weak convergence to a solution of (2.9) when ε → 0. An obvious
+necessary condition is that the support of dxdy should contain the support of an
+optimizer of the unregularized problem (2.9). For instance, when solving an un-
+balanced optimal transport problem between µ and ν, the choice dx = µ/µ(X)
+and dy = ν/ν(Y ) is not suitable if one of the divergences is not superlinear because
+Dϕ (σ|µ) < ∞ does not imply σ  µ. In this case, the support of the reference mea-
+sure dxdy should contain the sets (well defined under the hypotheses of Proposition
+2.12)
+         {(x, argmin c(x, y)); x ∈ X),          and {(argmin c(x, y), y); y ∈ Y } .
+                    y                                         x
+
+   Also, for the barycenter (2.6) or the gradient flow problems (2.7), one does not
+have access in general to a reference measure according to which an optimizer is
+absolutely continuous. For numerics, the choice of the reference measures then
+corresponds to the choice of a discretization grid on which we find approximate
+solutions to the original problem.
+
+3.2. Reformulation using Densities and Duality. From the definition of the
+entropy H, any feasible γ of the generic problem (3.1) admits an L1 density with
+respect to the reference measure dxdy. Accordingly, for the convenience of the
+analysis, we reformulate (3.2) as a variational problem on measurable functions:
+                                            X           Y
+(Pε )                       min        F1 (P# r) + F2 (P# r) + ε KL(r|K).
+                        r∈L1 (X×Y )n
+
+             def.                        def.
+where F1 (s) = F1 (sdx), F2 (s) = F2 (sdy), K ∈ L∞         n
+                                                 + (X × Y ) is defined compo-
+nentwise by
+                                                def.    ck (x,y)
+(3.3)                                  Kk (x, y) = e−       ε
+
+
+for k ∈ {1, . . . , n}, and with the convention exp(−∞) = 0, the projection operator
+acts on each component of r and KL is the sum of the Kullback-Leibler divergences
+on each component (see the notations in Section 1.3). In this Section, we only make
+the following general assumptions on the objects involved in (Pε ):
+Assumptions 1.
+  (i) (X, dx) and (Y, dy) are probability spaces (i.e. measured spaces with unit
+      total mass). The product space X × Y is equipped with the product measure
+            def.
+      dxdy = dx ⊗ dy;
+ (ii) F1 : L1 (X)n → R ∪ {∞} and F2 : L1 (Y )n → R ∪ {∞} are weakly lower
+      semicontinuous, convex and proper functionals;
+(iii) K ∈ L∞           n
+             + (X × Y ) and ε > 0.
+        SCALING ALGORITHMS FOR UNBALANCED OPTIMAL TRANSPORT PROBLEMS                 15
+
+
+   We begin with a general duality result, which is an application of Fenchel-
+Rockafellar Theorem (see Appendix A.1). It is similar to duality results that can be
+found in the literature on entropy minimization [13] but the functional we consider
+is more general.
+Theorem 3.2 (Duality). The dual problem of (Pε ) is
+(Dε )                sup              − F1∗ (−u) − F2∗ (−v) − εhe(u⊕v)/ε − 1, Ki
+            (u,v)∈L∞ (X)n ×L∞ (Y )n
+
+where u ⊕ v : (x, y) 7→ u(x) + v(y). Strong duality holds, i.e. min (Pε ) = sup (Dε )
+and the minimum of (Pε ) is attained for a unique r = (rk )k=1,...,n ∈ L1 (X × Y )n .
+Moreover, u and v maximize (Dε ) if and only if
+(3.4)
+   (
+                  X
+      −u ∈ ∂F1 (P#  r)                      uk (x)         vk (x)
+
+                  Y
+                           and rk (x, y) = e ε Kk (x, y)e ε for k = 1, . . . , n.
+      −v ∈ ∂F2 (P# r)
+
+Proof. In this proof, the spaces L∞ and (L∞ )∗ are endowed with the strong and
+the weak* topology respectively. As L1 (X × Y )n can be identified with a subset
+of the topological dual of L∞ (X × Y )n , the function KL(·|K) can be extended on
+(L∞ (X × Y )n )∗ as G(r) = KL(r|K) if r ∈ L1 (X × Y )n and +∞ otherwise. Its
+convex conjugate G∗ : L∞ (X × Y )n → R is
+                    X n Z
+           G∗ (w) =           (ewk (x,y) − 1)Kk (x, y)dxdy = hew − 1, Ki .
+                       k=1    X×Y
+
+and is everywhere continuous for the strong topology [63, Theorem 4] (this property
+relies on the finiteness of dxdy and the boundedness of K). The linear operator
+A : L∞ (X)n × L∞ (Y )n → L∞ (X × Y )n defined by A(u, v) : (x, y) 7→ u(x) +
+v(y) is continuous and its adjoint is defined on (L∞ (X × Y )n )∗ (identified with
+a subset of M(X × Y )n ) by A∗ (r) = (P#    X     Y
+                                              r, P# r). Since F1 and F2 are convex,
+lower semicontinuous, proper and since G is everywhere continuous on L∞ (X ×
+                                            ∗
+
+Y )n , strong duality and the existence of a minimizer for (Pε ) is given by Fenchel-
+Rockafellar theorem (see Appendix A.1). More explicitely, this theorem states that
+                        sup             −F1∗ (−u) − F2∗ (−v) − εG∗ (A(u, v)/ε)
+              (u,v)∈L∞ (X)n ×L∞ (Y )n
+
+and
+                                              X           Y
+                              min        F1 (P# r) + F2 (P# r) + εG(r)
+                      r∈(L∞ (X×Y )n )∗
+
+are equal, the latter being exactly (Pε ) since G is infinite outside of L1 (X × Y )n .
+It states also that if (u, v) maximizes (Dε ), then any minimizer of (3.1) satisfies
+r ∈ ∂G∗ (A(u, v)/ε) and the expression for the subdifferential of G∗ is an application
+of the result in Appendix A.2. Finally, uniqueness of the minimizer for (Pε ) comes
+from the strict convexity of G.                                                      
+
+3.3. Scaling Algorithm. The specific splitting of the problem (Pε ) makes it suit-
+able for the well-known Dykstra’s algorithm (see Section 1.1 for more background
+on this algorithm). Since the functions F1 and F2 operate on the marginals only,
+Dykstra’s iterations take a very simple form which is related to the celebrated
+Sinkhorn algorithm. They are obtained as an alternating maximization on (Dε ).
+16                  L. CHIZAT, G. PEYRÉ, B. SCHMITZER, AND F-X. VIALARD
+
+
+    Let K and KT be the linear operators defined, for a : X → [0, ∞[n and b : Y →
+[0, ∞[n measurable, for k = 1, . . . , n as
+                    Z                                          Z
+               def.                             T         def.
+(3.5) (Kb)(x)k =      Kk (x, y)bk (y)dy and (K a)(y)k =          Kk (x, y)ak (x)dx .
+                             Y                                                                        X
+            (0)     ∞        n
+Given v ∈ L (Y ) , alternating maximizations on the dual problem (Dε ) define,
+for ` = 0, 1, 2, . . ., the iterates
+                                                              v (`)
+                                                       u
+
+                   u
+                   
+                   
+                         (`+1)
+                               = argmax −F1∗ (−u) − εhe ε , Ke ε iX ,
+                                      u∈L∞ (X)n
+(3.6)
+                                                       v       u(`+1)
+                     v (`+1) = argmax −F2∗ (−v) − εhe ε , KT e ε iY ,
+                    
+                    
+                                      v∈L∞ (Y )n
+
+where we used the fact that, by Fubini-Tonelli, one has
+                                                          u          v                      v        u
+(3.7)                    he(u⊕v)/ε , KiX×Y = he ε , Ke ε iX = he ε , KT e ε iY .
+Conditions which ensure the existence of these iterates are given later in Theorem
+3.8; for now, remark that by strict convexity, they are uniquely defined when they
+exist. Given an initialization b(0) ∈ L∞    + (Y ), the main iterations of this paper are
+defined as follows, for ` = 0, 1, 2, . . .:
+
+      Scaling iterations:
+                           def.
+                                  proxKL       (`)
+                                      F1 /ε (Kb )                          def.
+                                                                                   proxKL      T (`+1)
+                                                                                       F2 /ε (K a      )
+      (S)         a(`+1) =                            ,       b(`+1) =
+                                       Kb(`)                                                     KT a(`+1)
+
+   where the proximal operator for the KL divergence is defined for F1 (and similarly
+for F2 ) as
+                                            def.
+                            proxKL
+                                F1 /ε (z) = argmin F1 (s) + ε KL(s|z) .
+                                                    s:X→Rn
+                                                   measurable
+The following Proposition shows that, as long as they are well defined, these iterates
+are related to the alternate dual maximization iterates.
+Proposition 3.3. Define a(0) = exp(v (0) ), let (a(`) , b(`) ) be the scaling iterates (S)
+and (u(`) , v (`) ) the alternate dual maximization iterates defined in (3.6). If for all
+` ∈ N, either log a(`) ∈ L∞ (X)n and log b(`) ∈ L∞ (Y )n , or u(`) ∈ L∞ (X)n and
+v (`) ∈ L∞ (Y )n then
+                                                               (`)               (`)
+                                       (a(`) , b(`) ) = (eu          /ε
+                                                                          , ev         /ε
+                                                                                            ).
+     The proof of this proposition makes use of the following Lemma.
+Lemma 3.4. Let (T, dt) be a measure space and v ∈ L1+ (T ). For any u : T → R
+measurable, if KL(u|v) < ∞ then u ∈ L1+ (T ).
+Proof. Without loss of generality, one can assume v positive since for dt-a.e. t,
+if v(t) = 0 then u(t) = 0. The subgradient inequality at 1 gives, for all s ∈ R,
+s ⩽ ϕKL (s) + e1 − 1. Consequently,
+     Z        Z                     Z
+                                        ϕKL (u(t)/v(t)) + e1 − 1 v(t)dt < ∞ .
+                                                                
+        udt = (u(t)/v(t))v(t)dt ⩽
+        T            T                                T
+                                                                                                             
+    SCALING ALGORITHMS FOR UNBALANCED OPTIMAL TRANSPORT PROBLEMS                                     17
+
+                                                                                              (`)
+Proof of Proposition 3.3. Suppose that v (`) ∈ L∞ (Y )n and that b(`) = ev /ε . One
+has Kb(`) ∈ L1 (X)n and from Lemma 3.4, one can compute proxKL                 (`)
+                                                                      F1 /ε (Kb ) in
+L1 (X)n . The Fenchel-Rockafellar Theorem gives (see the proof of Theorem 3.2 for
+more details):
+                                     u       v (`)                                           v (`)
+         sup      −F1∗ (−u) − εhe ε , Ke ε i =               min
+                                                              1
+                                                                            F1 (s) + ε KL(s|Ke ε )
+      u∈L∞ (X)n                                          s∈L     (X)n
+
+and the optimality conditions state that u? maximizes the problem on the right if
+                              def.                       v (`)
+and only if the minimizer s? = proxKL
+                                   F1 /ε (Ke
+                                             ε ) of the problem on the left belongs
+
+                                     u           v (`)
+to the subdifferential of u 7→ he ε , Ke ε i at the point u? . That is (see Appendix
+A.2) if and only if for dx almost every x ∈ X,
+                                             ?                   (`)
+                            s? (x) = eu (x)/ε · (Kev                   /ε
+                                                                            )(x)
+
+Thus if ε log a(`+1) belongs to L (X)n or if u? ∈ L∞ (X)n exists, then u? =
+                                         ∞
+
+ε log a(`+1) . The rest of the proof is done by induction.                
+
+3.4. Existence of the iterates for integral functionals. Our next step is to
+give conditions on F1 and F2 that guarantee the existence of the scaling iterates (S)
+and an equivalence with alternate maximization on the dual (3.6). This is provided
+by Theorem 3.8, where it is required that F1 and F2 are integral functionals, as we
+define now.
+
+Definition 3.5 (Normal integrands and Integral functionals [65]). A function f :
+X × Rn → R ∪ {∞} is called a normal integrand if its epigraphical mapping X 3
+x 7→ epi f (x, ·) is closed-valued and measurable. A convex integral functional is a
+function F : L1 (X)n → R ∪ {∞} of the form
+                                                Z
+                                           def.
+                            F (s) = If (s) =      f (x, s(x))dx
+                                                         X
+
+where f is a normal integrand and f (x, ·) is convex for all x ∈ X. In this paper, F is
+an admissible integral functional if moreover for all x ∈ X, f (x, ·) takes nonnegative
+values, has a domain which is a subset of [0, ∞[n and if there exists s ∈ L1 (X)n
+such that If (s) < ∞.
+
+   The concept of normal integrands allows to deal conveniently with measurability
+issues. For finite dimensional problems (when X and Y have a finite number of
+points), integral functionals are simply sums of pointwise lower semicontinuous
+functions. The following proposition shows that for such functionals, conjugation
+and subdifferentiation can be performed pointwise.
+
+Proposition 3.6. If F is an admissible integral functional associated to the convex
+normal integrand f , then F is convex and weakly lower semicontinuous, f ∗ is also
+a normal convex integrand, F ∗ = If ∗ and
+                      ∂F (s) = {u ; u(x) ∈ ∂f (x, s(x)), dx a.e.},
+                     ∂F ∗ (u) = {s ; s(x) ∈ ∂f ∗ (x, u(x)), dx a.e.},
+where conjugation and subdifferentiation on f are w.r.t. the second variable.
+18                L. CHIZAT, G. PEYRÉ, B. SCHMITZER, AND F-X. VIALARD
+
+
+Proof. This property can be found in [64] under the assumption of existence of a
+feasible point s? ∈ L1 (X)n for If and a feasible point u? ∈ L∞ (X)n for If ∗ . Our
+admissibility criterion requires the existence of s? and one has
+                            Z                 Z
+                               ∗
+                 If ∗ (0) =   f (x, 0)dx = −       infn f (x, s)dx < ∞
+                                  X                 X s∈R
+
+since inf s f (x, s) ∈ [0, f (x, s? (x))].                                             
+
+   We now prove a general result on the “separability” of the KL proximal operator.
+The Kullback-Leibler divergence between two vectors s and z in Rn is defined as
+                                    n         
+                               def.
+                                    X         sk
+(3.8)                KL(s|z) =        sk log        − sk + zk
+                                              zk
+                                             k=1
+
+if (zk = 0) ⇒ (sk = 0), and +∞ otherwise, with the convention 0 log(0/0) = 0.
+While we use a separate notation for the sake of clarity, this definition is actually
+consistent with the definition of KL if one interprets s and z as vector densities on
+a space (X, dx) which is a singleton with unit mass.
+Proposition 3.7. Let s : X → Rn be measurable. If F = If is an admissible
+integral functional then for almost all x ∈ X,
+                          proxKL                 KL
+                                      
+                               1
+                                 F (s) (x) = prox 1 f (x,·) (s(x)) .
+                                      ε              ε
+
+
+Proof. The problem which defines the proximal operator is that of minimizing
+                 def.
+If (z) + KL(z|s) = Ig (z) over measurable functions z : X → Rn with
+                         g : (x, z) ∈ X × Rn 7→ f (x, z) + KL(z|s(x)) .
+The function (x, z) 7→ KL(z|s(x)) is a convex normal integrand by [65, Prop. 14.30
+and 14.45c]. Thus g is itself a normal convex integrand, as the sum of normal
+convex integrands [65, Prop. 14.44]. Then a minimization interchange result [65,
+Thm. 14.60]] states that minimizing Ig is the same as minimizing g pointwise. 
+
+   By Proposition 3.6, if F1 and F2 are admissible integral functionals then F1∗ and
+ ∗
+F2 are also integral functionals. So the alternating optimization on (Dε ) can be
+relaxed to the space of measurable functions and still have a meaning:
+                
+                                                    u      v (`)
+                    (`+1)
+                u
+                
+                         = argmax −If1∗ (−u) − εhe ε , Ke ε iX
+                            u:X→Rn
+(3.9)
+                                                    v         u(`+1)
+                    (`+1)
+                v        = argmax −If2∗ (−v) − εhe ε , KT e ε iY .
+                
+                
+                                  v:Y →Rn
+
+The following Theorem gives existence, uniqueness of this iterates and a precise
+relation with the scaling iterates (S).
+Theorem 3.8. Let F1 and F2 be admissible integral functionals as in Defini-
+tion (3.5) associated to the normal integrands f1 and f2 . Assume that for all x ∈ X
+and y ∈ Y , there exists points s1 and s2 with strictly positive coordinates such that
+f1 (x, s1 ) < ∞ and f2 (y, s2 ) < ∞ and that K takes positive values. Define a(0) = 1
+and let (a(`) , b(`) ) be the scaling iterates (S). Then, with initialization v (0) = 0,
+the iterates (u(`) , v (`) ) in (3.9) are uniquely well-defined and for all ` ∈ N one has
+                  u(`)    v (`)
+(a(`) , b(`) ) = (e ε , e ε ).
+     SCALING ALGORITHMS FOR UNBALANCED OPTIMAL TRANSPORT PROBLEMS                     19
+
+
+Proof. Suppose that v (`) : Y → Rn is a well-defined measurable function and that
+         (`)
+b(`) = ev /ε . As K is positive, Kb(`) is positive dx a.e. Let a(`+1) be computed
+with (S). Thanks to Proposition 3.7, the proximal operator can be decomposed
+as pointwise optimization problems and our assumptions allows to apply Fenchel-
+Rockafellar (see Appendix A.1) in the case where both problems reach their optima
+        max −f1∗ (x, −u) − εheu/ε , Kb(`) i = minn f1 (x, s) + ε KL(s|Kb(`) (x))
+        u∈Rn                                      s∈R
+                                            u/ε
+with the relation between optimizers: e      = s/Kb(`) (x). This formula guarantees
+that the function of pointwise maximizers x 7→ u(x) is measurable since the function
+of pointwise minimizers x 7→ s(x) is uniquely well-defined and measurable by [65,
+Thm. 14.37]. Indeed, the minimized function is a strictly convex normal integrand
+because it is shown in Appendix A.2 that KL(·|Kb(`) (x)) is a normal integrand
+and sum of normal integrands are normal [65, Prop. 14.44]. This shows that
+             u(`+1)
+a(`+1) = e      ε     and one concludes by induction.                                 
+
+3.5. Convergence Analysis. This Section gives a fixed point result and a con-
+vergence result for a particular case. The finite dimensional case is postponed to
+the next Section.
+   The following proposition sheds some light on the name “scaling” given to iter-
+ations (S). It comes from the fact that these iterations allow to recover a solution
+to (Pε ) by multiplying the kernel K with positive functions, interpreted as scalings.
+Proposition 3.9. Under the assumptions of Theorem 3.8, if the scaling iterations
+(S) admit a fixed point (a, b) such that log a ∈ L∞ (X)n and log b ∈ L∞ (Y )n then
+(ε log a, ε log b) is the unique solution of (Dε ) and the function r defined for each
+k = 1, . . . , n by rk (x, y) = ak (x)Kk (x, y)bk (y) is the unique solution of (Pε ).
+Proof. As a consequence of Proposition 3.7, on can write the optimality condition
+of a fixed point of (3.9) for almost every x ∈ X as
+                                                            
+                                            ak (x) · Kbk (x)
+                           uk (x) = ε log
+                                                Kbk (x)
+                                                                    X             X
+for some u(x) ∈ −∂f1 (x, a(x)·Kb(x)). Thus −ε log(a) ∈ ∂If1 (P#       r) because P#  r=
+a·Kb (the dot denotes componentwise multiplication). Similar derivations for b show
+that the couple (ε log a, ε log b) and r satisfies the primal dual optimality conditions
+(3.4).                                                                                
+
+   Sinkhorn’s algorithm (the special case of the scaling iterations (S) obtained when
+F1 = ι{p} (s) and F2 = ι{q} (s) are the convex indicators of equality constraints) is
+known to converge at a linear rate. This property is usually shown (see for in-
+stance [34]) by using the contraction property of the operator K for the Hilbert
+metric (a projective metric on the cone of nonnegative functions). Using a sim-
+ilar approach, based on the related Thompson metric, we now show the linear
+convergence of the scaling iterates (S) in another special case, which is central in
+unbalanced optimal transport: when F1 and F2 are KL divergences with respect to
+fixed densities.
+   An approach involving the Hilbert metric would still be possible, but the use of
+the Thompson metric allows for a very short proof and a convergence rate which
+does not depend on a bound on the cost. This metric is defined as follows.
+20                   L. CHIZAT, G. PEYRÉ, B. SCHMITZER, AND F-X. VIALARD
+
+
+Definition 3.10 (Thompson part metric on L∞                    ∞
+                                          + [75]). For r, s ∈ L+ (X), let
+          def.
+M (r/s) = inf {α ⩾ 0 ; r ⩽ αs} (or ∞ if that set is empty). The Thomson part
+metric is defined by
+
+                             d(r, s) = max{log M (r/s), log M (s/r)} .
+
+     Key properties of this metric are:
+       • if T : L∞ (X) → L∞ (Y ) is a z-homogeneous order-preserving (or order-
+         reversing) operator, then d(T x, T y) ⩽ |z| · d(x, y);
+       • the equivalence relation r ∼ s ⇔ d(r, s) < +∞ generates a partition of
+         (L∞ (X), d) and each part is a complete metric space. In particular, the set
+           s ∈ L∞                ∞
+         
+                + (X) ; log s ∈ L (X) endowed with the Thompson metric form a
+         complete metric space.
+
+Theorem 3.11. Let p and q be such that log p ∈ L∞ (X) and log q ∈ L∞ (Y ) and
+define
+                             F1 = λ1 KL(·|p)        and    F2 = λ2 KL(·|q)
+for some λ1 , λ2 > 0. Assume that the kernel K is lower bounded by a positive real
+number. If (a(`) , b(`) ) are the scaling iterates (S) initialized with b(0) = 1, then
+(x, y) 7→ a(`) (x)K(x, y)b(`) (y) converges at a linear rate (for the Thompson metric)
+to a solution of (Pε ).
+                    def.
+Proof. Let zi = λi /(λi + ε) ∈ ]0, 1[ for i ∈ {1, 2} and let b(0) = 1. Following a
+simple application of Proposition 3.7 (or see Table 1) the iterates in this specific
+case read
+                          p z 1                        q    z 2
+                a(`+1) =    (`)
+                                      and b(`+1) =       (`+1)
+                                                                    .
+                          Kb                           Ka
+Our assumptions are such that d(b(1) , b(0) ) and d(a(1) , a(0) ) are finite (this is direct
+since the logarithms of b(0) , K, p and q are bounded). Using the properties of the
+Thompson metric, it holds
+
+                 d(a(`+1) , a(`) ) = z1 .d(Kb(`) , Kb(`−1) ) ⩽ z1 .d(b(`) , b(`−1) ) ,
+
+since K is an order preserving linear operator. In a similar fashion, we obtain
+d(b(`+1) , b(`) ) ⩽ z2 .d(a(`) , a(`) ). Thus the application a(`) 7→ a(`+1) is contractant
+of factor z1 .z2 < 1 and (a(`) , b(`) )` converges linearly to some (a? , b? ) ∈ L∞  + (X) ×
+L∞+ (Y )  which    is a  fixed   point   of the iterations. Moreover,  | log a?
+                                                                                | is bounded
+because d(a(0) , a? ) < ∞, and so is | log b? |. The result follows then by Proposition
+3.9.                                                                                       
+
+
+                           4. Algorithm for Discrete Measures
+   In this section, we take a closer look at the scaling iterations (S) in the specific
+case of discrete finite spaces. We give a convergence result, we adapt the nota-
+tion to obtain an algorithm that can be implemented in a straightforward manner
+and also discuss how to numerically stabilize the algorithm for small values of the
+regularization parameter ε, to reach a higher precision.
+     SCALING ALGORITHMS FOR UNBALANCED OPTIMAL TRANSPORT PROBLEMS                                  21
+
+
+4.1. Convergence. In finite dimension4, the scaling iterations (S) converge in gen-
+eral. Note that the given convergence rate is pessimistic compared to that observed
+in practice (which is linear, see Figure 5).
+Theorem 4.1. Assume that X and Y are finite sets and that K takes positive val-
+ues. Denote by (a(`) , b(`) ) the scaling iterates (S), by (u(`) , v (`) ) = (ε log a(`) , ε log b(`) )
+the associated dual iterates and by −I the dual functional (Dε ). Then one has
+                       ε KL(r∗ |r(`) ) ⩽ I(u(`) , v (`) ) − inf I ⩽ O(1/`)
+where r(`) (x, y) = a(`) (x)K(x, y)b(`) (y).
+Proof. By Proposition 3.3, (u(`) , v (`) ) are the iterates of an alternate maximization
+on the dual problem (Dε ). Moreover (minus) the dual functional has the structure
+                         I(u, v) = F ∗ (−(u, v)/ε) + εG∗ (A(u, v)/ε)
+where G : r 7→ KL(r|K) so that G∗ (z) = hez −1, Ki is continuously differentiable, A
+is defined as A(u, v)(x, y) = u(x) + v(y), and F ∗ (u, v) = F1∗ (u) + F2∗ (v) is separable.
+Let us check that (i) G∗ is Lipschitz on the sublevel sets of I and (ii) I admits
+minimizers, so that [6, Thm. 3.9] applies and proves I(u(`) , v (`) ) − inf I ⩽ O(1/`).
+   In order to check (i), take any feasible point s for F . The Hölder inequality
+F (s) + F ∗ (−(u, v)/ε) ⩾ hs, −(u, v)/εi gives
+                     εG∗ (A(u, v)/ε) ⩽ I(u, v) + h(u, v)/ε, si + F (s).
+As a consequence, the components of A(u, v) are upper bounded on the set of dual
+variables (u, v) satisfying I(u, v) ⩽ I(u(1) , v (0) ) and so I is uniformly Lipschitz on
+this set. In order to check (ii), remark that a primal minimizer r∗ exists and since K
+takes positive values, one can build a minimizer by simply inverting the primal-dual
+relationship (u∗ , v ∗ ) ∈ A−1 (ε log r∗ /K).
+   It remains to prove the first part of the inequality of the Theorem. We follow
+the strategy developed in [32, Thm. 1]. By direct computations (standard for
+Bregman divergences), one has for any pair (z, z ∗ ) in the domain of G∗ , by defining
+r(z)(x, y) = K(x, y) exp(z(x, y)),
+              ε(G∗ (z) − G∗ (z ∗ ) − h∇G∗ (z ∗ ), z − z ∗ i) = ε KL(r(z ∗ )|r(z))
+which is similar to a strict convexity estimate. Moreover, for any m ∈ ∂F ∗ (−(u∗ , v ∗ )/ε),
+one has by definition of the subdifferential
+       F ∗ (−(u(`) , v (`) )/ε) − F ∗ (−(u∗ , v ∗ )/ε) ⩾ −hm, (u(`) − u∗ , v (`) − v ∗ )i/ε .
+By optimality, it holds 0 ∈ ∂I(u∗ , v ∗ ) so one can chose m = εA∗ ∇G∗ (A(u∗ , v ∗ )/ε).
+Then one poses z = A(u(`) , v (`) )/ε and z ∗ = A(u∗ , v ∗ )/ε in the first inequality, and
+add it to the second to obtain the result.                                                
+
+4.2. Numerical Algorithm for Discrete Measures. We now adopt a more “im-
+plementation oriented” point of view, which leads to algorithms which are straight-
+forward to implement. For the sake of clarity, we focus on the case of a single
+unknown coupling (i.e. n = 1, the extension to n > 1 merely requires to add an
+index).
+
+   4when X and Y are finite sets, or when the reference measures are finite sums of atoms.
+22               L. CHIZAT, G. PEYRÉ, B. SCHMITZER, AND F-X. VIALARD
+
+
+   Assume that X = {x1 , . . . , xI } and Y = {y1 , . . . , yJ } are discrete finite spaces of
+cardinal I and J respectively, endowed with the reference probability measures dx
+and dy described by nonnegative vectors summing to one
+                 def.                                  def.
+              dx = (dx({xi })Ii=1 ∈ RI+      and    dy = (dy({yj })Jj=1 ∈ RJ+ .
+In this context, one identifies functions a : X → R ∪ {∞} or b : Y → R ∪ {∞}
+to vectors a = (a(xi ))Ii=1 and b = (b(yj ))Jj=1 and functions on the product space
+r : X × Y → R ∪ {∞} to matrices R = (r(xi , yj ))i,j (denoted with capital letters
+for a clearer distinction between vectors and matrices). This notation allows for a
+simple expression for the projections (1.2) through
+                             X                    Y
+                            P# R = R dy      and P# R = RT dx
+          T
+where (·) denotes matrix transposition and R dy denotes the standard matrix-
+vector product. Finally, the notation    denotes the entrywise product and     the
+entrywise division with convention 0/0 = 0.
+   Suppose we are given a cost function c described by the I × J matrix C and two
+convex, lower semicontinuous and lower bounded functions F1 and F2 whose domain
+is nonempty and included in RI+ and RJ+ respectively. The Gibbs kernel (3.3) is
+then given by K = (e−Ci,j /ε )i,j and, by simply replacing continuous variables by
+their discrete counterparts, the main variational problem (Pε ) reads
+                                                  X
+(4.1)             min F1 (R dy) + F2 (RT dx) + ε      KL(Ri,j |Ki,j ),
+                 R∈RI×J
+                                                          ij
+
+where KL is the pointwise Kullback-Leibler divergence (defined in (3.8)). Applying
+the operators K and KT defined in (3.5) amounts to
+                        K b = K(b    dy)   and KT a = KT (a            dx) .
+For computing the scaling iterates (S), all the information we need about F1 and
+F2 can be condensed by the specification of functions proxdivF1 : RI+ × R+ → RI+
+and proxdivF2 : RJ+ × R+ → RJ+ defined as
+(4.2)                       proxdivFi : (s, ε) 7→ proxKL
+                                                      Fi /ε (s)   s.
+Given this function, which is easy to compute in many cases (see e.g. Table 1), the
+scaling algorithm is straightforward to implement.
+
+Algorithm 1 Scaling algorithm
+ 1: function ScalingAlgo(proxdivF1 , proxdivF2 , K, dx, dy, ε)
+ 2:    b ← 1J
+ 3:    repeat
+ 4:       a ← proxdivF1 (K(b dy), ε)
+ 5:       b ← proxdivF2 (KT (a dx), ε)
+ 6:    until stopping criterion
+ 7:    return (ai Kij bj )ij                                       . The primal optimizer
+ 8: end function
+
+
+  By virtue of Theorem 4.1, Algorithm 1 is guaranteed to stop and to return an
+approximate minimizer of (4.1) if one uses a consistant stopping criterion.
+     SCALING ALGORITHMS FOR UNBALANCED OPTIMAL TRANSPORT PROBLEMS                                        23
+
+
+4.3. Log-domain Stabilization. For small values of ε the entries of K = e−C/ε ,
+           (`)                 (`)
+a(`) = eu /ε and b(`) = ev /ε may become both very small and very large,
+leading to numerically imprecise values of their mutual products and overflow of the
+numerical range. On the other hand, executing the algorithm in the log domain (i.e.
+storing the logarithms of the entries of K, a(`) and b(`) ) is not completely satisfying
+because then the computation of Kb(`) and Ka(`) is not a simple matrix/vector
+product and the algorithm is considerably slowed down. We suggest a middle way,
+using a redundant parametrization of the iterates as follows:
+(4.3)      a(`) = ã(`)     exp(ũ(`) /ε),               b(`) = b̃(`)        exp(ṽ(`) /ε).
+The idea is to keep ã(`) and b̃(`) close to 1 and to absorb the extreme values of a(`)
+and b(`) into the log-domain via ũ(`) and ṽ(`) from time to time.
+  Consider the stabilized kernels K̃(`) whose entries are given by
+                               (`)            (`)       (`)
+                            K̃ij = exp((ũi + ṽj − Ci,j )/ε)
+and remark that it holds, after direct computations,
+             ũ(`)                                                  ṽ(`)                T
+ Kb(`) = e− ε        K̃(`) (b̃(`)    dy)     and KT a(`) = e− ε                (K̃(`) ) (ã(`)      dx) .
+The scaling iterates (S) then read
+                             ũ(`)                                               ṽ(`)
+    ã(`+1) = proxKL
+                  1  (e− ε           s1 )    s1 ,   b̃(`+1) = proxKL
+                                                                  1  (e− ε                   s2 )   s2
+                     ε F1                                             ε F2
+                                                    T
+where s1 = K̃(`) (b̃(`) dy) and s2 = (K̃(`) ) (ã(`) dx).
+  For computing these iterates, all the information we need about F1 and F2 can
+be condensed by the specification of “stabilized proxdiv” functions proxdivF1 :
+RI × RI × R+ → RI and proxdivF2 : RJ × RJ × R+ → RJ defined as
+                                                                u
+                                                           −ε
+(4.4)                proxdivFi : (s, u, ε) 7→ proxKL
+                                                  Fi /ε (e              s)     s.
+We adopt the same notation as in (4.2) because it is just the special case when
+u = 0. The main numerical algorithm thus obtained is displayed in Algorithm 2.
+4.3.1. Computing proxdiv. The issue of extreme numerical values is not completely
+remedied by the absorption steps in Algorithm 2 since the proxdiv operation still
+involves the potentially extreme factor e−u/ε . In practice however, we find that
+for many problems proxdiv can be computed without evaluating the exponential
+e−u/ε and the formula remains numerically stable in the limit of small ε. Several
+examples for this are given in Section 5.
+4.3.2. Frequency of absorptions. In practice, we recommend to run stabilized iter-
+ations and check for the extreme values of (ã(`) , b̃(`) ) every couple of iterations.
+When they exceed a given threshold, an absorption step is performed.
+4.4. Comments on Implementation. We wish to emphasize the simplicity of
+Algorithm 1 and Algorithm 2. When an optimization problem of the form (2.9) is
+given one just has to (i) choose the reference measures (which also determines a dis-
+cretization grid in practice) (ii) determine the functions Fi by going to the space of
+densities and (iii) find a way to efficiently compute proxdivFi or proxdivFi (in many
+cases, this operator has a closed form, or can be computed with a few parallelizable
+iterations). Let us briefly discuss some details on the practical implementation of
+Algorithm 2.
+24              L. CHIZAT, G. PEYRÉ, B. SCHMITZER, AND F-X. VIALARD
+
+
+Algorithm 2 Scaling algorithm with stabilization
+ 1: function ScalingAlgo2(proxdivF1 , proxdivF2 , C, dx, dy, ε)
+ 2:    (b̃, u, v) ← (1J , 0I , 0J )
+ 3:    K̃ij ← exp(−Cij /ε)                                                  . for all i, j.
+ 4:    repeat
+ 5:         ã ← proxdivF1 (K̃(b̃ dy), u, ε)
+ 6:         b̃ ← proxdivF2 (K̃T (ã dx), v, ε)
+ 7:         if a component of | log ã| or | log b̃| is “too big” then
+ 8:             (u, v) ← (u + ε log ã, v + ε log b̃)
+ 9:             K̃ij ← exp((ui + vj − Ci,j )/ε)                             . for all i, j.
+10:             b̃ ← 1J
+11:         end if
+12:    until stopping criterion
+13:    return (ãi K̃i,j b̃j )i,j                                 . The primal optimizer
+14: end function
+
+
+4.4.1. Computing the matrix multiplications. The size of the matrix K is I × J
+so the matrix-vector multiplication step or even merely storing K in memory can
+quickly become intractable as the sizes of X and Y increase. For special problems it
+is possible to avoid dense matrix multiplication (and storage). For instance, when
+X, Y are Cartesian grids in Rd and c(x, y) = |x − y|2 is the squared Euclidean
+distance, then K is the separable Gaussian kernel: multiplying by K can be done
+by successive “1-D convolutions”. We use this trick in Section 5, when mentioned.
+For more general geometric surfaces, K can also be approximated by the heat
+kernel [73]. These methods however cannot be combined with Algorithm 2, as the
+“stabilized kernels” K̃ lose the particular structure.
+4.4.2. Gradually decreasing ε. When solving for a very small ε, most of the entries
+of K are below machine precision, so one need to first “estimate” the dual variables
+(u, v) by performing several iterations with higher values of ε. Reduction of ε
+should be performed between lines 8 and 9 in Algorithm 2: after line 8, (u, v)
+are “approximations” of the dual variable of the unregularized problem so one can
+change ε and start solving for a different ε with (u, v) as a starting point. We use
+this heuristic in Section 5 (when mentioned) as follows: starting from ε = 1, after
+every 100 iteration we perform an absorption step and divide ε by factor chosen
+so that the final value ε is reached after 10 divisions. Then we run the standard
+Algorithm 2 until the desired convergence criterion is met.
+   Note that gradually decreasing ε has also been proposed to asymptotically solve
+the unregularized OT problem [71] (but ε should be of the order 1/ log(`) which is
+too slow to be of practical interest) and, heuristically, to accelerate the convergence
+of Sinkhorn’s iterations [42], in the same fashion as for interior point methods, but
+theoretical justification is an open problem.
+4.4.3. Multiple couplings. The general optimization problem in Section 3 involved
+n couplings, potentially n > 1. For simplicity, throughout Section 4 we focussed
+on the case n = 1. However, the extension to n > 1 is rather simple. In particular,
+the variables a, b, u, v of the algorithm lie in Rn×I or Rn×J , the kernel K is a n-
+family of I × J matrices, the entrywise operations (multiplication, division) are still
+     SCALING ALGORITHMS FOR UNBALANCED OPTIMAL TRANSPORT PROBLEMS                                         25
+
+
+performed entrywise and the matrix vector multiplications are performed “coupling
+by coupling”, e.g. for k ∈ {1, . . . , n} and j ∈ {1, . . . , J}:
+                                            X
+                             (K b)k,i =         Kk,i,j bk,j .
+                                                      j
+
+4.4.4. More tricks in [69]. An efficient numerical implementation of Algorithm 2 is
+studied further in [69]. In addition to the log-domain stabilization and gradually
+decreasing ε, it is proposed to approximate K by a sparse matrix, obtained by
+adaptive truncation. Thus, one can avoid storing of and multiplication by the
+dense kernel matrix, while keeping the inflicted truncation error negligible. This
+is more flexible than for instance the Gaussian convolution trick and can easily be
+extended to more general cost functions. In addition, this can be directly combined
+with the log-domain stabilization and therefore allows to solve larger problems with
+small regularization parameter (and hence, with little entropic blur). We choose
+however not to use these additional tricks Section 5 in order to display results which
+are easily reproducible.
+4.5. Generalization: more spaces and pushforward operators. Scaling al-
+gorithms similar to Algorithm (S) can be formulated for solving problems of more
+general form than (Pε ). There can be more than 2 functionals, more than 2 spaces
+                                               X        Y
+involved and the projection operators P#          and P#  can be replaced by more gen-
+eral linear operators, such as pushforwards of functions t which are not necessarily
+projections (i.e. not of the form t(x, y) = x). Several examples of such extensions
+can be found in [8] for the special case of classical optimal transport. Let us sketch
+this extension in the discrete setting and for the case of n = 1 (one “coupling”) so
+as to remain simple and to stick close to implementation concerns. For brevity, we
+limit ourselves to giving the “scaling” form of the alternate maximization on the
+dual and an example, without proof.
+   Let (X k , dxk )N
+                   k=1 and (Z, dz) be finite measured spaces of respective cardinalities
+(Ik )N
+     k=1 and   L and let (tk : Z → Xk )N k=1 be surjective maps. The space Z plays the
+role of X × Y in the previous discussions, but in this generalization the structure
+of a product space is lost. For conciseness, in the notations, the maps (tk )k act on
+indices of points instead of points, with an obvious meaning. Given k ∈ {1, . . . , N },
+R ∈ RL and u ∈ RIk the pushforward operator tk# and its adjoint (tk# )∗ read
+                       X                      Ik                           L
+          tk# R =              Rl · dzl / dxki i=1   and (tk# )∗ u = utk (l) l=1 .
+                   l∈(tk )−1 (i)
+
+   Given a nonnegative vector K ∈ RL and N convex, proper, lower semicontinuous
+functions Fk : RIk → R ∪ {∞}, the generalization of (4.1) is (up to a constant)
+                        N
+                        X                       L
+                                                X
+                               Fk (tk# R) + ε
+                                                                            
+                min                                   Rl · log(Rl / Kl ) − 1 · dzl
+               R∈RL
+                        k=1                     l=1
+
+with the convention 0 log(0/0) = 0, and the dual reads
+                                   N
+                                   X                      L
+                                                          X               N
+                                                                          X
+(4.5)           sup P          −         Fk∗ (−uk ) − ε         exp( 1ε         uktk (l) ) · Kl · dzl .
+          (uk )N
+               k=1 ∈R
+                        k Ik
+                                   k=1                    l=1             k=1
+
+   In order to perform alternate maximization on the dual as before, one needs a
+“disintegration” relation, in the spirit of (3.7). To this end, we define, for (an )N
+                                                                                    n=1 ∈
+26              L. CHIZAT, G. PEYRÉ, B. SCHMITZER, AND F-X. VIALARD
+
+ P
+        I
+R+ n n and k ∈ {1, . . . , N } the operator Kk as
+                             def.
+                                     X       Y                            Ik
+            Kk ((an )n6=k ) =              (   antn (l) ) · Kl · dzl /dxki i=1
+                                  l∈(tk )−1 (i) n6=k
+
+With those operators, the rightmost term of (4.5) can be computed in a “marginal-
+ized” way, using the relation
+                                                 L Y
+                                                 X  N
+                   hak , Kk ((an )n6=k )idxk =    (   antn (l) ) · Kl · dzl
+                                                 l=1 n=1
+valid for k ∈ {1, . . . , N }. The key feature for obtaining this relation is the fact that
+((tk )−1 (i))Ii=1
+               k
+                  forms a partition of Z, and this explains why the scaling algorithm
+generalizes naturally to linear operators which are “pushforward”. It is now simple,
+at least formally, to define the generalization of the scaling algorithm dispayed in
+Algorithm 3, by writing the alternate optimization on the dual problem, and taking
+again the dual, in the spirit of Proposition 3.3.
+
+Algorithm 3 Generalized scaling algorithm
+ 1: function GeneralScalingAlgo((proxdivFk , Kk , tk )n
+                                                      k=1 , K, ε)
+ 2:    ak ← 1Ik                                                      . for all k = 1, . . . , N .
+ 3:    repeat
+ 4:       for k=1,. . . ,N do
+ 5:           ak ← proxdiv(Kk ((an )n6=k ), ε)
+ 6:       end for
+ 7:    until stopping criteron
+                     QN        L
+ 8:    return Kl · k=1 aktk (l) l=1                                 . The primal optimizer
+ 9: end function
+
+
+  As a simple illustration, consider, in the setting of equation (4.1), an extension
+where is added a function of the total mass
+                        X           Y
+               min F1 (P# R) + F2 (P# R) + F3 (m# R) + ε KL(R|K) .
+              R∈RI×J
+
+where m : (x, y) → {0} (m# returns the total mass) and F3 : R → R ∪ {∞}
+is a proper, lower semicontinuous and convex function. Applying the reasoning
+above, and after some rearrangement (here Z is still a product space and thus
+it is convenient to store R as a matrix), one obtains Algorithm 4. If F3 is the
+indicator of equality with a positive real number, this algorithm solves the partial
+optimal transport problem [19, 33] but more general F3 can be considered such as,
+for instance, a range constraint on the total mass.
+
+                                    5. Applications
+   Throughout this Section, we detail how to use the scaling iterations (S) for
+solving the problems discussed in Section 2. We first analyze the properties of the
+functionals on marginals Fi , then we derive the iterations in a continuous setting,
+and finally show numerical experiments. We extend the definition of the operator
+proxdiv (defined in (4.4) in the discrete setting) to the continuous setting as follows:
+for s ∈ L1 (X), u ∈ L∞ (X) and ε > 0
+                                                               u
+                                                          −ε
+(5.1)                    proxdivF (s, u, ε) = proxKL
+                                                  F/ε (s e   )/s
+      SCALING ALGORITHMS FOR UNBALANCED OPTIMAL TRANSPORT PROBLEMS                     27
+
+
+Algorithm 4 Scaling algorithm with a function on the total mass
+ 1: function MassScalingAlgo((proxdivFk )3k=1 , K, dx, dy, ε)            . K is a matrix.
+ 2:    b ← 1J
+ 3:    z←1
+ 4:    repeat
+ 5:       a ← proxdivF1 (z · K(b dy))
+ 6:       b ← proxdivF2 (z · KT (a dx))
+                                   T
+ 7:       z ← proxdivF3 ((a dx) K(b dy))
+ 8:    until convergence
+ 9:    return z · (ai Ki,j bj )i,j                             . The primal optimizer
+10: end function
+
+
+
+with the convention 0/0 = 0. Moreover, in order to avoid the heavy notation
+Dϕ (adx|bdx), we denote by straight letters the divergences between functions, i.e.
+for a, b measurable nonnegative functions on X and ϕ a nonnegative entropy func-
+tion (see Definition 2.1):
+(5.2)                                                  (
+                                                         b · ϕ(a/b) if b > 0
+                  Z
+             def.
+    Dϕ (a|b) =       Dϕ (a(x)|b(x))dx with Dϕ (a|b) =
+                   X                                     a · ϕ0∞    otherwise .
+with the convention 0 × ∞ = 0. Some properties of these divergences between
+functions are studied in Appendix A.2.
+   All reported runtimes were obtained with an implementation in Julia, on a stan-
+dard laptop with CPU clock rate 2.5 GHz.
+
+5.1. Balanced and Unbalanced Optimal Transport.
+
+5.1.1. Derivation of the algorithm. The basic framework of classical and unbalanced
+optimal transport has been recalled in Sections 2.2 and 2.3. Assume that we are
+given marginals µ ∈ M+ (X), ν ∈ M+ (ν) and a cost function c : X ×Y → R∪{∞}.
+By defining p = dµ/dx and q = dν/dy, the marginal functionals involved in the
+regularized problem are
+(5.3)            F1 (s1 ) = Dϕ1 (s1 |p)   and F2 (s2 ) = Dϕ2 (s2 |q) .
+as in (5.2) above. As shown in Appendix A.2, if ϕ1 and ϕ2 are a nonnegative
+entropy function (Definition 2.1) then F1 and F2 are admissible integral functionals
+(Definition 3.5). In order to compute the associated proxdiv operator, let us apply
+Proposition 3.7 in this precise case.
+Proposition 5.1. Let ϕ be a nonnegative entropy function and (s, p) ∈ L1+ (X)2
+such that 0 ∈ dom ϕ or s(x) = 0 ⇒ p(x) = 0 a.e. Let F (s) = Dϕ (s|p). Then
+proxKL                                         ?
+    F/ε (s) is not empty and is the singleton s satisfying for a.e. x ∈ X,
+       
+               ?
+       0 = s (x)
+                                                 if s(x) = 0,
+                    ?              0
+         0 = ε log(s (x)/s(x)) + ϕ∞               if p(x) = 0 and s(x) > 0,
+       
+         0 ∈ ε log(s? (x)/s(x)) + ∂ϕ(s? (x)/p(x)) otherwise.
+       
+
+Proof. It is the pointwise optimality conditions associated to Proposition 3.7.        
+28                  L. CHIZAT, G. PEYRÉ, B. SCHMITZER, AND F-X. VIALARD
+
+
+
+
+      3
+
+                                                      proxdivF (s)
+      2                                                              100
+                                         KL
+      1                                  TV
+                                         RG
+      0                                  ι=
+                                                                             10-1      100           101
+       0        1       2       3       4                                               s
+
+     (a) Graph of the entropy functions ϕ            (b) Operator proxdivF associated to
+     used to define the divergences in the leg-      these divergence functions, for p = 1,
+     end.                                            u = 0 and varying s ∈ R (in log scale)
+
+            Figure 2. Divergences and proxdiv operators for the examples of
+            Table 1
+
+   This formula allows to compute explicitly the proxdiv operators of the examples
+introduced in Section 2.1, as listed in Table 1. These entropy functions as well as
+the associated proxdiv operators are displayed on Figure 2. Note that, in Table 1
+the first line corresponds to standard Sinkhorn iterations and these iterations are
+recovered in the second and third line by letting λ → +∞ and by setting α = β = 1
+in the fourth line. In the context of the log-domain stabilization (Section 4.3), all
+four proxdiv operators remain stable in the limit of small ε: either proxdiv is
+independent of u, only a regularized exponential e−u/(λ+ε) must be evaluated, or
+extreme values are cut off by thresholding.
+
+            F                               proxKL
+                                                F/ε (s)                                     proxdivF (s, u, ε)
+ ι{=} (·|p)                                          p                                                     p/s
+                                             ε      λ                                          λ
+λ KL(·|p)                              s      ·p
+                                            ε+λ    ε+λ                                (p/s)   · e−u/(λ+ε)
+                                                                                              λ+ε
+
+                       n      λ
+                                     n       λ
+                                                  oo                           n λ−u      n λ+u       oo
+λ TV(·|p)           min s · e ε , max s · e− ε , p                         min e ε , max e− ε , p/s
+
+                                                                           min β p/s, max α p/s, e−u/ε
+                                                                                         
+     RG[α,β]                min {β p, max {α p, s}}
+            Table 1. Some divergence functionals and the associated prox
+            and proxdiv operators for functions s and u defined on X. All
+            operators are acting pointwise and λ > 0, 0 ⩽ α ⩽ β are real
+            parameters (see Section 2.1 for the definitions).
+
+
+
+5.1.2. Numerical examples for X = [0, 1]. Let X = Y be the discretization of
+the interval [0, 1] into I = J = 1000 uniform samples and dx = dy = I1 1I (the
+discretized Lebesgue measure). Let p, q be the (discrete) marginals displayed on
+Figures 3a-3b. We solve the discrete entropic regularized problem (4.1) using the
+stabilized scaling Algorithm 2 for marginal functions Fi of the form (5.3) with
+several choices of divergences listed in Figure 3. The algorithm was stopped after
+103 iterations with a runtime of approximately 30 seconds.
+    For the optimal solution R ∈ RI×J , obtained after convergence, Figure 3 displays
+its projections R dy and RT dx on the domain X and Figure 4 illustrates the entries
+     SCALING ALGORITHMS FOR UNBALANCED OPTIMAL TRANSPORT PROBLEMS                      29
+
+
+of R which are greater than 10−10 , which can be interpreted as the approximate
+support of the optimizers. Thanks to the stabilization of Algorithm 2, the parameter
+ε could be made extremely small, until the plan is quasi-deterministic. Here we set
+it to ε = 10−7 for the support to be clearly visible on Figure 4. Remark that for
+the TV case (orange support), the straigth segments correspond to a density of 1
+on the diagonal: this is the plan with minimal entropy among the (non-unique)
+optimal plans, in accordance with Proposition 3.1.
+   Figure 5 displays the primal-dual gap (Pε ) − (Dε ) as a function of the itera-
+tion number ` when running Algorithm 1 for solving unbalanced optimal transport
+problems with ε = 0.01. More precisely, we display
+                               Pε (r(`) ) − Dε (u(`) , v (`) )
+where Pε and Dε are the primal and dual functionals (where set constraints are
+replaced by an exponential function of the distance to the set) as in Theorem 3.2 and
+r(`) , u(`) , v (`) are the primal and dual iterates as in Theorem 4.1. The marginals are
+the same as shown on Figures 3a-3b and the cost is quadratic. The discretization is
+I = J = 500 except for the thin black line where I = J = 1000. This plot leads to
+3 observations which generalize the conclusion of Theorem 3.11: (i) convergence in
+function values is empirically linear (ii) convergence is faster when the divergences
+are multiplied by a small weight (iii) convergence speed is insensitive to dimension
+of the problem.
+
+5.1.3. Numerical examples for X = Y = [0, 1]2 . Let X = Y be the discretization
+of the 2-dimensional domain [0, 1]2 into I = J = 200 × 200 uniform samples and
+dx = dy be the discrete Lebesgue measures. Let p, q be the densities displayed
+together on Figure 6a and c be the quadratic cost c(x, y) = |y − x|2 . We solve the
+discrete entropic regularized problem (4.1) using Algorithm 1 for several unbalanced
+optimal transport problems. We apply the “separable kernel” method (see Section
+4.4) to accelerate the algorithm. Since this cannot be combined with the log-
+stabilization, the regularization parameter ε has been fixed to the rather high value
+ε = 10−4 in order to avoid numerical issues. Figure 6 shows the marginals of the
+optimal coupling R and Figure 7 illustrates the resulting transport plan: points
+with the same color correspond roughly to the same mass particle before and after
+transport. The algorithm was stopped after 103 iterations and the running time
+was of 35 seconds approximately.
+
+5.1.4. Color transfer. In general it is difficult to display optimal transport maps
+for three-dimensional problems. An interesting application which allows intuitive
+visualization is color transfer: a classical task in image processing where the goal is
+to impose the color histogram of one image onto another image. Optimal transport
+between histograms has proven useful for problems of this sort such as contrast
+adjustment [28] and color transfer via 1D transportation [60]. Indeed, optimal
+transport produces a correspondence between histograms which minimizes the total
+amount of color “distortion” (where the notion of distortion is specified by the cost
+function) and thus maintains maximal visual consistency.
+   In our experiments we represent colors in the three-dimensional “CIE-Lab” space
+(one coordinate for luminance and two for chrominance), resized to fit into a cuboid
+X = Y = [0, 1]3 , discretized into I = J = 64 × 32 × 32 uniform bins and we choose
+the quadratic cost c(x, y) = |x − y|2 . The anisotropic discretization of X account
+30                  L. CHIZAT, G. PEYRÉ, B. SCHMITZER, AND F-X. VIALARD
+
+
+
+
+     0.0     0.2       0.4    0.6     0.8   1.0   0.0    0.2      0.4    0.6    0.8   1.0
+
+
+                   (a) Marginal p                              (b) Marginal q
+
+
+
+
+            (c) ι{=} (classical OT)                            (d) 0.05 × TV
+
+
+
+
+                   (e) 0.5 × KL                                (f) 0.1 × KL
+
+
+
+
+                   (g) RG[0.7, 1.2]                (h) WFR (with cut locus at 0.2)
+
+           Figure 3. (A)-(B) Input marginals. (C)-(H) Marginals of the
+           optimal plan R displayed together for several divergences (specified
+           in the caption). The color shows the location of the same subset
+           of mass before and after transportation. The cost is the quadratic
+           cost c(x, y) = |y − x|2 except for (H) which is a computation of
+           the optimal plan for WFR that is F1 = F2 = KL and c as in (2.5)
+           (with a spatial rescaling so that c(x, y) = ∞ ⇔ |y − x| ⩾ 0.2).
+
+
+
+
+           Figure 4. Support of the optimal plans (xi , yj ) ; Ri,j > 10−10
+                                                     
+
+           for all the examples displayed on Figure 3, except (E). Orange and
+           black are superimposed at the top.
+    SCALING ALGORITHMS FOR UNBALANCED OPTIMAL TRANSPORT PROBLEMS                                 31
+
+
+                       100
+                                                                       ι=
+                                                                       KL
+                                                                       KL (dim × 2)
+                                                                       TV
+                                                                       RG[0.5, 1.5]
+                                                                       0.1 × TV
+              P` −D`                                                   0.1 × KL
+                   10-10
+
+
+
+
+                   10-18 0                250                 500                     750
+                                                    `
+
+
+        Figure 5. Primal dual gap as a function of the iterations for
+        Algorithm 1 applied to unbalanced optimal transport problems.
+
+
+
+
+   (a) p and q               (b) 0.1×KL         (c) RG[0.7, 1.2]       (d) 0.05 × TV
+
+
+        Figure 6. Marginals of the optimal plan R for several unbalanced
+        optimal transport problems (quadratic cost, divergence specified in
+        the captions).
+
+
+
+
+       (a) ι{=}                (b) 0.1 × KL             (c) RG[0.7, 1.2]         (d) 0.05 × TV
+
+        Figure 7. Representation of the transport map for the experi-
+        ments of Figure 6.
+
+
+for the fact that the eye is more sensitive to variations in luminance than variations
+in chrominance.
+   Let Ω ⊂ R2 be the image domain. An image is described by a function g : Ω → X
+and its color histogram is the pushforward of the Lebesgue measure on Ω by g. Let
+32              L. CHIZAT, G. PEYRÉ, B. SCHMITZER, AND F-X. VIALARD
+
+
+
+
+                     (a) Image gX                     (b) Image gY
+
+
+
+
+        (c) ι{=}          (d) 0.03 × KL          (e) RG[0, 5]        (f) 0.2 × TV
+
+        Figure 8. A challenging color transfer experiment where the col-
+        ors of the image gY are transferred to the image gX . In all cases
+        F1 = ι{=} (· | p) and F2 is the divergence with respect to q specified
+        in the caption. Note that in (F) some colors are not “displaced”.
+        The parameters for F2 are chosen arbitrarily.
+
+
+gX : Ω → X and gY : Ω → Y (= X) be two images and p, q be the densities of the
+associated color histograms with respect to the reference measures dx = dy = 1I
+which gives unit mass to each point of X. We run Algorithm 1 with the “separable
+kernel” method (see Section 4.4) to obtain an (unbalanced) optimal transport plan
+R. An approximate transport map T is then computed according to the barycentric
+projection (as already used for instance in [73])
+                                          def.
+               T (xi ) = Ti   where    T = (R.y1 , R.y2 , R.y3 )/R.1J
+
+where y = (y1 , y2 , y3 ) ∈ RJ×3 is the vector of coordinates of the points in Y (= X).
+The modified image is finally obtained as T ◦ gX .
+   On Figure 8, we display the color transfer between very dissimilar images, com-
+puted with parameter ε = 0.002. The algorithm was stopped after 2000 iterations
+and the running time was approximately 160 seconds. This intentionally challeng-
+ing example is insightful as it exhibits a strong effect of the choice of the divergence.
+There are no quantitative measures for the quality of a transformed image, but the
+application of unbalanced optimal transport allows to select the “right amount of
+colors” in the target histogram so as to match the modes of the initial histogram
+and yields meaningful results.
+
+5.2. Unbalanced Barycenters.
+     SCALING ALGORITHMS FOR UNBALANCED OPTIMAL TRANSPORT PROBLEMS                                            33
+
+
+5.2.1. Well-posedness. Barycenters and related problems have been defined in Sec-
+tion 2.4. Assume we are given a family of n measures (pk dx)nk=1 , families of en-
+tropies (ϕ1,k )nk=1 and (ϕ2,k )nk=1 and families of cost functions (ck )nk=1 . For a clearer
+picture, let us focus on the case where
+
+                            ϕ2,k = αk · λ · ϕ for k = 1, . . . , n
+
+where ϕ is a nonnegative entropy function, (αk )nk=1 ∈]0, ∞[n are weights and λ > 0
+is a (redundant) parameter. It is also convenient to slightly modify (for this Section
+only) the definition of the KL divergence given in (1.1) by introducing weights as
+                                   def.
+                                        X
+                           KL(r|s) =       αk · KL(rk |sk ) .
+                                                 k
+
+No theoretical aspect is affected by this small change, but the definition of the
+kernel has to be adapted, for each component, as
+
+                                   Kk = exp(−ck /(αk ε))
+
+so that one still has hc, ri + ε KL(r|1) = ε KL(r|K) + const. By equation (2.6), the
+barycenter problem with entropic regularization corresponds to defining
+              n
+              X                                                                     n
+                                                                                    X
+   F1 (r) =         Dϕk,1 (rk dx|pk dx)    and F2 (s) =                inf      λ          αk Dϕ (sk dy|σ)
+                                                                   σ∈M+ (Y )
+              k=1                                                                   k=1
+
+(for all r ∈ L1 (X)n and s ∈ L1 (Y )n ) in (Pε ). It is direct to see that the proximal
+operator of F1 for the KL divergence (according to our specific definition of KL)
+can be computed componentwise as
+
+(5.4)          proxKL            KL
+                   F1 (r) = (proxDϕ                     (r1 ), . . . , proxKL              (rn ))
+                                          1,1 (·|p1 )                      Dϕn,1 (·|pn )
+
+
+so we can use the results from the previous section (recall that D denotes divergences
+between functions as in (5.2)). Let us turn our attention to the function F2 . As it
+is assumed ϕ(0) ⩾ 0, F2 is not changed by taking the infimum over σ of the form
+h · dy for h ∈ L1 (Y ). So one can express F2 for s ∈ L1 (Y )n , with notation of (5.2)
+as
+                           n
+                           X                           Xn      Z
+(5.5) F2 (s) = min  1
+                         λ   α   D
+                               k ϕ k(s |h) =   min
+                                                 1
+                                                     λ     α k    Dϕ (sk (x)|h(x))dx .
+                h∈L (Y )                                 h∈L (Y )                X
+                             k=1                                      k=1
+
+Proposition 5.2. If ϕ0∞ > 0 then F2 is an admissible integral functional in the
+sense of Definition 3.5 and for all s ∈ L1 (Y )n , there exists a minimizer h ∈ L1 (Y ).
+Moreover, if r? ∈ L1 (X × Y )n minimizes (Pε ), then the associated minimizer h? is
+                                                      Y ?
+a pointwise minimizer of (5.5) at the point s = P#      r .
+
+Proof. Let G(s, h) be the function on the right side, which is an admissible integral
+functional (see Proposition A.2 in Appendix A.2). Let us verify the assumptions of
+the “reduced minimization Theorem” [64, Corollary 3B]. Assumption (i) is satisfied
+because ϕ0∞ > 0 guarantees the growth condition [64, 2R] and assumption (ii) is
+guaranteed by the fact that if u ∈ L1 (Y ) and Dϕ (u|v) < ∞ then v ∈ L1 (Y ) (this
+is proven by adapting slightly the proof of Lemma 3.4, using the—at least linear—
+growth of ϕ). Thus the cited Corollary applies.                                    
+34              L. CHIZAT, G. PEYRÉ, B. SCHMITZER, AND F-X. VIALARD
+
+
+5.2.2. Derivation of the algorithm. According to Proposition 3.7, computing the
+prox and proxdiv operators requires to solve, for each point y ∈ Y , a problem of
+the form
+                            Xn
+                                                                     
+(5.6)               minn        αk ε · KL(s̃k |sk ) + λ · Dϕ (s̃k |h) .
+                   (s̃,h)∈R ×R
+                                 k=1
+
+If ϕ is smooth, first order optimality conditions for (5.6) are simple to obtain. The
+next Proposition deals with the general case where more care is needed.
+Proposition 5.3. Let (si )ni=1 ∈ Rn+ . Assume that there exists a feasible candidate
+(s̃0 , h0 ) for (5.6) such that (si > 0) ⇒ (s̃0i > 0). A candidate (s̃, h) is a solution of
+(5.6) if and only if
+        • (si = 0) ⇔ (s̃i = 0) and            Pn
+        • there exists b ∈ Rn such that k=1 αk bk = 0 and, for all k ∈ {1, . . . , n},
+                                               def.
+            (ak , bk ) ∈ ∂ Dϕ (s̃k |h) with ak = λε log ss̃kk if sk > 0 and bk ∈ ∂2 Dϕ (0, h)
+            otherwise.
+Proof. First assume that si > 0 for all i ∈ {1, . . . , n}. The positivity assumption on
+the feasible point implies that the sum of the subdifferential is the subdifferential
+of the sum by continuity of KL for positive arguments. Moreover, a minimizer
+necessarily satisfies s̃i > 0 for all i. Consequently, the subderivative of the function
+in (5.6) at ((s̃i )n , h) is the set of vectors in Rn+1 of the form
+                                                 ..
+                                                              
+                                                 .            
+                                   εαi log(s̃i /si ) + λαi ai 
+                                                              
+                                                 ..           
+                                   
+                                             P     .           
+                                           λ k αk bk
+with (ai , bi ) ∈ ∂ Dϕ (s̃i |h). Writing the first order optimality condition yields the
+second condition of the Proposition. Now for all i such that si is null, set s̃i = 0
+(this is required for feasibility) and do the reasoning above by withdrawing the
+variables s̃i which have been fixed.                                                  
+   Note that once the optimal h is found (possibly with the help of the optimality
+conditions of Proposition 5.3), determining the optimal values for s̃ can be done
+componentwise as in (5.4) with the help of Proposition 5.1. In Table 2 we provide
+formulas for h for some examples (proofs can be found in Appendix A.3), for the
+subsequent computation of s̃k (and the proxdiv step) we refer the reader to Table
+1 (where of course one must replace p by h).
+5.2.3. Numerical experiments. Geodesics in Wasserstein and Wasserstein–Fisher–
+Rao space can be computed as weighted barycenters between their endpoints. In
+Figure 9 geodesics for the Wasserstein–Fisher–Rao distance on X = Y = [0, 1] for
+different cut-loci dmax and the Wasserstein distance (corresponding to dmax = ∞)
+are compared and the influence of entropy regularization is illustrated. The interval
+[0, 1] was discretized into I = J = 512 uniform samples. dx and dy were chosen to
+be the discretized Lebesgue measure.
+    In Figure 10, we display Fréchet means-like experiments for a family of 4 given
+marginals where X = Y is the segment [0, 1] (discretized as above). The (discrete)
+densities of the marginals (pk )4k=1 consist each of the sum of three bumps (centered
+     SCALING ALGORITHMS FOR UNBALANCED OPTIMAL TRANSPORT PROBLEMS                          35
+
+
+                    Dϕ      Formula for h as a function of s ∈ Rn
+                                         P 1
+                            h = ( k sα
+                                 Q
+    (i)            ι{=}              k )
+                                       k  k αk
+
+
+
+                                 P          ε     ε+λ
+                                                     ε
+                                       αk skε+λ
+    (ii)          λ KL      h=       kP
+                                         k αk
+
+                              P           P
+    (iii)         λ TV      if k /∈I+ αk ⩾ k∈I+ αk then h = 0 otherwise solve:
+                                                                        
+                                                                  ε    h
+                            P            P
+                               ∈I+ αk +
+                              k/          k∈I+ αk max −1, min 1, λ log si    =0
+
+    (iv)     RG[β1 ,β2 ]    if sk = 0 for some k then h = 0 otherwise solve:
+                                   h                                      i
+                            P                   β2 h                  β1 h
+                               k αk β2 min log sk , 0 + β1 max log sk , 0       =0
+
+            Table 2. Expression for the minimizer h of (5.6) as a function of
+            s ∈ Rn where I+ = {k ; sk > 0} (proofs in Appendix A.3). For
+            the implicit equations of cases (iii) and (iv), an exact solution can
+            be given quickly because computing log h consists in finding the
+            root of a piecewise linear non-decreasing function (with at most
+            2n pieces), which is guaranteed to change its sign.
+
+
+
+near the points x = 0.1, x = 0.5 and x = 0.9). These computations where performed
+with Algorithm 2 which was stopped after 1500 iterations (running time of 30
+seconds approximately) and with ε = 10−5 . We observe that relaxing the marginal
+constraints (Figures 10c-10f) allows to conserve this structure in three bumps in
+contrast to classical optimal transport (Figure 10b).
+   Figure 11 and 12 display barycenters for the Wasserstein and the GHK metric
+(defined in Section 2.3) between three densities on [0, 3]2 discretized into 200 × 200
+samples. Computations where performed using Algorithm 1 and the “separable
+kernel” method (see Section 4.4) which was stopped after 1500 iterations (running
+time of 70 seconds approximately) with ε = 9.10−4 . The barycenter coefficients are
+the following:
+                                                (0, 1, 0)
+                                   (1, 3, 0)/4         (0, 3, 1)/4
+                           (2, 2, 0)/4     (1, 2, 1)/4         (0, 2, 2)/4
+                   (3, 1, 0)/4     (2, 1, 1)/4         (1, 1, 2)/4     (0, 1, 3)/4
+              (1, 0, 0)    (3, 0, 1)/4     (2, 0, 2)/4         (1, 0, 3)/4     (0, 0, 1)
+The input densities have a similar global structure: each is made of three distant
+“shapes” of varying mass. The comparison between Figures 11 and 12 lead to a
+similar remark than for Figure 10: relaxing the strict marginal constraints allows
+to maintain the global “structure” of the input densities.
+5.3. Gradient Flows and Evolution of Densities. The basic framework of
+gradient flows has been briefly laid out in Section 2.5. This Section details the
+application of Algorithm 2 for solving them. As the transition from the measures
+36             L. CHIZAT, G. PEYRÉ, B. SCHMITZER, AND F-X. VIALARD
+
+
+
+
+                   1
+                                                                 ε=1E-6
+                                                                 ε=1E-5
+                                                                 ε=1E-4
+                   0                                             ε=1E-3
+                    0.0             0.5              1.0
+
+
+        Figure 9. Top: Geodesics in Wasserstein distance (dmax = ∞)
+        and Wasserstein–Fisher–Rao distance (dmax gives the cut-locus dis-
+        tance) as weighted (unbalanced) barycenters between endpoints.
+        For dmax = ∞ the mass difference between left and right blocks
+        must be compensated by transport. As dmax is reduced, the mass
+        difference is increasingly compensated by growth and shrinkage. In
+        all experiments ε = 10−6 . Bottom: Midpoint of the Wasserstein
+        geodesic for various ε.
+
+
+formulation to the density formulation and further to the algorithm with pointwise
+optimality conditions was carefully detailed in Sections 5.1 and 5.2, we skip some
+of these intermediate steps here.
+
+5.3.1. In the Wasserstein Space. Scaling algorithms for solving Wasserstein gra-
+dient flows are not new [58], but our framework allows to simplify the derivation
+of the algorithm and the stabilized Algorithm 2 allows to use much smaller regu-
+larization parameter ε yielding sharper and more precise flows. Given a convex,
+lower semicontinuous function on measures G with compact sublevel sets, each step
+requires to find the minimizer of
+                                                1
+                          min   hc, γi + ι{=} (P# γ|µτk ) + 2 τ G(P#
+                                                                   2
+                                                                     γ)
+                   γ∈M+ (X×X)
+
+where c : (x, y) 7→ |y − x|2 is the quadratic cost. This directly fits in our framework
+by choosing F1 (s) = ι{=} (s dx|µτk ) and F2 (s) = 2 τ G(s dx).
+Example 5.4. If the energy is given by the relative entropy G = KL(·|p dx) for
+some reference measure p dx, then the proximal step for F2 is given by
+                                                                   ε      2τ
+          proxKL
+              1
+                F2 (q) = argmin (ε KL(s|q) + 2τ KL(s|p)) = q
+                                                             ε+2τ · p ε+2τ .
+               ε
+                            s:X→R
+SCALING ALGORITHMS FOR UNBALANCED OPTIMAL TRANSPORT PROBLEMS                                 37
+
+
+
+
+0.0      0.2        0.4     0.6     0.8   1.0     0.0      0.2      0.4   0.6    0.8   1.0
+
+
+
+
+        (a) Marginals (pk )4k=1                                    (b) ι{=}
+
+
+
+
+0.0      0.2        0.4     0.6     0.8   1.0     0.0      0.2      0.4   0.6    0.8   1.0
+
+
+
+
+                (c) 0.07 × KL                                    (d) 0.02 × TV
+
+
+
+
+0.0      0.2        0.4     0.6     0.8   1.0     0.0      0.2      0.4   0.6    0.8   1.0
+
+
+
+
+               (e) RG[0.65, 1.35]                       (f) WFR (cut locus at 0.2)
+
+      Figure 10. Illustration of barycenter-like problems on X = Y =
+      [0, 1]. Except for (F), the function F1 is the equality constraint
+      with respect to the densities (pk )4k=1 , the cost is c(x, y) = |y − x|2 ,
+      the weights are ( 14 , 14 , 14 , 41 ) and the function F2 is of the type (5.5)
+      with the divergence specified in the legend. Figure (F) represents
+      the Fréchet mean for the WFR metric. The dotted lines display
+      the second marginal of the optimal plans.
+
+
+
+
+        Figure 11. Wasserstein barycenters with entropic smoothing
+38             L. CHIZAT, G. PEYRÉ, B. SCHMITZER, AND F-X. VIALARD
+
+
+
+
+        Figure 12. GHK barycenters with entropic smoothing (the defini-
+        tion of the GHK metric is similar to Wasserstein but the marginal
+        constraints are replaced by KL divergences, see Section 2.3).
+
+
+This problem is identical to an unbalanced transport problem where one of the
+marginal is fixed and the other is controlled by a KL divergence. The difference
+is, that we want to solve a whole sequence of such problems, each time taking the
+second marginal of the optimal coupling and plugging it into the next problem
+as constraint for the first marginal. The gradient flow associated to this example
+allows to recover the heat flow when p dx is the Lebesgue measure on X = Rd .
+
+Example 5.5. Some models of crowd motion with congestion [51] can be ap-
+proximatively simulated by computing a sequence of measures (µτk ) from an initial
+measure µ0 , where for all k ∈ N, µτ2k+1 is obtained from µτ2k by performing a free
+evolution during a time τ (this requires another algorithm) and then defining µτ2k+2
+as the Wasserstein projection of µτ2k+1 (which we write as p2k+1 dx) onto the set
+of measures with densities smaller than 1. The second step can be performed by
+setting F1 (s) = ι{=} (s|p2k+1 ) and F2 (s) = ι⩽1 (s). The proximal operator of F2 at
+a point s is given by min{1, s} and thus p2k+2 can be obtained from p2k+1 with the
+stabilized Algorithm 2 with
+
+      proxdivF1 (s, u, ε) = p2k+1
+                              s   ,   and   proxdivF2 (s, u, ε) = min{ 1s , e−u/ε } .
+
+5.3.2. WFR Gradient Flows. For WFR gradient flows, each step requires to solve
+                                       1
+                  inf     hc, γi + KL(P# γ|µτk ) + KL(P#
+                                                       2
+                                                         γ|µ) + 2τ G(µ)
+              µ∈M+ (X)
+             γ∈M+ (X×X)
+     SCALING ALGORITHMS FOR UNBALANCED OPTIMAL TRANSPORT PROBLEMS                               39
+
+
+where c is the cost given in (2.5). By denoting pk the density of µτk with respect to
+dx, one defines the functions
+            F1 (s) = KL(s|pk )         and F2 (s) =      inf     KL(s|p) + 2τ G(p)
+                                                      p∈L1 (X)
+
+            def.                                                                 R
+where G(p) = G(pdx). If G is an integral functional of the form G(s) =               X
+                                                                                         gx (s(x))dx,
+the proximal operator is given pointwise by
+                            inf       ε KL(s̃|s) + KL(s̃|p) + 2τ gx (p)
+                          (s̃,p)∈R2
+
+for which the first order optimality conditions read
+                            (
+                              0 = ε log(s̃/s) + log(s̃/p)
+                              (s̃/p − 1)/(2τ ) ∈ ∂gx (p)
+and s̃ = 0 if s = 0 or p = 0. In many cases, this system can be easily solved, as in
+the following example.
+Example 5.6. One of the simplest functional which generates non-trivial gradient
+flows is
+                      G(µ) = −α · µ(X) + ι⩽1 (dµ/dx)
+where α ∈]0, ∞[. Since the distance WFR measures both the displacement and the
+rate of growth, one can interpret the gradient flow of G as describing the evolution
+of a density of cells (a tumor, say) which have a tendency to multiply—hence
+increase the total mass—but which density cannot exceed 1. One can solve the
+time discretized gradient flow with Algorithm 2 by choosing F2 (s) = inf p KL(s|p) −
+2ατ p + ι⩽1 (p). With the optimality conditions above, one obtains
+                                (                  1          u             1+ε
+                                  (eu (1 − 2τ α))− ε if s ⩽ e ε (1 − 2τ α) ε
+          proxdivF2 (s, u, ε) =            1
+                                 (s eu )− 1+ε        otherwise.
+                                                                  2        
+                                                                   P# r
+Moreover, given an optimal coupling r, one has µτk+1 = min 1−2τ        α , 1  dx.
+
+   A numerical illustration is given in Figure 13 where we used Algorithm 2 (stopped
+after 500 iterations) for solving each step , with the following parameters: X is the
+segment [0, 1] discretized into 3000 uniformly spaced samples, the initial density p0
+is the black line on Figure 13b, τ = 0.006, α = 1 and ε = 10−8 . The running time
+was 315 seconds. Remark how, by using a very small value for ε, the “smoothing”
+effect of the entropy disappears: the contours of the free-boundary which evolve
+with time remain sharp.
+
+5.3.3. WFR Gradient Flows with Multiple Species. The generic form (2.9) also in-
+cludes gradient flows with multiple species with a mutual interaction (with n > 1,
+similar to the barycenter problem). Such systems have been theoretically studied
+in [43, 79]. Here we consider this class of problems in order to illustrate the ver-
+satility of the algorithm and it is not our purpose to make a link with the theory
+of PDEs. Let us consider a simple example which is a direct extension of Example
+5.6. Consider the following functional:
+                   G(µa , µb ) = −α · µa − α · µb + ι⩽1 (d(µa + µb )/dx)) .
+40                          L. CHIZAT, G. PEYRÉ, B. SCHMITZER, AND F-X. VIALARD
+
+
+               0.20                                                                                                        1.0
+                                                                                                                           0.9
+                                                                                                                           0.8
+               0.15                                                                                                        0.7
+                                                                                                                           0.6
+           t   0.10                                                                                                        0.5
+                                                                                                                           0.4
+                                                                                                                           0.3
+               0.05
+                                                                                                                           0.2
+                                                                                                                           0.1
+               0.00                                                                                                        0.0
+                    .0               0.2         0.4                           0.6                  0.8              1.0
+                                                                X
+
+
+                  (a) Evolution in color scale: time evolves from bottom to top.
+                  1.2
+
+                  1.0
+
+                  0.8
+
+                  0.6
+            ρkτ
+                  0.4
+
+                  0.2
+
+                  0.0
+                      0.0            0.2        0.4                      0.6                  0.8              1.0
+                                                            X
+
+     (b) Evolution viewed “laterally” : the initial density p0 is the black line, then
+     the density is displayed at every time step with a color ranging from blue (small
+     times) to pink (bigger times).
+
+         Figure 13. Evolution of the density with respect to time for the
+         growth model of Example 5.6.
+
+
+In this model, one has two species which have a tendency to grow in mass (with
+the same incentive α > 0, for simplicity of the algorithm), and their sum cannot
+exceed the reference measure. The corresponding F2 is given by
+                                                      Z
+F2 (sa , sb ) = inf 1 KL(sa |ra ) + KL(sb |rb ) − 2ατ   (ra + rb )dx + ι⩽1 (ra + rb ) .
+               (r a ,r b )∈L (X)2                                                    X
+The optimality conditions yield
+                                                       ua           ub                   ua               ub
+              proxdivF2 (s, u, ε) = (e− ε , e− ε )/β(sa e− ε , sb e− ε )
+                     n            1
+                                                  o
+              def.                              1
+where β(x, y) = max (x + y) 1+ε , (1 − 2τ α) ε . Morevoer, given an optimal pair
+of couplings ra , rb , the next densities are given by (pak+1 , pbk+1 ) = (P#
+                                                                            2 a    2 b
+                                                                              r , P#        2 a
+                                                                                     r )/β(P#      2 b
+                                                                                              r , P# r ).
+Remark than in this model, as in Example 5.6, if the domain X is compact and the
+initial densities are not null, a steady state is reached in finite time, where the sum
+of the two densities is constant and equal to 1.
+    Some initial densities and the associated final steady state are shown on Figure
+14. For this illustration, we started with input densities pa and pb on the segment
+[0, 1] discretized into 3000 uniform samples, as displayed on Figure 14a (where the
+red density pb is layered over pa ). We computed the evolution with Algorithm 2 for
+solving each step of the discretized gradient flow, with the parameters τ = 0.004,
+α = 1 and ε = 10−7 .
+    Note that although the incentive of growing mass α is the same for the two
+species, the resulting interaction is non trivial: for instance the small amount of
+blue mass is pushed to the right by the action of the expanding red mass. This
+behavior is explained by the fact that for the WFR metric, it requires less effort
+(i.e. the distance is smaller) to add a given amount of mass to a high density than
+to a small one.
+                   SCALING ALGORITHMS FOR UNBALANCED OPTIMAL TRANSPORT PROBLEMS                                                     41
+
+           1.2                                                                          1.2
+
+           1.0                                                                          1.0
+
+           0.8                                                                          0.8
+
+           0.6                                                                          0.6
+ density                                                                      density
+           0.4                                                                          0.4
+
+           0.2                                                                          0.2
+
+           0.0                                                                          0.0
+             0.0        0.2        0.4          0.6      0.8          1.0                 0.0    0.2         0.4       0.6   0.8   1.0
+                                            X                                                                      X
+
+
+
+                   (a) Initial state (blue) pa0 (red)pb0                                  (b) Steady state densities (for t big)
+
+
+
+
+                              (c) Evolution of pa                                                      (d) Evolution of pb
+
+                      Figure 14. (top row) initial state and steady state (density pb is
+                      layered over pa ) (bottom row) time evolution (time evolves from
+                      bottom to top) with density in color scale.
+
+
+                                                        Acknowledgements
+   The work of Bernhard Schmitzer has been supported by the French National
+Research Agency (ANR) as part of the ‘Investissements d’avenir’, program-reference
+ANR-10-LABX-0098 via the Fondation Sciences Mathématiques de Paris. The work
+of Bernhard Schmitzer and Gabriel Peyré has been supported by the European
+Research Council (ERC project SIGMA-Vision).
+
+                                                      Appendix A. Appendix
+A.1. Reminders on Convex Analysis. Let E and E ∗ be topologically paired
+vector spaces i.e. vector spaces assigned with locally convex Hausdorff topology
+such that all continuous linear functionals on each space can be identified with
+the elements of the other. The pairing between those spaces is the bilinear form
+h·, ·i : E × E ∗ → R. The convex conjugate of a function f : E → R ∪ {+∞} is
+defined for each y ∈ E ∗ by
+                                                               def.
+                                                      f ∗ (y) = sup hx, yi − f (x) .
+                                                                      x∈E
+
+The subdifferential operator is defined at a point x ∈ E as
+                                         def.
+                              ∂f (x) = {y ∈ E ∗ ; f (x0 ) − f (x) ⩾ hy, x0 − xi for all x0 ∈ E}
+and is empty if f (x) = ∞. Those definitions admit their natural counterparts for
+functions defined on E ∗ .
+Theorem A.1 (Fenchel-Rockafellar [62]). Let (E, E ∗ ) and (F, F ∗ ) be two couples
+of topologically paired spaces. Let A : E → F be a continuous linear operator and
+A∗ : F ∗ → E ∗ its adjoint. Let f and g be lower semicontinuous and proper convex
+functions defined on E and F respectively. If there exists x ∈ dom f such that g is
+continuous at Ax, then
+                                     sup −f (−x) − g(Ax) = min
+                                                           ∗  ∗
+                                                                f ∗ (A∗ y ∗ ) + g ∗ (y ∗ )
+                                    x∈E                                     y ∈F
+42             L. CHIZAT, G. PEYRÉ, B. SCHMITZER, AND F-X. VIALARD
+
+
+and the min is attained. Moreover, if there exists a maximizer x ∈ E then there
+exists y ∗ ∈ F ∗ satisfying Ax ∈ ∂g ∗ (y ∗ ) and A∗ y ∗ ∈ ∂f (−x).
+A.2. Properties of Divergence Functionals. Here we collect a few results on
+divergences functionals when they are defined on functions as in (5.2) (as opposed
+to Section 2.1 where they are defined between measures).
+Proposition A.2. Let ϕ be a nonnegative entropy function as in Definition 2.1 and
+(X, dx) a measured space. Then (u, v) ∈ L1 (X)2 7→ Dϕ (u|v) is an admissible inte-
+gral functional (in the sense of Definition 3.5) which is positively 1-homogeneous,
+convex and weakly lower semicontinuous. Moreover, D∗ϕ = ιBϕ with Bϕ = {(a, b) ∈
+R2 ; b ⩽ −ϕ∗ (a)}.
+Proof. As a preliminary, remark that for (u, v) ∈ R2 ,
+                    (                                       (
+     ∗                b(u · a/b + v − ϕ(a/b)) if b > 0        0 if v ⩽ ϕ∗ (u)
+   D (u|v) = sup               0
+                                                          =
+              a,b∈R+ a(u − ϕ∞ )                 otherwise     ∞ otherwise.
+
+Now, the function (x, u, v) ∈ X × R2 7→ Dϕ (u, v) defined in (5.2) is a normal
+integrand since it does not depend on x. Moreover, there exists feasible points
+for Dϕ (take v ∈ L1 (X) and u = αv where α ∈ dom ϕ) and for the integral
+                          ∗
+functional associated to Dϕ (given its expression above). The conclusion follows by
+[64, Theorem 3C].                                                                 
+
+Proposition A.3. Let (X, dx) be a measured space, v ∈ L1+ (X) and ϕ a nonnega-
+tive entropy function as in Definition 2.1. Then Dϕ (·|v) is a proper, weakly lower
+semicontinuous convex function on L1 (X) and its convex conjugate is given, for
+a ∈ L∞ (X), by
+                              Z                  Z
+                  ∗      def.    ∗
+                Dϕ (a|v) =      ϕ (a(x))v(x)dx +    ι⩽ϕ0∞ (a(x))dx
+                              X                     X
+        ∗
+where ϕ is the convex conjugate of ϕ.
+    Moreover, the subdifferential ∂ Dϕ (·|v) at a point u ∈ L1 (X) is the set of func-
+tions a ∈ L∞ (X) such that ϕ0∞ − a is nonnegative and such that, for a.e. x where
+v(x) > 0, a(x) ∈ ∂ϕ(u(x)/v(x)) .
+    Similarly, the subdifferential ∂ D∗ϕ (·|v) at a point a ∈ L∞ (X) bounded above by
+ϕ∞ is the set of nonnegative functions u ∈ L1 (X) such that, for a.e. x, u(x) ∈
+  0
+
+∂ϕ∗ (a(x))v(x) if v(x) > 0 and u(x) = 0 if v(x) = 0 and a(x) < ϕ0∞ .
+
+Proof. By [65, Proposition 14.45c], (x, u) ∈ X × R 7→ Dϕ (u|v(x)) is a normal
+integrand. Then [64, Theorem 3C] and Corollaries apply and conjugation and
+subdifferentiation can be performed pointwise.                             
+
+A.3. Proof of the Iterates for the Barycenter Problems. We explain be-
+low how to derive the expression for h which are given in Table 2, by applying
+Proposition 5.3. Assume that (si )ni=1 ∈ Rn ⩾ 0 is given.
+
+A.3.1. Case Dϕ = ι{=} . This case is simple because solving (5.6) boils down to
+                                        P
+solving the one dimensional problem minh αk KL(h|sk ), which is direct with first
+order optimality conditions.
+    SCALING ALGORITHMS FOR UNBALANCED OPTIMAL TRANSPORT PROBLEMS                       43
+
+
+A.3.2. Case Dϕ = λ KL. First remark that the assumption of Proposition 5.3 is
+satisfied and that h = 0 if and only if for all k, sk = 0 (otherwise, the joint
+subdifferential is empty). Since ϕ is smooth, its joint subdifferential is a singleton
+∂KL(s̃|h) = {(log(s̃/h), 1 − s̃/h)} if s̃, h > 0. Also, since KL(0|h) = h + ι[0,∞[ (h),
+one has ∂2 KL(0, h) = {1} if h > 0. Thus, optimality conditions in Proposition 5.3
+yields the system
+                          
+                                 s̃k   ε     sk
+                          log h = λ log s̃k
+                                                  if sk > 0,
+                            s̃k = 0                if sk = 0,
+                                         s̃k
+                          
+                          P
+                                αk (1 − h ) = 0 .
+
+A.3.3. Case Dϕ = λ TV. By Proposition A.2, one has DϕTV (s̃|h) = sup(a,b)∈B a ·
+x + b · y with B = {(a, b) ∈ R2 ; a ⩽ 1, b ⩽ 1, a + b ⩽ 0}. The set of points in
+B at which this supremum is attained is easy to see graphically and gives the set
+∂DϕTV (s̃|h). With the notations of Proposition 5.3, one has with ak = λε log s̃skk ,
+
+    (1) s̃k > h > 0 ⇔ −bk = ak = 1             (2) h > s̃k > 0 ⇔ −bk = ak = −1
+    (3) s̃k = h > 0 ⇔ −bk = ak ∈ [−1, 1]       (4) h > s̃k = 0 ⇔ bk = 1
+    (5) s̃k > h = 0 ⇔ ak = 1 and bk ⩽ −1        (6) s̃k = h = 0 ⇔ bk ⩽ 1 .
+                                                                         P
+Let us first deal with the case h = 0 (cases (5) and (6)). P   Condition P  α k bk = 0
+from Proposition 5.3 says that it is the case if and only if k /∈I+ αk ⩾ k∈I+ αk .
+Now assume that h > 0. If s̃k > 0 (cases (1), (2) and (3)) then bk can be expressed
+as max(−1, min(1, λε log shk )) otherwise bk = 1. The implicit expression given for h
+                      P
+is thus the condition    αk bk = 0.
+
+A.3.4. Case Dϕ = RG[β1 ,β2 ] . In this case, Dϕ is the support function of B =
+{(a, b) ∈ R2 ; for i ∈ {1, 2}, b ⩽ −βi · a}. With the notations of Proposition 5.3, one
+has with ak = λε log ss̃kk ,
+
+   (1) 0 < β1 h < s̃k < β2 h ⇔ ak = bk = 0      (2) 0 < β1 h = s̃k ⇔ bk = −β1 ak
+          (3) 0 < β2 h = s̃k ⇔ bk = −β2 ak        (4) 0 = h = s̃k ⇔ (bk , ak ) ∈ B .
+If sk = 0 for some k ∈ {1, . . . , n} P
+                                      then h = 0 (this is the only feasible point).
+Otherwise, h > 0 and the condition      αk bk = 0 gives the implicit equation.
+
+                                    References
+ 1. M. Agueh and G. Carlier, Barycenters in the Wasserstein space, SIAM Journal
+    on Mathematical Analysis 43 (2011), no. 2, 904–924.
+ 2. M. Agueh, B. Khouider, and L-P. Saumier, Optimal transport for particle image
+    velocimetry, Communications in Mathematical Sciences 13 (2015), no. 1, 269–
+    296.
+ 3. L. Ambrosio, N. Gigli, and G. Savaré, Gradient flows: in metric spaces and in
+    the space of probability measures, Springer Science & Business Media, 2008.
+ 4. F. Aurenhammer, F. Hoffmann, and B. Aronov, Minkowski-type theorems and
+    least-squares clustering, Algorithmica 20 (1998), no. 1, 61–76.
+ 5. H. H. Bauschke and A. S. Lewis, Dykstra’s algorithm with Bregman projections:
+    a convergence proof, Optimization 48 (2000), no. 4, 409–427.
+44             L. CHIZAT, G. PEYRÉ, B. SCHMITZER, AND F-X. VIALARD
+
+
+ 6. A. Beck, On the convergence of alternating minimization for convex program-
+    ming with applications to iteratively reweighted least squares and decomposition
+    schemes, SIAM Journal on Optimization 25 (2015), no. 1, 185–209.
+ 7. J-D. Benamou and Y. Brenier, A computational fluid mechanics solution to the
+    Monge-Kantorovich mass transfer problem, Numerische Mathematik 84 (2000),
+    no. 3, 375–393.
+ 8. J-D. Benamou, G. Carlier, M. Cuturi, L. Nenna, and G. Peyré, Iterative Breg-
+    man projections for regularized transportation problems, SIAM Journal on Sci-
+    entific Computing 37 (2015), no. 2, A1111–A1138.
+ 9. J-D. Benamou, G. Carlier, Q. Mérigot, and E. Oudet, Discretization of func-
+    tionals involving the Monge-Ampère operator, Preprint arXiv:1408.4536 (2014).
+10. Jean-David Benamou, Guillaume Carlier, and Maxime Laborde, An augmented
+    lagrangian approach to wasserstein gradient flows and applications, (2015).
+11. D. Bertsekas and D. Castanon, The auction algorithm for the transportation
+    problem, Annals of Operations Research 20 (1989), 67–96.
+12. N. Bonneel, M. van de Panne, S. Paris, and W. Heidrich, Displacement in-
+    terpolation using Lagrangian mass transport, ACM Transactions on Graphics
+    (SIGGRAPH ASIA’11) 30 (2011), no. 6.
+13. Jonathan M Borwein and Adrian S Lewis, Duality relationships for entropy-like
+    minimization problems, SIAM Journal on Control and Optimization 29 (1991),
+    no. 2, 325–338.
+14. L. M. Bregman, The relaxation method of finding the common point of convex
+    sets and its application to the solution of problems in convex programming,
+    USSR computational mathematics and mathematical physics 7 (1967), no. 3,
+    200–217.
+15. Y. Brenier, Polar factorization and monotone rearrangement of vector-valued
+    functions, Comm. Pure Appl. Math. 44 (1991), no. 4, 375–417.
+16. M. Burger, J. A. Carrillo, and M-T. Wolfram, A mixed finite element method
+    for nonlinear diffusion equations, Kinetic and Related Models 3 (2010), no. 1,
+    59–83.
+17. M. Burger, M. Franek, and C-B. Schönlieb, Regularised regression and density
+    estimation based on optimal transport, Appl. Math. Res. Express 2 (2012),
+    209–253.
+18. R. Burkard, M. Dell’Amico, and S. Martello, Assignment problems, Society for
+    Industrial and Applied Mathematics, Philadelphia, PA, USA, 2009.
+19. L. A. Caffarelli and R. J. McCann, Free boundaries in optimal transport and
+    monge-ampere obstacle problems, Annals of mathematics (2010), 673–730.
+20. G. Carlier, V. Duval, G. Peyré, and B. Schmitzer, Convergence of entropic
+    schemes for optimal transport and gradient flows, Preprint 01235146, HAL,
+    2015.
+21. J. A. Carrillo, A. Chertock, and Y. Huang, A finite-volume method for non-
+    linear nonlocal equations with a gradient flow structure, Communications in
+    Computational Physics 17 (2015), 233–258.
+22. Y. Censor and S. Reich, The Dykstra algorithm with Bregman projections, Com-
+    munications in Applied Analysis 2 (1998), 407–419.
+23. A. Chambolle and T. Pock, On the ergodic convergence rates of a first-order
+    primal-dual algorithm, preprint (2014).
+    SCALING ALGORITHMS FOR UNBALANCED OPTIMAL TRANSPORT PROBLEMS                   45
+
+
+24. L. Chizat, G. Peyré, B. Schmitzer, and F-X. Vialard, Unbalanced optimal trans-
+    port: Geometry and kantorovich formulation, Preprint 1508.05216, Arxiv, 2015.
+25. L. Chizat, B. Schmitzer, G. Peyré, and F-X. Vialard, An interpolating distance
+    between optimal transport and Fischer-Rao, Preprint 1506.06430, Arxiv, 2015.
+26. M. Cuturi, Sinkhorn distances: Lightspeed computation of optimal transport,
+    Advances in Neural Information Processing Systems (NIPS) 26, 2013, pp. 2292–
+    2300.
+27. M. Cuturi and A. Doucet, Fast computation of Wasserstein barycenters, Pro-
+    ceedings of ICML, vol. 32, 2014.
+28. J. Delon, Movie and video scale-time equalization application to flicker reduc-
+    tion, IEEE Transactions on Image Processing 15 (2006), no. 1, 241–248.
+29. W. E. Deming and F. F. Stephan, On a least squares adjustment of a sampled
+    frequency table when the expected marginal totals are known, Annals Mathe-
+    matical Statistics 11 (1940), no. 4, 427–444.
+30. R. L. Dykstra, An algorithm for restricted least squares regression, J. Amer.
+    Stat. 78 (1983), no. 384, 839–842.
+31. J. Eckstein, Nonlinear proximal point algorithms using Bregman functions, with
+    applications to convex programming, Mathematics of Operations Research 18
+    (1993), no. 1, 202–226.
+32. Jalal M Fadili and Gabriel Peyré, Total variation projection with first order
+    schemes, IEEE Transactions on Image Processing 20 (2011), no. 3, 657–669.
+33. A. Figalli, The optimal partial transport problem, Archive for rational mechanics
+    and analysis 195 (2010), no. 2, 533–560.
+34. J. Franklin and J. Lorenz, On the scaling of multidimensional matrices, Linear
+    Algebra and its applications 114 (1989), 717–735.
+35. C. Frogner, C. Zhang, H. Mobahi, M. Araya-Polo, and T. Poggio, Learning
+    with a Wasserstein loss, Preprint 1506.05439, Arxiv, 2015.
+36. A. Galichon and B. Salanié, Matching with trade-offs: Revealed preferences over
+    competing characteristics, Tech. report, Preprint SSRN-1487307, 2009.
+37. T. O. Gallouet and L. Monsaingeon, A JKO splitting scheme for Kantorovitch-
+    Fisher-Rao gradient flows, Preprint arXiv (2015).
+38. L. G. Hanin, Kantorovich-Rubinstein norm and its application in the theory
+    of Lipschitz spaces, Proceedings of the American Mathematical Society 115
+    (1992), no. 2, 345–352.
+39. R. Jordan, D. Kinderlehrer, and O. Otto, The variational formulation of the
+    Fokker-Planck equation, SIAM journal on mathematical analysis 29 (1998),
+    no. 1, 1–17.
+40. L. Kantorovich, On the transfer of masses (in russian), Doklady Akademii
+    Nauk 37 (1942), no. 2, 227–229.
+41. S. Kondratyev, L. Monsaingeon, and D. Vorotnikov, A new optimal transport
+    distance on the space of finite Radon measures, Tech. report, Pre-print, 2015.
+42. J.J. Kosowsky and A.L. Yuille, The invisible hand algorithm: Solving the as-
+    signment problem with statistical physics, Neural Networks 7 (1994), no. 3,
+    477–490.
+43. Maxime Laborde, On some non linear evolution systems which are perturba-
+    tions of wasserstein gradient flows, arXiv preprint arXiv:1506.00126 (2015).
+44. C. Léonard, From the schrödinger problem to the monge–kantorovich problem,
+    Journal of Functional Analysis 262 (2012), no. 4, 1879–1920.
+46             L. CHIZAT, G. PEYRÉ, B. SCHMITZER, AND F-X. VIALARD
+
+
+45.          , A survey of the Schrödinger problem and some of its connections with
+    optimal transport, Discrete Contin. Dyn. Syst. A 34 (2014), no. 4, 1533–1574.
+46. B. Levy, A numerical algorithm for L2 semi-discrete optimal transport in 3d,
+    M2AN, to appear (2015).
+47. M. Liero, A. Mielke, and G. Savaré, Optimal entropy-transport problems and a
+    new Hellinger-Kantorovich distance between positive measures, ArXiv e-prints
+    (2015).
+48.          , Optimal transport in competition with reaction: the Hellinger-
+    Kantorovich distance and geodesic curves, ArXiv e-prints (2015).
+49. J. Maas, M. Rumpf, C. Schönlieb, and S. Simon, A generalized model for
+    optimal transport of images including dissipation and density modulation,
+    arXiv:1504.01988, 2015.
+50. B. Maury, A. Roudneff-Chupin, and F. Santambrogio, A macroscopic crowd
+    motion model of gradient flow type, Mathematical Models and Methods in Ap-
+    plied Sciences 20 (2010), no. 10, 1787–1821.
+51. B. Maury, A. Roudneff-Chupin, F. Santambrogio, and J. Venel, Handling con-
+    gestion in crowd motion models, Journal: Net. Het. Media 6 (2011), no. 3,
+    485–519.
+52. Q. Mérigot, A multiscale approach to optimal transport, Comput. Graph. Forum
+    30 (2011), no. 5, 1583–1592.
+53. G. Monge, Mémoire sur la théorie des déblais et des remblais, Histoire de
+    l’Académie Royale des Sciences (1781), 666–704.
+54. Q. V. Nguyen, Forward-backward splitting with Bregman distances,
+    arXiv:1505.05198 (2015).
+55. F. Otto, The geometry of dissipative evolution equations: the porous medium
+    equation, Communications in partial differential equations 26 (2001), no. 1-2,
+    101–174.
+56. N. Papadakis, G. Peyré, and E. Oudet, Optimal transport with proximal split-
+    ting, SIAM Journal on Imaging Sciences 7 (2014), no. 1, 212–238.
+57. B. Perthame, F. Quiros, and J. L. Vazquez, The Hele-Shaw asymptotics for me-
+    chanical models of tumor growth, Archive for Rational Mechanics and Analysis
+    212 (2014), no. 1, 93–127 (English).
+58. G. Peyré, Entropic approximation of Wasserstein gradient flows, SIAM Journal
+    on Imaging Sciences 8 (2015), no. 4, 2323–2351.
+59. B. Piccoli and F. Rossi, Generalized Wasserstein distance and its application to
+    transport equations with source, Archive for Rational Mechanics and Analysis
+    211 (2014), no. 1, 335–358.
+60. F. Pitié, A.C. Kokaram, and R. Dahyot, Automated colour grading using colour
+    distribution transfer, Computer Vision and Image Understanding 107 (2007),
+    no. 1, 123–137.
+61. J. Rabin and N. Papadakis, Convex color image segmentation with optimal
+    transport distances, Proc. SSVM’15, 2015.
+62. R.T. Rockafellar, Duality and stability in extremum problems involving convex
+    functions, Pacific Journal of Mathematics 21 (1967), no. 1, 167–187.
+63.          , Integrals which are convex functionals, Pacific journal of mathematics
+    24 (1968), no. 3, 525–539.
+64.          , Integral functionals, normal integrands and measurable selections, Non-
+    linear operators and the calculus of variations, Springer, 1976, pp. 157–207.
+    SCALING ALGORITHMS FOR UNBALANCED OPTIMAL TRANSPORT PROBLEMS                   47
+
+
+65. R.T. Rockafellar and R. J-B. Wets, Variational analysis, vol. 317, Springer
+    Science & Business Media, 2009.
+66. Y. Rubner, C. Tomasi, and L.J. Guibas, The earth mover’s distance as a metric
+    for image retrieval, International Journal of Computer Vision 40 (2000), no. 2.
+67. F. Santambrogio, Optimal transport for applied mathematicians, Birkhauser,
+    2015.
+68. B. Schmitzer, A sparse multiscale algorithm for dense optimal transport, J Math
+    Imaging Vis 56 (2016), no. 2, 238–259.
+69.         , Stabilized sparse scaling algorithms for entropy regularized transport
+    problems, https://arxiv.org/abs/1610.06519, 2016.
+70. E. Schrödinger, Über die Umkehrung der Naturgesetze, Sitzungsberichte Preuss.
+    Akad. Wiss. Berlin. Phys. Math. 144 (1931), 144–153.
+71. Meisam Sharify, Stéphane Gaubert, and Laura Grigori, Solution of the op-
+    timal assignment problem by diagonal scaling algorithms, arXiv preprint
+    arXiv:1104.3830 (2011).
+72. R. Sinkhorn, A relationship between arbitrary positive matrices and doubly sto-
+    chastic matrices, Ann. Math. Statist. 35 (1964), 876–879.
+73. J. Solomon, F. de Goes, G. Peyré, M. Cuturi, A. Butscher, A. Nguyen, T. Du,
+    and L. Guibas, Convolutional Wasserstein distances: Efficient optimal trans-
+    portation on geometric domains, ACM Transactions on Graphics (Proc. SIG-
+    GRAPH 2015) 34 (2015), no. 4, 66:1–66:11.
+74. J. Solomon, R.M. Rustamov, L. Guibas, and A. Butscher, Wasserstein propa-
+    gation for semi-supervised learning, Proc. ICML 2014, 2014.
+75. A.C. Thompson, On certain contraction mappings in a partially ordered vector
+    space, Proceedings of the American Mathematical Society 14 (1963), no. 3,
+    438–443.
+76. C. Villani, Topics in optimal transportation, American Mathematical Soc.,
+    2003.
+77. C. Villani, Optimal transport: Old and new, Grundlehren der mathematischen
+    Wissenschaften, vol. 338, Springer, 2009.
+78. H. Wang and A. Banerjee, Bregman alternating direction method of multipliers,
+    preprint arXiv:1306.3203 (2014).
+79. Jonathan Zinsl and Daniel Matthes, Transport distances and geodesic convexity
+    for systems of degenerate diffusion equations, Calculus of Variations and Partial
+    Differential Equations 54 (2015), no. 4, 3397–3438.
+  CEREMADE, CNRS, Université Paris-Dauphine, INRIA Project team Mokaplan
+  E-mail address: {chizat,schmitzer,vialard}@ceremade.dauphine.fr
+
+  CNRS and DMA, École Normale Supérieure, INRIA Project team Mokaplan
+  E-mail address: gabriel.peyre@ens.fr
+

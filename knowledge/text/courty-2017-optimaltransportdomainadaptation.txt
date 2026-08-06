@@ -1,0 +1,1082 @@
+                                     IEEE TRANSACTIONS ON PATTERN ANALYSIS AND MACHINE INTELLIGENCE, VOL. X, NO. X, JANUARY XX                                                 1
+
+
+
+
+                                             Optimal Transport for Domain Adaptation
+                                                              Nicolas Courty, Rémi Flamary, Devis Tuia, Senior Member, IEEE,
+                                                                           Alain Rakotomamonjy, Member, IEEE
+
+                                          Abstract—Domain adaptation is one of the most challenging tasks of modern data analytics. If the adaptation is done correctly,
+                                          models built on a specific data representation become more robust when confronted to data depicting the same classes, but
+                                          described by another observation system. Among the many strategies proposed, finding domain-invariant representations has
+                                          shown excellent properties, in particular since it allows to train a unique classifier effective in all domains. In this paper, we
+                                          propose a regularized unsupervised optimal transportation model to perform the alignment of the representations in the source
+                                          and target domains. We learn a transportation plan matching both PDFs, which constrains labeled samples of the same class
+
+
+
+
+arXiv:1507.00504v2 [cs.LG] 22 Jun 2016
+                                          in the source domain to remain close during transport. This way, we exploit at the same time the labeled samples in the source
+                                          and the distributions observed in both domains. Experiments on toy and challenging real visual adaptation examples show
+                                          the interest of the method, that consistently outperforms state of the art approaches. In addition, numerical experiments show
+                                          that our approach leads to better performances on domain invariant deep learning features and can be easily adapted to the
+                                          semi-supervised case where few labeled samples are available in the target domain.
+
+                                          Index Terms—Unsupervised Domain Adaptation, Optimal Transport, Transfer Learning, Visual Adaptation, Classification.
+
+                                                                                                         F
+
+
+
+                                     1    I NTRODUCTION                                                      as the domain adaptation problem [37]. In this work,
+                                                                                                             we address the most difficult variant of this problem,
+                                     M       ODERN data analytics are based on the avail-
+                                            ability of large volumes of data, sensed by a
+                                     variety of acquisition devices and at high temporal
+                                                                                                             denoted as unsupervised domain adaptation, where
+                                                                                                             data labels are only available in the source domain.
+                                     frequency. But this large amounts of heterogeneous                      We tackle this problem by assuming that the effects
+                                     data also make the task of learning semantic concepts                   of the drifts can be reduced if data undergo a phase
+                                     more difficult, since the data used for learning a                      of adaptation (typically, a non-linear mapping) where
+                                     decision function and those used for inference tend                     both domains look more alike.
+                                     not to follow the same distribution. Discrepancies                         Several theoretical works [2], [36], [22] have empha-
+                                     (also known as drift) in data distribution are due                      sized the role played by the divergence between the
+                                     to several reasons and are application-dependent. In                    data probability distribution functions of the domains.
+                                     computer vision, this problem is known as the vi-                       These works have led to a principled way of solving
+                                     sual adaptation domain problem, where domain drifts                     the domain adaptation problem: transform data so as
+                                     occur when changing lighting conditions, acquisition                    to make their distributions “closer”, and use the label
+                                     devices, or by considering the presence or absence of                   information available in the source domain to learn
+                                     backgrounds. In speech processing, learning from one                    a classifier in the transformed domain, which can be
+                                     speaker and trying to deploy an application targeted                    applied to the target domain. Our work follows the
+                                     to a wide public may also be hindered by the dif-                       same intuition and proposes a transformation of the
+                                     ferences in background noise, tone or gender of the                     source data that fits a least effort principle, i.e. an
+                                     speaker. In remote sensing image analysis, one would                    effect that is minimal with respect to a transformation
+                                     like to leverage from labels defined over one city                      cost or metric. In this sense, the adaptation problem
+                                     image to classify the land occupation of another city.                  boils down to: i) finding a transformation of the input
+                                     The drifts observed in the probability density function                 data matching the source and target distributions and
+                                     (PDF) of remote sensing images are caused by variety                    then ii) learning a new classifier from the transformed
+                                     of factors: different corrections for atmospheric scat-                 source samples. This process is depicted in Figure 1.
+                                     tering, daylight conditions at the hour of acquisition                  In this paper, we advocate a solution for finding this
+                                     or even slight changes in the chemical composition of                   transformation based on optimal transport.
+                                     the materials.                                                             Optimal Transport (OT) problems have recently
+                                        For those reasons, several works have coped with                     raised interest in several fields, in particular because
+                                     these drift problems by developing learning methods                     OT theory can be used for computing distances
+                                     able to transfer knowledge from a source domain to                      between probability distributions. Those distances,
+                                     a target domain for which data have different PDFs.                     known under several names in the literature (Wasser-
+                                     Learning in this PDF discrepancy context is denoted                     stein, Monge-Kantorovich or Earth Mover distances)
+                                                                                                             have important properties: i) They can be evalu-
+                                     Manuscript received January 2015; revised September 2015.               ated directly on empirical estimates of the distribu-
+IEEE TRANSACTIONS ON PATTERN ANALYSIS AND MACHINE INTELLIGENCE, VOL. X, NO. X, JANUARY XX                                     2
+
+
+              Dataset                               Optimal transport                 Classification on transported samples
+
+
+
+
+                         Class 1
+                         Class 2
+                                                                  Samples                                  Samples
+                         Samples
+                                                                  Samples                                   Samples
+                         Samples
+                         Classifier on                                                                      Classifier on
+
+
+Fig. 1: Illustration of the proposed approach for domain adaptation. (left) dataset for training, i.e. source
+domain, and testing, i.e. target domain. Note that a classifier estimated on the training examples clearly does
+not fit the target data. (middle) a data dependent transportation map Tγ0 is estimated and used to transport
+the training samples onto the target domain. Note that this transformation is usually not linear. (right) the
+transported labeled samples are used for estimating a classifier in the target domain.
+
+
+tions without having to smoothen them using non-                  In the first family, methods which have been pro-
+parametric or semi-parametric approaches; ii) By ex-           posed include searching for projections that are dis-
+ploiting the geometry of the underlying metric space,          criminative in both domains by using inner products
+they provide meaningful distances even when the                between source samples and transformed target sam-
+supports of the distributions do not overlap. Leverag-         ples [42], [32], [29]. Learning projections, for which
+ing from these properties, we introduce a novel frame-         labeled samples of the target domain fall on the
+work for unsupervised domain adaptation, which                 correct side of a large margin classifier trained on
+consists in learning an optimal transportation based           the source data, have also been proposed [27]. Several
+on empirical observations. In addition, we propose             works based on extraction of common features under
+several regularization terms that favor learning of            pairwise constraints have also been introduced as
+better transformations w.r.t. the adaptation problem.          domain adaptation strategies [26], [52], [47].
+They can either encode class information contained                The second family tackles the domain adaptation
+in the source domain or promote the preservation               problem assuming, as in this paper, that no labels are
+of neighborhood structures. An efficient algorithm is          available in the target domain. Besides works dealing
+proposed for solving the resulting regularized op-             with sample reweighting [46], many works have con-
+timal transport optimization problem. Finally, this            sidered finding a common feature representation for
+framework can also easily be extended to the semi-             the two (or more) domains. Since the representation,
+supervised case, where few labels are available in the         or latent space, is common to all domains, projected
+target domain, by a simple and elegant modification            labeled samples from the source domain can be used
+in the optimal transport optimization problem.                 to train a classifier that is general [18], [38]. A common
+   The remainder of this Section presents related              strategy is to propose methods that aim at finding rep-
+works, while Section 2 formalizes the problem of un-           resentations in which domains match in some sense.
+supervised domain adaptation and discusses the use             For instance, adaptation can be performed by match-
+of optimal transport for its resolution. Section 3 intro-      ing the means of the domains in the feature space [38],
+duces optimal transport and its regularized version.           aligning the domains by their correlations [33] or
+Section 4 presents the proposed regularization terms           by using pairwise constraints [51]. In most of these
+tailored to fit the domain adaptation constraints. Sec-        works, feature extraction is the key tool for finding
+tion 5 discusses algorithms for solving the regular-           a common latent space that embeds discriminative
+ized optimal transport problem efficiently. Section 6          information shared by all domains.
+evaluates the relevance of our domain adaptation
+framework through both synthetic and real-world                  Recently, the unsupervised domain adaptation
+examples.                                                      problem has been revisited by considering strategies
+                                                               based on a gradual alignment of a feature repre-
+                                                               sentation. In [24], authors start from the hypothesis
+1.1   Related works                                            that domain adaptation can be better estimated when
+Domain adaptation. Domain adaptation strategies                comparing gradual distortions. Therefore, they use
+can be roughly divided in two families, depending              intermediary projections of both domains along the
+on whether they assume the presence of few labels              Grassmannian geodesic connecting the source and
+in the target domain (semi-supervised DA) or not               target eigenvectors. In [23], [54], all sets of trans-
+(unsupervised DA).                                             formed intermediary domains are obtained by using
+IEEE TRANSACTIONS ON PATTERN ANALYSIS AND MACHINE INTELLIGENCE, VOL. X, NO. X, JANUARY XX                                  3
+
+
+
+a geodesic-flow kernel. While these methods have               standard learning paradigm assumes the existence of
+the advantage of providing easily computable out-              a set of training data Xs = {xsi }N i=1 associated with
+                                                                                                     s
+
+                                                                                              s Ns
+of-sample extensions (by projecting unseen samples             a set of class labels Ys = {yi }i=1 , with yis ∈ C, and
+onto the latent space eigenvectors), the transformation        a testing set Xt = {xti }Ni=1 with unknown labels. In
+                                                                                           t
+
+
+defined remains global and is applied in the same way          order to infer the set of labels Yt associated with
+to the whole target domain. An approach combining              Xt , one usually relies on an empirical estimate of the
+sample reweighting logic with representation trans-            joint probability distribution P(x, y) ∈ P(Ω × C) from
+fer is found in [53], where authors extend the sam-            (Xs , Ys ), and assumes that Xs and Xt are drawn from
+ple re-weighing to reproducing kernel Hilbert space            the same distribution P(x) ∈ P(Ω).
+through the use of surrogate kernels. The transforma-
+tion achieved is again a global linear transformation
+                                                               2.2 Domain adaptation as a transportation prob-
+that helps in aligning domains.
+                                                               lem
+   Our proposition strongly differs from those re-
+viewed above, as it defines a local transformation             In domain adaptation problems, one assumes the
+for each sample in the source domain. In this sense,           existence of two distinct joint probability distributions
+the domain adaptation problem can be seen as a                 Ps (xs , y) and Pt (xt , y), respectively related to a source
+graph matching problem [35], [10], [11] as each source         and a target domains, noted as Ωs and Ωt . In the
+sample has to be mapped on target samples under the            following, µs and µt are their respective marginal
+constraint of marginal distribution preservation.              distributions over X. We also denote fs and ft the true
+Optimal Transport and Machine Learning. The op-                labeling functions, i.e. the Bayes decision functions in
+timal transport problem has first been introduced              each domain.
+by the French mathematician Gaspard Monge in the                 At least one of the two following assumptions is
+middle of the 19th century as a way to find a mini-            generally made by most domain adaptation methods:
+mal effort solution to the transport of a given mass             • Class imbalance: Label distributions are different
+of dirt into a given hole. The problem reappeared                    in the two domains (Ps (y) 6= Pt (y)), but the con-
+in the middle of the 20th century in the work of                     ditional distributions of the samples with respect
+Kantorovitch [30] and found recently surprising new                  to the labels are the same (Ps (xs |y) = Pt (xt |y));
+developments as a polyvalent tool for several funda-             • Covariate shift: Conditional distributions of
+mental problems [49]. It was applied in a wide panel                 the labels with respect to the data are equal
+of fields, including computational fluid mechanics [3],              (Ps (y|xs ) = Pt (y|xt ), or equivalently fs = ft =
+color transfer between multiple images or morphing                   f ). However, data distributions in the two do-
+in the context of image processing [40], [20], [5], inter-           mains are supposed to be different (Ps (xs ) 6=
+polation schemes in computer graphics [6], and eco-                  Pt (xt )). For the adaptation techniques to be ef-
+nomics, via matching and equilibriums problems [12].                 fective, this difference needs to be small [2].
+   Despite the appealing properties and application            In real world applications, the drift occurring between
+success stories, the machine learning community has            the source and the target domains generally implies a
+considered optimal transport only recently (see, for           change in both marginal and conditional distributions.
+instance, works considering the computation of dis-              In our work, we assume that the domain drift is due
+tances between histograms [15] or label propagation            to an unknown, possibly nonlinear transformation of
+in graphs [45]); the main reason being the high com-           the input space T : Ωs → Ωt . This transformation
+putational cost induced by the computation of the              may have a physical interpretation (e.g. change in the
+optimal transportation plan. However, new comput-              acquisition conditions, sensor drifts, thermal noise,
+ing strategies have emerged [15], [17], [5] and made           etc.). It can also be directly caused by the unknown
+possible the application of OT distances in operational        process that generates the data. Additionnally, we
+settings.                                                      also suppose that the transformation preserves the
+                                                               conditional distribution, i.e.
+2     O PTIMAL TRANSPORT AND APPLICATION                                        Ps (y|xs ) = Pt (y|T(xs )).
+TO DOMAIN ADAPTATION
+                                                                This means that the label information is preserved by
+In this section, we present the general unsupervised           the transformation, and the Bayes decision functions
+domain adaptation problem and show how it can be               are tied through the equation ft (T(x)) = fs (x).
+addressed from an optimal transport perspective.                  Another insight can be provided regarding the
+                                                               transformation T. From a probabilistic point of view,
+2.1   Problem and theoretical motivations                      T transforms the measure µ in its image measure, noted
+                                                               T#µ, which is another probability measure over Ωt
+Let Ω ∈ Rd be an input measurable space of di-                 satisfying
+mension d and C the set of possible labels. P(Ω)
+denotes the set of all probability measures over Ω. The                    T#µ(x) = µ(T−1 (x)), ∀x ∈ Ωt                  (1)
+IEEE TRANSACTIONS ON PATTERN ANALYSIS AND MACHINE INTELLIGENCE, VOL. X, NO. X, JANUARY XX                                           4
+
+
+
+T is said to be a transport map or push-forward from                           In the remainder, we consider the squared `2 Eu-
+µs to µt if T#µs = µt (as illustrated in Figure 2.a).                       clidean distance as a cost function, c(x, y) = kx − yk22
+Under this assumption, Xt are drawn from the same                           for computing optimal transportation. As a conse-
+PDF as T#µs . This provides a principled way to solve                       quence, we evaluate distances between measures ac-
+the adaptation problem:                                                     cording to the squared Wasserstein distance W22 asso-
+  1) Estimate µs and µt from Xs and Xt (Equation                            ciated with the Euclidean distance d(x, y) = kx − yk2 .
+      (6))                                                                  The main rationale for this choice is that it experimen-
+  2) Find a transport map T from µs to µt                                   tally provided the best result on average (as shown in
+  3) Use T to transport labeled samples Xs and train                        the supplementary material). Nevertheless, other cost
+      a classifier from them.                                               functions better suited to the nature of specific data
+  Searching for T in the space of all possible trans-                       can be considered, depending on the application at
+formations is intractable, and some restrictions need                       hand and the data representation, as discussed more
+to be imposed. Here, we propose that T should be                            in details in Section 3.4.
+chosen so as to minimize a transportation cost C(T)
+expressed as:                                                               3  R EGULARIZED               DISCRETE       OPTIMAL
+                       Z                                                    TRANSPORT
+              C(T) =      c(x, T(x))dµ(x),         (2)
+                              Ωs
+                                                                            This section discusses the problem of optimal trans-
+                                                                            port for domain adaptation. In the first part, we in-
+where the cost function c : Ωs × Ωt → R+ is a distance                      troduce the OT optimization problem on discrete em-
+function over the metric space Ω. C(T) can be inter-                        pirical distributions. Then, we discuss a regularized
+preted as the energy required to move a probability                         variant of this discrete optimal transport problem.
+mass µ(x) from x to T(x).                                                   Finally, we address the question of how the result-
+   The problem of finding such a transportation of                          ing probabilistic coupling can be used for mapping
+minimal cost has already been investigated in the                           samples from source to target domain.
+literature. For instance, the optimal transportation
+problem as defined by Monge is the solution of the
+following minimization problem:                                             3.1   Discrete optimal transport
+              Z                                                             When µs and µt are only accessible through discrete
+ T0 = argmin      c(x, T(x))dµ(x),    s.t. T#µs = µt                        samples, the corresponding empirical distributions
+          T        Ωs                                                       can be written as
+                                                      (3)
+                                                                                              ns               nt
+The Kantorovitch formulation of the optimal trans-                                           X
+                                                                                                  s s
+                                                                                                               X
+                                                                                       µs =      pi δxi , µt =    pti δxti  (6)
+portation [30] is a convex relaxation of the above
+                                                                                              i=1              i=1
+Monge problem. Indeed, let us define Π as the set of
+all probabilistic couplings ∈ P(Ωs ×Ωt ) with marginals                     where δxi is the Dirac function at location xi ∈ Rd .
+µs and µt . The Kantorovitch problem seeks for a                            psi and pti are probability masses associated to the
+general coupling γ ∈ Π between Ωs and Ωt :                                  i-th P
+                                                                                 sample and Pnbelong   to the probability simplex,
+                                                                                   ns   s           t
+                                                                                   i=1 pi =    i=1 pi = 1. It is straightforward to
+                                                                                                t
+                      Z                                                     i.e.
+        γ 0 = argmin          c(xs , xt )dγ(xs , xt ) (4)                   adapt the Kantorovich formulation of optimal trans-
+                γ∈Π           Ωs ×Ωt                                        port problem to the discrete case. We denote B the set
+In this formulation, γ can be understood as a joint                         of probabilistic couplings between the two empirical
+probability measure with marginals µs and µt as                             distributions defined as:
+depicted in Figure 2.b. γ 0 is also known as transporta-                       B = γ ∈ (R+ )ns ×nt | γ1nt = µs , γ T 1ns = µt
+                                                                                    
+                                                                                                                                (7)
+tion plan [43]. It allows to define the Wasserstein
+distance of order p between µs and µt . This distance                       where 1d is a d-dimensional vector of ones. The
+is formalized as                                                            Kantorovitch formulation of the optimal transport [30]
+                        Z                             p1                  reads:
+               def
+ Wp (µs , µt ) =     inf             s   t p    s   t
+                                  d(x , x ) dγ(x , x )                                     γ 0 = argmin hγ, CiF                (8)
+                     γ∈Π Ω ×Ω                                                                       γ∈B
+                       ( s t                     1 )            p         where h., .iF is the Frobenius dot product and C ≥
+               =        inf             Et         d(xs , xt )p       (5)   0 is the cost function matrix, whose term C(i, j) =
+                        γ∈Π        xs ∼µs ,x ∼µt
+                                                                            c(xsi , xtj ) denotes the cost to move a probability mass
+where d is a distance and the corresponding cost func-                      from xsi to xtj . As previously detailed, this cost was
+tion c(xs , xt ) = d(xs , xt )p . The Wasserstein distance                  chosen as the squared Euclidean distance between the
+is also known as the Earth Mover Distance in the                            two locations, i.e. C(i, j) = ||xsi − xtj ||22 .
+computer vision community [41] and it defines a met-                           Note that when ns = nt = n and ∀i, j psi =
+                                                                             t
+ric over the space of integrable squared probability                        pj = 1/n, γ 0 is simply a permutation matrix. In this
+measures.                                                                   case, the optimal transport problem boils down to
+IEEE TRANSACTIONS ON PATTERN ANALYSIS AND MACHINE INTELLIGENCE, VOL. X, NO. X, JANUARY XX                                        5
+
+
+
+an optimal assignment problem. In the general case,                 efficient algorithm will also be a key element in our
+it can be shown that γ 0 is a sparse matrix with at                 methodology presented in Section 4.
+most ns + nt − 1 non zero entries, equating the rank
+of the constraint matrix expressing the two marginal                3.3   OT-based mapping of the samples
+constraints.
+                                                                    In the context of domain adaptation, once the proba-
+   Problem (8) is a linear program and can be solved
+                                                                    bilistic coupling γ 0 has been computed, source sam-
+with combinatorial algorithms such as the simplex
+                                                                    ples have to be transported in the target domain. For
+methods and its network variants (successive shortest
+                                                                    this purpose, one can interpolate the two distribu-
+path algorithms, Hungarian or relaxation algorithms).
+                                                                    tions µs and µt by following the geodesics of the
+Yet, the computational complexity was shown to be
+                                                                    Wasserstein metric [49, Chapter 7], parameterized by
+O((ns + nt )ns nt log(ns + nt )) [1, p. 472, Th. 12.2] at
+                                                                    t ∈ [0, 1]. This defines a new distribution µ̂ such that:
+best, which dampens the utility of the method when
+handling large datasets. However, the regularization                  µ̂ = argmin (1 − t)W2 (µs , µ)2 + tW2 (µt , µ)2 .      (10)
+scheme recently proposed by Cuturi [15] presented in                              µ
+
+the next section, allows a very fast computation of a               Still following Villani’s book, one can show that for a
+transportation plan.                                                squared `2 cost, this distribution boils down to:
+                                                                                       X
+                                                                                  µ̂ =     γ 0 (i, j)δ(1−t)xsi +txtj . (11)
+3.2   Regularized optimal transport
+                                                                                           i,j
+Regularization is a classical approach used for pre-
+venting overfitting when few samples are available for               Since our goal is to transport the source samples onto
+learning. It can also be used for inducing some prop-               the target distribution, we are mainly interested in the
+erties on the solution. In the following, we discuss                case t = 1. For this value of t, the novel distribution
+a regularization term recently introduced for optimal               µ̂ is a distribution with the same support of µt , since
+transport problem.                                                  Equation (11) reduces to
+   Cuturi [15] proposed to regularize the expression
+                                                                                               X
+                                                                                          µ̂ =    p̂tj δxtj .           (12)
+of the optimal transport problem by the entropy of                                                 j
+the probabilistic coupling. The resulting information-
+                                                                    with p̂tj =                                   t
+                                                                                  P
+theoretic regularized version of the transport γ λ0 is the                            i γ 0 (i, j). The weights p̂j can be seen as
+solution of the minimization problem:                               the sum of probability mass coming from all samples
+                                                                    {xsi } that is transferred to sample xtj . Alternatively,
+             γ λ0 = argmin hγ, CiF + λΩs (γ),                (9)    γ 0 (i, j) also tells us how much probability mass of xsi
+                      γ∈B
+                   P                                                is transferred to xtj . We can exploit this information
+where Ωs (γ) =         i,j γ(i, j) log γ(i, j) computes the         to compute a transformation of the source samples.
+negentropy of γ. The intuition behind this form of                  This transformation can be conveniently expressed
+regularization is the following: since most elements                with respect to the target samples as the following
+of γ 0 should be zero with high probability, one                    barycentric mapping:
+can look for a smoother version of the transport,                                                X
+thus lowering its sparsity, by increasing its entropy.
+                                                                                  csi = argmin
+                                                                                  x                γ 0 (i, j)c(x, xtj ). (13)
+                                                                                         x∈Rd
+As a result, the optimal transport γ λ0 will have a                                                 j
+
+denser coupling between the distributions. Ωs (·) can               where   xsiis a given source sample and x   csi is its
+also be interpreted as a Kullback-Leibler divergence                corresponding image. When the cost function is the
+KL(γkγ u ) between the joint probability γ and a                    squared `2 distance, this barycenter corresponds to
+uniform joint probability γu (i, j) = ns1nt . Indeed, by            a weighted average and the sample is mapped into
+expandingPthis KL divergence, we have KL(γkγ u ) =                  the convex hull of the target samples. For all source
+log ns nt + i,j γ(i, j) log γ(i, j). The first term is a con-       samples, this barycentric mapping can therefore be
+stant w.r.t. γ, which means that    P we can equivalently           expressed as:
+use KL(γkγ u ) or Ωs (γ) =             i,j γ(i, j) log γ(i, j) in
+Equation (9).                                                               X̂s = Tγ 0 (Xs ) = diag(γ 0 1nt )−1 γ 0 Xt .     (14)
+   Hence, as the parameter λ weighting the entropy-                    The inverse mapping from the target to the source
+based regularization increases, the sparsity of γ λ0                domain can also be easily computed from γ T0 . In-
+decreases and source points tend to distribute their                terestingly, one can show [17, Eq. 8] that this trans-
+probability masses toward more target points. When                  formation is a first order approximation of the true
+λ becomes very large (λ → ∞), the OT solution of                    ns Wasserstein barycenters of the target distributions.
+Equation (9) converges toward γ0λ (i, j) → ns1nt , ∀i, j.           Also note that when marginals µs and µt are uniform,
+   Another appealing outcome of the regularized OT
+                                                                    one can easily derive the barycentric mapping as a
+formulation given in Equation (9) is the derivation
+                                                                    linear expression:
+of a computationally efficient algorithm based on
+Sinkhorn-Knopp’s scaling matrix approach [31]. This                          X̂s = ns γ 0 Xt      and     X̂t = nt γ >
+                                                                                                                     0 Xs    (15)
+IEEE TRANSACTIONS ON PATTERN ANALYSIS AND MACHINE INTELLIGENCE, VOL. X, NO. X, JANUARY XX                                6
+
+
+
+for the source and target samples. Finally, remark that        a squared `2 distance, so it does not hold anymore.
+if γ0 (i, j) = ns1nt , ∀i, j, then each transported source     Nevertheless, the solution of (10) for t = 1 does
+point converges toward thePcenter of mass of the               not depend on the cost c and one can still use the
+target distribution that is n1t j xtj . This occurs when       proposed barycentric mapping (13). For instance if the
+λ → ∞ in Equation (9).                                         cost function is based on the `1 norm, the transported
+                                                               samples will be estimated using a component-wise
+3.4 Discussing optimal transport for domain
+                                                               weighted median. Unfortunately, for more complex
+adaptation
+                                                               cost functions, the barycentric mapping might be
+We discuss here the requirements and conditions of             complex to estimate.
+applicability of the proposed method.
+Guarantees of recovery of the correct transforma-
+tion. Our goal for achieving domain adaptation is
+                                                               4  C LASS - REGULARIZATION              FOR      DOMAIN
+to uncover the transformation that occurred between            ADAPTATION
+source and target distributions. While the family of           In this section we explore regularization terms that
+transformation that an OT formulation can recover is           preserve label information and sample neighborhood
+wide, we provide a proof that, for some simple affine          during transportation. Finally, we discuss the semi-
+transformations of discrete distributions, our OT so-          supervised case and show that label information in
+lution is able to match source and target examples             the target domain can be effectively included in he
+exactly.                                                       proposed model.
+   Theorem 3.1: Let µs and µt be two discrete distribu-
+tions with n Diracs as defined in Equation (6). If the         4.1   Regularizing the transport with class labels
+following conditions hold
+                                                               Optimal transport, as it has been presented in the
+   1) The source samples in µs are xsi ∈ Rd , ∀i ∈
+                                                               previous section, does not use any class informa-
+       1, . . . , n such that xsi 6= xsj if i 6= j .
+                                                               tion. However, and even if our goal is unsupervised
+   2) All weights in the source and target distributions
+                                                               domain adaptation, class labels are available in the
+       are n1 .
+                                                               source domain. This information is typically used only
+   3) The target samples are defined as xti = Axsi + b
+                                                               during the decision function learning stage, which
+       i.e. an affine tranformation of the source samples.
+                                                               follows the adaptation step. Our proposition is to take
+   4) b ∈ Rd and A ∈ S + is a strictly positive definite
+                                                               advantage of the label information for estimating a
+       matrix.
+                                                               better transport. More precisely, we aim at penalizing
+   5) The cost function is c(xs , xt ) = kxs − xt k22 .
+                                                               couplings that match source samples with different
+then the solution T0 of the optimal transport problem          labels to same target samples.
+(8) is so that T0 (xsi ) = Axsi + b = xti ∀i ∈ 1, . . . , n.      To this end, we propose to add a new term to the
+   In this case, we retrieve the exact affine                  regularized optimal transport, leading to the follow-
+transformation on the discrete samples, which means            ing optimization problem:
+that the label information are fully preserved during
+transportation. Therefore, one can train a classifier on                  min    hγ, CiF + λΩs (γ) + ηΩc (γ),        (16)
+                                                                          γ∈B
+the mapped samples with no generalization loss. We
+provide a simple demonstration in the supplementary            where η ≥ 0 and Ωc (·) is a class-based regularization
+material.                                                      term.
+                                                                  In this work, we propose and study two choices
+Choosing the cost function. In this work, we have              for this regularizer Ωc (·). The first is based on group
+mainly considered a `2 -based cost function. Let us            sparsity and promotes a probabilistic coupling γ 0
+now discuss the implication of using a different cost          where a given target sample receives masses from
+function in our framework. A number of norm-based              source samples which have same labels. The second
+distances have been investigated by mathematicians             is based on graph Laplacian regularization and pro-
+[49, p 972]. Other types of metrics can also be con-           motes a locally smooth and class-regular structure in
+sidered, such as Riemannian distances over a man-              the source transported samples.
+ifold [49, Part II], or learnt metrics [16]. Concave
+cost functions are also of particular use in real life         4.1.1 Regularization with group-sparsity
+problems [21]. Each different cost function will lead          With the first regularizer, our objective is to exploit la-
+to a different OT plan γ 0 , but the cost itself does not      bel information in the optimal transport computation.
+impact the OT optimization problem, i.e. the solver            We suppose that all samples in the source domain
+is independent from the cost function. Nonetheless,            have labels. The main intuition underlying the use
+since c(·, ·) defines the Wasserstein geodesic, the in-        of this group-sparse regularizer is that we would like
+terpolation between domains defined in Equation                each target sample to receive masses only from source
+(10) leads to a different trajectory (potentially non-         samples that have the same label. As a consequence,
+unique). Equation (11), which corresponds to c(·, ·), is       we expect that a given target sample will be involved
+IEEE TRANSACTIONS ON PATTERN ANALYSIS AND MACHINE INTELLIGENCE, VOL. X, NO. X, JANUARY XX                                  7
+
+
+
+
+             µs (xs )                     µt (T(xs ))
+                                                               ⌦s
+
+
+             xs                       T(xs )            ⌦t
+      ⌦s
+                                                                            ⌦t
+                             (a)                                           (b)                            (c)
+
+Fig. 2: Illustration of the optimal transport problem. (a) Monge problem over 2D domains. T is a push-forward
+from Ωs to Ωt . (b) Kantorovich relaxation over 1D domains: γ can be seen as a joint probability distribution
+with marginals µs and µt . (c) Illustration of the solution of the Kantorovich relaxation computed between two
+ellipsoidal distributions in 2D. The grey line between two points indicate a non-zero coupling between them.
+
+
+in the representation of transported source samples as         mild requirement since, in practice, small deviations
+defined in Equation (14), but only for samples from            of proportions do not prevent the method from work-
+the source domain of the same class. This behaviour            ing (see reference [48] for experimental results on this
+can be induced by means of a group-sparse penalty              particular issue).
+on the columns of γ.
+   This approach has been introduced in our prelimi-           4.1.2   Laplacian regularization
+nary work [14]. In that paper, we proposed a `p − `1
+                                                               This regularization term aims at preserving the data
+regularization term with p < 1 (mainly for algorithmic
+                                                               structure – approximated by a graph – during trans-
+reasons). When applying a majoration-minimization
+                                                               port [20], [13]. Intuitively, we would like similar sam-
+technique on the `p −`1 norm, the problem can be cast
+                                                               ples in the source domain to also be similar after
+as problem (9) and can be solved using the efficient
+                                                               transportation. Hence, denote as x̂si the transported
+Sinkhorn-Knopp algorithm at each iteration. How-
+                                                               source sample xsi , with x̂si being linearly dependent
+ever, this regularization term with p < 1 is non-convex
+                                                               on the transportation matrix γ through Equation (14).
+and thus the proposed algorithm is guaranteed to
+                                                               Now, given a positive symmetric similarity matrix Ss
+converge only to local stationary points.
+                                                               of samples in the source domain, our regularization
+   In this paper, we retain the convexity of the un-
+                                                               term is defined as
+derlying problem and use the convex group-lasso
+regularizer `1 − `2 instead. This regularizer is defined                             1 X
+                                                                          Ωc (γ) = 2         Ss (i, j)kx̂si − x̂sj k22 , (18)
+as                      XX                                                          Ns i,j
+              Ωc (γ) =        ||γ(Icl , j)||2 ,      (17)
+                         j   cl                                where Ss (i, j) ≥ 0 are the coefficients of matrix
+                                                               Ss ∈ RNs ×Ns that encodes similarity between pairs
+where || · ||2 denotes the `2 norm and Icl contains the        of source sample. In order to further preserve class
+indices of rows in γ related to source domain samples          structures, we can sparsify similarities for samples of
+of class cl. Hence, γ(Icl , j) is a vector containing          different classes. In practice, we thus impose Ss (i, j) =
+coefficients of the jth column of γ associated to class        0 if yis 6= yjs .
+cl. Since the jth column of γ is related to the jth target
+                                                                  The above equation can be simplified when the
+sample, this regularizer will induce the desired sparse
+                                                               marginal distributions are uniform. In that case, trans-
+representation in the target sample. Among other
+                                                               ported source samples can be computed according to
+benefits, the convexity of the corresponding problem
+                                                               Equation (15). Hence, Ωc (γ) boils down to
+allows to use an efficient generic optimization scheme,
+presented in Section 5.                                                          Ωc (γ) = Tr(X>  >
+                                                                                              t γ Ls γXt ),             (19)
+   Ideally, with this regularizer we expect that the
+masses corresponding to each group of labels are               where Ls = diag(Ss 1) − Ss is the Laplacian of the
+matching samples of the source and target domains              graph Ss . The regularizer is therefore quadratic w.r.t.
+exclusively. Hence, for the domain adaptation prob-            γ.
+lem to have a relevant solution, the distributions                The regularization terms (18) or (19) are defined
+of labels are expected to be preserved in both the             based on the transported source samples. When a
+source and target distributions. We thus need to have          similarity information is also available in the target
+Ps (y) = Pt (y). This assumption, which is a classical         samples, for instance, through a similarity matrix
+assumption in the field of learning, is nevertheless a         St , we can take advantage of this knowledge and a
+IEEE TRANSACTIONS ON PATTERN ANALYSIS AND MACHINE INTELLIGENCE, VOL. X, NO. X, JANUARY XX                                 8
+
+
+
+symmetric Laplacian regularization of the form                 (hence compact) subset of Rd , the objective function
+                                                               reaches its minimum on B. In addition, if the regular-
+Ωc (γ) = (1 − α)Tr(X>  >                >      >
+                    t γ Ls γXt ) + αTr(Xs γLt γ Xs )           izer is strictly convex that minimum is unique. This
+                                                 (20)          occurs for instance, for the Laplacian regularization in
+can be used instead. In the above equation Lt =                Equation (18).
+diag(St 1) − St is the Laplacian of the graph in the              Now, let us discuss algorithms for computing opti-
+target domain and 0 ≤ α ≤ 1 is a trade-off param-              mal transport solution of problem (16). For solving
+eter that weights the importance of each part of the           a similar problem with a Laplacian regularization
+regularization term. Note that, unlike the matrix Ss ,         term, Ferradans et al. [20] used a conditional gradient
+the similarity matrix St cannot be sparsified according        (CG) algorithm [4]. This approach is appealing and
+to the class structure, since labels are generally not         could be extended to our problem. It is an iterative
+available for the target domain.                               scheme that guarantees any iterate to belong to B,
+   A regularization term similar to Ωc (γ) has been            meaning that any of those iterates is a transportation
+proposed in [20] for histogram adaptation between              plan. At each of these iterations, in order to find a
+images. However, the authors focused on displace-              feasible search direction, a CG algorithm looks for a
+ments (x̂si − xsi ) instead of on preserving the class         minimizer of the objective function’s linear approx-
+structure of the transported samples.                          imation . Hence, at each iteration it solves a Linear
+                                                               Program (LP) that is presumably easier to handle than
+                                                               the original regularized optimal transport problem.
+4.2 Regularizing for semi-supervised domain
+                                                               Nevertheless, and despite existence of efficient LP
+adaptation
+                                                               solvers such as CPLEX or MOSEK, the dimensionality
+In semi-supervised domain adaptation, few labelled             of the LP problem makes this LP problem hardly
+samples are available in the target domain [50]. Again,        tractable, since it involves ns × nt variables.
+such an important information can be exploited by                 In this work, we aim for a more scalable algorithm.
+means of a novel regularization term to be integrated          To this end, we consider an approach based on a gen-
+in the original optimal transport formulation. This            eralization of the conditional gradient algorithm [7]
+regularization term is designed such that samples              denoted as generalized conditional gradient (GCG).
+in the target domain should only be matched with                  The framework of the GCG algorithm addresses the
+samples in the source domain that have the same                general case of constrained minimization of composite
+labels. It can be expressed as:                                functions defined as
+                   Ωsemi (γ) = hγ, Mi                   (21)                       min      f (γ) + g(γ),              (22)
+                                                                                   γ∈B
+where M is a ns × nt cost matrix, with M(i, j) = 0             where f (·) is a differentiable and possibly non-convex
+whenever yis = yjt (or j is a sample with unknown              function; g(·) is a convex, possibly non-differentiable
+label) and +∞ otherwise. This term has the benefit             function; B denotes any convex and compact subset
+to be parameter free. It boils down to changing the            of Rn . As illustrated in Algorithm 1, all the steps
+original cost function C, defined in Equation (8), by          of the GCG algorithm are exactly the same as those
+adding an infinite cost to undesired matches. Smooth           used for CG, except for the search direction part (Line
+versions of this regularization can be devised, for            3). The difference is that GCG linearizes only part
+instance, by using a probabilistic confidence of target        f (·) of the composite objective function, instead of
+sample xtj to belong to class yjt . Though appealing,          the full objective function. This approach is justified
+we have not explored this latter option in this work.          when the resulting nonlinear optimization problem
+It is also noticeable that the Laplacian strategy in           can be efficiently solved. The GCG algorithm has been
+Equation (20) can also leverage on these class labels          shown by Bredies et al. [8] to converge towards a sta-
+in the target domain through the definition of matrix          tionary point of Problem (22). In our case, since g(γ)
+St .                                                           is differentiable, stronger convergence results can be
+                                                               provided (see supplementary material for a discussion
+5 G ENERALIZED CONDITIONAL GRADIENT                            on convergence rate and duality gap monitoring).
+FOR SOLVING REGULARIZED OT PROBLEMS                               More specifically, for problem (16) we can set
+In this section, we discuss an efficient algorithm for            f (γ) = hγ, CiF + ηΩc (γ) and g(γ) = λΩs (γ).
+solving optimization problem (16), that can be used
+                                                               Supposing now that Ωc (γ) is differentiable, step 3 of
+with any of the proposed regularizers.
+                                                               Algorithm 1 boils down to
+  Firstly, we characterize the existence of a solution
+to the problem. We remark that regularizers given                   γ ? = argmin      γ, C + η∇Ωc (γ k ) F + λΩs (γ)
+                                                                            γ∈B
+in Equations (17) and (18) are continuous, thus the
+objective function is continuous. Moreover, since the          Interestingly, this problem is an entropy-regularized
+constraint set B is a convex, closed and bounded               optimal transport problem similar to Problem (9) and
+IEEE TRANSACTIONS ON PATTERN ANALYSIS AND MACHINE INTELLIGENCE, VOL. X, NO. X, JANUARY XX                                                      9
+
+
+                                                                 Target rotation angle   10◦    20◦     30◦     40◦     50◦     70◦     90◦
+Algorithm 1 Generalized Conditional Gradient                       SVM (no adapt.)        0    0.104   0.24    0.312    0.4    0.764   0.828
+                                                                     DASVM [9]            0      0     0.259   0.284   0.334   0.747    0.82
+ 1: Initialize k = 0 and γ 0 ∈ P                                      PBDA [22]           0    0.094   0.103   0.225   0.412   0.626   0.687
+ 2: repeat                                                             OT-exact           0    0.028   0.065   0.109   0.206   0.394   0.507
+                                                                        OT-IT             0    0.007   0.054   0.102   0.221   0.398   0.508
+ 3:   With G ∈ ∇f (γ k ), solve                                         OT-GL             0      0       0     0.013   0.196   0.378   0.508
+                                                                     OT-Laplace           0      0     0.004   0.062   0.201   0.402   0.524
+
+                 γ ? = argmin     hγ, GiF + g(γ)
+                         γ∈B                                    TABLE 1: Mean error rate over 10 realizations for the
+ 4:    Find the optimal step α    k                             two moons simulated example.
+
+          αk = argmin f (γ k + α∆γ) + g(γ k + α∆γ)
+                 0≤α≤1
+
+      with ∆γ = γ ∗ − γ k                                       the corresponding problem is clearly non-linear, and
+ 5:   γ k+1 ← γ k + αk ∆γ, set k ← k + 1                        because the input dimensionality is small, 2, which
+ 6: until Convergence                                           leads to poor performances when applying methods
+                                                                based on subspace alignment (e.g. [23], [34]).
+                                                                   We follow the same experimental protocol as in [22],
+can be efficiently solved using the Sinkhorn-Knopp
+                                                                thus allowing for a direct comparison with the state-
+scaling matrix approach.
+                                                                of-the-art results presented therein. The source do-
+   In our optimal transport problem, Ωc (γ) is instan-
+                                                                main is composed of two moons of 150 samples each.
+tiated by the Laplacian or the group-lasso regular-
+                                                                The target domain is also sampled from these two
+ization term. The former is differentiable whereas
+                                                                shapes, with the same number of examples. Then, the
+the group-lasso is not when there exists a class cl
+                                                                generalization capability of our method is tested over
+and an index j for which γ(Icl , j) is a vector of 0.
+                                                                a set of 1000 samples that follow the same distribution
+However, one can note that if the iterate γ k is so
+                                                                as the target domain. The experiments are conducted
+that γ k (Icl , j) 6= 0 ∀cl, ∀j, then the same property
+                                                                10 times, and we consider the mean classification error
+holds for γ k+1 . This is due to the exponentiation
+                                                                as comparison criterion. As a classifier, we used a
+occurring in the Sinkhorn-Knopp algorithm used for
+                                                                SVM with a Gaussian kernel, whose parameters were
+the entropy-regularized optimal transport problem.
+                                                                set by 5-fold cross-validation. We compare the adap-
+This means that if we initialize γ 0 so that γ 0 (Icl , j) 6=
+                                                                tation results with two state-of-the-art methods: the
+0, then Ωc (γ k ) is always differentiable. Hence, our
+                                                                DA-SVM approach [9] and the more recent PBDA [22],
+GCG algorithm can also be applied to the group-lasso
+                                                                which has proved to provide competitive results over
+regularization, despite its non-differentiability in 0.
+                                                                this dataset.
+
+6     N UMERICAL EXPERIMENTS                                       Results are reported in Table 1. Our first observation
+                                                                is that all the methods based on optimal transport
+In this section, we study the behavior of four dif-
+                                                                behave better than the state-of-the-art methods, in
+ferent versions of optimal transport applied to DA
+                                                                particular for low rotation angles, where results indi-
+problem. In the rest of the section, OT-exact is the
+                                                                cate that the geometrical structure is better preserved
+original transport problem (8), OT-IT the Information
+                                                                through the adaptation by optimal transport. Also, for
+theoretic regularized one (9), and the two proposed
+                                                                large angle (e.g. 90◦ ), the final score is also signifi-
+class-based regularized ones are denoted OT-GL and
+                                                                cantly better than other state-of-the-art method, but
+OT-Laplace, corresponding respectively to the group-
+                                                                falls down to a 0.5 error rate, which is natural since in
+lasso (Equation (17)) and Laplacian (Equation (18))
+                                                                this configuration a transformation of −90◦ , implying
+regularization terms. We also present some results
+                                                                an inversion of labels, would have led to similar em-
+with our previous class-label based regularizer built
+                                                                pirical distributions. This clearly shows the capacity of
+upon an `p − `1 norm: OT-LpL1 [14].
+                                                                our method to handle large domain transformations.
+                                                                Adding the class-label information into the regulariza-
+6.1 Two moons: simulated problem with control-                  tion also clearly helps for the mid-range angle values,
+lable complexity                                                where the adaptation shows nearly optimal results up
+In the first experiment, we consider the same toy               to angles < 40◦ . For the strongest deformation (> 70◦
+example as in [22]. The simulated dataset consists              rotation), no clear winner among the OT methods can
+of two domains: for the source, the standard two                be found. We think that, regardless of the amount and
+entangled moons data, where each moon is associated             type of regularization chosen, the classification of test
+to a specific class (See Figure 3(a)). The target domain        samples becomes too much tributary of the training
+is built by applying a rotation to the two moons,               samples. These ones mostly come from the denser part
+which allows to consider an adaptation problem with             of µs and as a consequence, the less dense parts of this
+an increasing difficulty as a function of the rotation          PDF are not satisfactorily transported. This behavior
+angle. This example is notably interesting because              can be seen in Figure 3d.
+IEEE TRANSACTIONS ON PATTERN ANALYSIS AND MACHINE INTELLIGENCE, VOL. X, NO. X, JANUARY XX                                                  10
+
+
+
+
+      (a) source domain               (b) rotation=20◦               (c) rotation=40◦                         (d) rotation=90◦
+
+Fig. 3: Illustration of the classification decision boundary produced by OT-Laplace over the two moons example
+for increasing rotation angles. The source domain is represented as coloured points. The target domain is
+depicted as points in grey (best viewed with colors).
+
+                                                                 Problem    Domains    Dataset    # Samples   # Features   # Classes   Abbr.
+6.2   Visual adaptation datasets                                             USPS       USPS         1800        256          10        U
+                                                                  Digits
+                                                                             MNIST     MNIST         2000         256         10        M
+We now evaluate our method on three challenging                              PIE05       PIE         3332        1024         68        P1
+                                                                             PIE07       PIE         1629        1024         68        P2
+real world vision adaptation tasks, which have at-                Faces      PIE09       PIE         1632        1024         68        P3
+tracted a lot of interest in recent computer vision lit-                     PIE29
+                                                                            Calltech
+                                                                                         PIE
+                                                                                       Calltech
+                                                                                                     1632
+                                                                                                     1123
+                                                                                                                 1024
+                                                                                                               800|4096
+                                                                                                                              68
+                                                                                                                              10
+                                                                                                                                        P4
+                                                                                                                                        C
+erature [39]. We start by presenting the datasets, then          Objects
+                                                                            Amazon      Office        958      800|4096       10        A
+                                                                            Webcam      Office        295      800|4096       10        W
+the experimental protocol, and finish by providing                           DSLR       Office        157      800|4096       10        D
+and discussing the results obtained.
+                                                               TABLE 2: Summary of the domains used in the visual
+6.2.1 Datasets                                                 adaptation experiment
+Three types of image recognition problems are con-
+sidered: digits, faces and miscellaneous objects recog-
+nition. This choice of datasets was already featured           tion [25], Webcam (images taken from a webcam) and
+in [34]. A summary of the properties of each domain            DSLR (images taken from a high resolution digital
+considered in the three problems is provided in Ta-            SLR camera). The variability of the different domains
+ble 2. An illustration of some examples of the different       come from several factors: presence/absence of back-
+domains for a particular class is shown in Figure 4.           ground, lightning conditions, noise, etc. We consider
+Digit recognition. As source and target domains, we            two feature sets:
+use the two digits datasets USPS and MNIST, that                  • SURF descriptors as described in [42], used to
+share 10 classes of digits (single digits 0 − 9). We                transform each image into a 800 bins histogram.
+randomly sampled 1, 800 and 2, 000 images from each                 These histograms are subsequently normalized
+original dataset. The MNIST images are resized to the               and reduced to standard scores.
+same resolution as that of USPS (16 × 16). The grey               • two DeCAF deep learning features sets [19]: these
+levels of all images are then normalized to obtain a                features are extracted as the sparse activation of
+final common feature space for both domains.                        the neurons from the fully connected 6th and
+Face recognition. In the face recognition experiment,               7th layers of a convolutional network trained
+we use the PIE ("Pose, Illumination, Expression")                   on imageNet and then fine tuned on the visual
+dataset, which contains 32 × 32 images of 68 indi-                  recognition tasks considered here. As such, they
+viduals taken under various pose, illumination and                  form vectors with 4096 dimensions.
+expressions conditions. The 4 experimental domains
+are constructed by selecting 4 distinct poses: PIE05
+                                                               6.2.2       Experimental setup
+(C05, left pose), PIE07 (C07, upward pose), PIE09
+(C09, downward pose) and PIE29 (C29, right pose).              Following [23], the classification is conducted using
+This allows to define 12 different adaptation problems         a 1-Nearest Neighbor (1NN) classifier, which has the
+with increasing difficulty (the most challenging being         advantage of being parameter free. In all experiments,
+the adaptation from right to left poses). Let us note          1NN is trained with the adapted source data, and
+that each domain has a strong variability for each             evaluated over the target data to provide a classifi-
+class due to illumination and expression variations.           cation accuracy score. We compare our optimal trans-
+Object recognition. We used the Caltech-Office                 port solutions to the following baseline methods that
+dataset [42], [24], [23], [54], [39]. The dataset contains     are particularly well adapted for image classification:
+images coming from four different domains: Ama-                  • 1NN is the original classifier without adaptation
+zon (online merchant), the Caltech-256 image collec-                and constitutes a baseline for all experiments;
+IEEE TRANSACTIONS ON PATTERN ANALYSIS AND MACHINE INTELLIGENCE, VOL. X, NO. X, JANUARY XX                               11
+
+
+
+                                                               Ss is filtered such that connections between elements
+                                                               of different classes are pruned. Finally, we set the α
+                                                               value Equation (20) to 0.5.
+
+                                                               6.2.3   Results on unsupervised domain adaptation
+                                                               Results of the experiment are reported in Table 3
+                                                               where the best performing method for each domain
+                                                               adaptation problem is highlighted in bold. On av-
+                                                               erage, all the OT-based domain adaptation methods
+                                                               perform better than the baseline methods, except in
+Fig. 4: Examples from the datasets used in the visual
+                                                               the case of the PIE dataset, where JDA outperforms
+adaptation experiment. 5 random samples from one
+                                                               the OT-based methods in 7 out of 12 domain pairs.
+class are given for all the considered domains.
+                                                               A possible explanation is that the dataset contains a
+                                                               lot of classes (68), and the EM-like step of JDA, which
+                                                               allows to take into account the current results of classi-
+  • PCA, which consists in applying a projection               fication on the target, is clearly leading to a benefit. We
+    on the first principal components of the joint             notice that TSL, which is based on a similar principle
+    source/target distribution (estimated from the             of distribution divergence minimization, almost never
+    concatenation of source and target samples);               outperforms our regularized strategies, except on pair
+  • GFK, Geodesic Flow Kernel [23];                            A→C. Among the different optimal transport strate-
+  • TSL, Transfer Subspace Learning [44], which op-            gies, OT-Exact leads to the lowest performances. OT-
+    erates by minimizing the Bregman divergence                IT, the entropy regularized version of the transport, is
+    between the domains embedded in lower dimen-               substantially better than OT-Exact, but is still inferior
+    sional spaces;                                             to the class-based regularized strategies proposed in
+  • JDA, Joint Distribution Adaptation [34], which             this paper. The best performing strategies are clearly
+    extends the Transfer Component Analysis algo-              OT-GL and OT-Laplace with a slight advantage for
+    rithm [38];                                                OT-GL. OT-LpL1, which is based on a similar regu-
+   In unsupervised DA no target labels are available.          larization strategy as OT-GL, but with a different opti-
+As a consequence, it is impossible to consider a cross-        mization scheme, has globally inferior performances,
+validation step for the hyper-parameters of the differ-        except on some pairs of domains (e.g. C→A ) where
+ent methods. However, and in order to compare the              it achieves better scores. On both digits and objects
+methods fairly, we follow the following protocol. For          recognition tasks, OT-GL significantly outperforms
+each source domain, a random selection of 20 samples           the baseline methods.
+per class (with the only exception of 8 for the DSLR              In the next experiment (Table 4), we use the same
+dataset) is adopted. Then the target domain is equiv-          experimental protocol on different features produced
+alently partitioned in a validation and test sets. The         by the DeCAF deep learning architecture [19]. We
+validation set is used to obtain the best accuracy in the      report the results of the experiment conducted on the
+range of the possible hyper-parameters. The accuracy,          Office-Caltech dataset, with the OT-IT and OT-GL
+measured as the percent of correct classification over         regularization strategies. For comparison purposes,
+all the classes, is then evaluated on the testing set,         JDA is also considered for this adaptation task. The
+with the best selected hyper-parameters. This strategy         results show that, even though the deep learning
+normally prevents overfitting on the testing set. The          features yield naturally a strong improvement over
+experimentation is conducted 10 times, and the mean            the classical SURF features, the proposed OT meth-
+accuracy over all these realizations is reported.              ods are still capable of improving significantly the
+                                                               performances of the final classification (up to more
+   We considered the following parameter range :
+                                                               than 20 points in some case, e.g. D→A or A→W). This
+for subspace learning methods (PCA,TSL, GFK, and
+                                                               clearly shows how OT has the capacity to handle non-
+JDA) we considered reduced k-dimensional spaces
+                                                               stationarity in the distributions that the deep architec-
+with k ∈ {10, 20, . . . , 70}. A linear kernel was cho-
+                                                               ture has difficulty handling. We also note that using
+sen for all the methods with a kernel formula-
+                                                               the features from the 7th layer instead of the 6th does
+tion. For the all methods requiring a regularization
+                                                               not bring a strong improvement in the classification
+parameter, the best value was searched in λ =
+                                                               accuracy, suggesting that part of the work of the 7th
+{0.001, 0.01, 0.1, 1, 10, 100, 1000}. The λ and η param-
+                                                               layer is already performed by the optimal transport.
+eters of our different regularizers (Equation (16)), are
+validated using the same search interval. In the case
+of the Laplacian regularization (OT-Laplace), St is            6.2.4   Semi-supervised domain adaptation
+a binary matrix which encodes a nearest neighbors              In this last experiment, we assume that few labels are
+graph with a 8-connectivity. For the source domain,            available in the target domain. We thus benchmark
+IEEE TRANSACTIONS ON PATTERN ANALYSIS AND MACHINE INTELLIGENCE, VOL. X, NO. X, JANUARY XX                                                                            12
+
+
+TABLE 3: Overall recognition accuracies in % obtained over all domains pairs using the SURF features.
+Maximum values for each pair is indicated in bold font.
+
+           Domains         1NN       PCA      GFK        TSL          JDA      OT-exact       OT-IT      OT-Laplace       OT-LpLq          OT-GL
+           U→M             39.00     37.83    44.16     40.66         54.52     50.67         53.66         57.42           60.15          57.85
+           M→U             58.33     48.05    60.96     53.79         60.09     49.26         64.73         64.72           68.07          69.96
+            mean           48.66     42.94    52.56     47.22         57.30     49.96         59.20         61.07           64.11          63.90
+           P1→P2           23.79     32.61    22.83     34.29         67.15     52.27         57.73         58.92           59.28          59.41
+           P1→P3           23.50     38.96    23.24     33.53         56.96     51.36         57.43         57.62           58.49          58.73
+           P1→P4           15.69     30.82    16.73     26.85         40.44     40.53         47.21         47.54           47.29          48.36
+           P2→P1           24.27     35.69    24.18     33.73         63.73     56.05         60.21         62.74           62.61          61.91
+           P2→P3           44.45     40.87    44.03     38.35         68.42     59.15         63.24         64.29           62.71          64.36
+           P2→P4           25.86     29.83    25.49     26.21         49.85     46.73         51.48         53.52           50.42          52.68
+           P3→P1           20.95     32.01    20.79     39.79         60.88     54.24         57.50         57.87           58.96          57.91
+           P3→P2           40.17     38.09    40.70     39.17         65.07     59.08         63.61         65.75           64.04          64.67
+           P3→P4           26.16     36.65    25.91     36.88         52.44     48.25         52.33         54.02           52.81          52.83
+           P4→P1           18.14     29.82    20.11     40.81         46.91     43.21         45.15         45.67           46.51          45.73
+           P4→P2           24.37     29.47    23.34     37.50         55.12     46.76         50.71         52.50           50.90          51.31
+           P4→P3           27.30     39.74    26.42     46.14         53.33     48.05         52.10         52.71           51.37          52.60
+            mean           26.22     34.55    26.15     36.10         56.69     50.47         54.89         56.10           55.45          55.88
+            C→A            20.54     35.17    35.29     45.25         40.73     30.54         37.75         38.96           48.21          44.17
+           C→W             18.94     28.48    31.72     37.35         33.44     23.77         31.32         31.13           38.61          38.94
+            C→D            19.62     33.75    35.62     39.25         39.75     26.62         34.50         36.88           39.62          44.50
+            A→C            22.25     32.78    32.87     38.46         33.99     29.43         31.65         33.12           35.99          34.57
+           A→W             23.51     29.34    32.05     35.70         36.03     25.56         30.40         30.33           35.63          37.02
+            A→D            20.38     26.88    30.12     32.62         32.62     25.50         27.88         27.75           36.38          38.88
+           W→C             19.29     26.95    27.75     29.02         31.81     25.87         31.63         31.37           33.44          35.98
+           W→A             23.19     28.92    33.35     34.94         31.48     27.40         37.79         37.17           37.33          39.35
+           W→D             53.62     79.75    79.25     80.50         84.25     76.50         80.00         80.62           81.38          84.00
+            D→C            23.97     29.72    29.50     31.03         29.84     27.30         29.88         31.10           31.65          32.38
+            D→A            27.10     30.67    32.98     36.67         32.85     29.08         32.77         33.06           37.06          37.17
+           D→W             51.26     71.79    69.67     77.48         80.00     65.70         72.52         76.16           74.97          81.06
+            mean           28.47     37.98    39.21     42.97         44.34     36.69         42.30         43.20           46.42          47.70
+
+
+
+
+TABLE 4: Results of adaptation by optimal transport                             TABLE 5: Results of semi-supervised adaptation with
+using DeCAF features.                                                           optimal transport using the SURF features.
+                                                                                                Unsupervised + labels                 Semi-supervised
+                      Layer 6                            Layer 7
+                                                                                    Domains      OT-IT       OT-GL        OT-IT          OT-GL      MMDT [28]
+ Domains   DeCAF   JDA      OT-IT    OT-GL   DeCAF    JDA     OT-IT    OT-GL
+  C→A      79.25   88.04     88.69   92.08   85.27    89.63   91.56    92.15
+                                                                                     C→A       37.0 ± 0.5   41.4 ± 0.5   46.9 ± 3.4    47.9 ± 3.1       49.4 ± 0.8
+  C→W      48.61   79.60     75.17   84.17   65.23    79.80   82.19    83.84         C→W       28.5 ± 0.7   37.4 ± 1.1   64.8 ± 3.0    65.0 ± 3.1       63.8 ± 1.1
+  C→D      62.75   84.12     83.38   87.25   75.38    85.00   85.00    85.38         C→D       35.1 ± 1.7   44.0 ± 1.9   59.3 ± 2.5    61.0 ± 2.1       56.5 ± 0.9
+  A→C      64.66   81.28     81.65   85.51   72.80    82.59   84.22    87.16         A→C       32.3 ± 0.1   36.7 ± 0.2   36.0 ± 1.3    37.1 ± 1.1       36.4 ± 0.8
+  A→W      51.39   80.33     78.94   83.05   63.64    83.05   81.52    84.50    s    A→W       29.5 ± 0.8   37.8 ± 1.1   63.7 ± 2.4    64.6 ± 1.9       64.6 ± 1.2
+  A→D      60.38   86.25     85.88   85.00   75.25    85.50   86.62    85.25         A→D       36.9 ± 1.5   46.2 ± 2.0   57.6 ± 2.5    59.1 ± 2.3       56.7 ± 1.3
+  W→C      58.17   81.97     74.80   81.45   69.17    79.84   81.74    83.71         W→C       35.8 ± 0.2   36.5 ± 0.2   38.4 ± 1.5    38.8 ± 1.2       32.2 ± 0.8
+  W→A      61.15   90.19     80.96   90.62   72.96    90.94   88.31    91.98         W→A       39.6 ± 0.3   41.9 ± 0.4   47.2 ± 2.5    47.3 ± 2.5       47.7± 0.9
+  W→D      97.50   98.88     95.62   96.25   98.50    98.88   98.38    91.38         W→D       77.1 ± 1.8   80.2 ± 1.6   79.0 ± 2.8    79.4 ± 2.8       67.0 ± 1.1
+  D→C      52.13   81.13     77.71   84.11   65.23    81.21   82.02    84.93
+  D→A      60.71   91.31     87.15   92.31   75.46    91.92   92.15    92.92
+                                                                                     D→C       32.7 ± 0.3   34.7 ± 0.3   35.5 ± 2.1    36.8 ± 1.5       34.1 ± 1.5
+  D→W      85.70   97.48     93.77   96.29   92.25    97.02   96.62    94.17         D→A       34.7 ± 0.3   37.7 ± 0.3   45.8 ± 2.6    46.3 ± 2.5       46.9 ± 1.0
+  mean     65.20   86.72     83.64   88.18   75.93    87.11   87.53    88.11         D→W       81.9 ± 0.6   84.5 ± 0.4   83.9 ± 1.4    84.0 ± 1.5       74.1 ± 0.8
+                                                                                     mean         41.8         46.6         54.8          55.6             52.5
+
+
+
+
+                                                                                semi-supervised regularization term in Equation (21)).
+our semi-supervised approach on SURF features ex-
+                                                                                   Results are reported in Table 5. They clearly show
+tracted from the Office-Caltech dataset. We consider
+                                                                                the benefits of the proposed semi-supervised regu-
+that only 3 labeled samples per class are at our
+                                                                                larization term in the definition of the transportation
+disposal in the target domain. In order to disentangle
+                                                                                plan. A comparison with the state-of-the-art method
+the benefits of the labeled target samples brought by
+                                                                                of Hoffman and colleagues [28] is also reported, and
+our optimal transport strategies from those brought
+                                                                                shows the competitiveness of our approach.
+by the classifier, we make a distinction between two
+cases: in the first one, denoted as “Unsupervised +
+labels”, we consider that the label target samples are                          7       C ONCLUSION
+available only at the learning stage, after an unsu-                            In this paper, we described a new framework based on
+pervised domain adaptation with optimal transport.                              optimal transport to solve the unsupervised domain
+In the second case, denoted as “semi-supervised”,                               adaptation problem. We proposed two regulariza-
+labels in the target domain are used to compute a new                           tion schemes to encode class-structure in the source
+transportation plan, through the use of the proposed                            domain during the estimation of the transportation
+IEEE TRANSACTIONS ON PATTERN ANALYSIS AND MACHINE INTELLIGENCE, VOL. X, NO. X, JANUARY XX                                                         13
+
+
+
+plan, thus enforcing the intuition that samples of                           [9]  L. Bruzzone and M. Marconcini, “Domain adaptation prob-
+the same class must undergo similar transformation.                               lems: A dasvm classification technique and a circular val-
+                                                                                  idation strategy,” IEEE Transactions on Pattern Analysis and
+We extended this OT regularized framework to the                                  Machine Intelligence, vol. 32, no. 5, pp. 770–787, May 2010.
+semi-supervised domain adaptation case, i.e. the case                        [10] T. S. Caetano, T. Caelli, D. Schuurmans, and D. Barone, “Grapi-
+where few labels are available in the target domain.                              hcal models and point pattern matching,” IEEE Transactions
+                                                                                  on Pattern Analysis and Machine Intelligence, vol. 28, no. 10, pp.
+Regarding the computational aspects, we suggested                                 1646–1663, 2006.
+to use a modified version of the conditional gradi-                          [11] T. S. Caetano, J. J. McAuley, L. Cheng, Q. V. Le, and A. J. Smola,
+ent algorithm, the generalized conditional gradient                               “Learning graph matching,” IEEE Transactions on Pattern Anal-
+                                                                                  ysis and Machine Intelligence, vol. 31, no. 6, pp. 1048–1058, 2009.
+splitting, which enables the method to scale up to                           [12] G. Carlier, A. Oberman, and E. Oudet, “Numerical methods
+real-world datasets. Finally, we applied the proposed                             for matching for teams and Wasserstein barycenters,” Inria,
+methods on both synthetic and real world datasets.                                Tech. Rep. hal-00987292, 2014.
+                                                                             [13] M. Carreira-Perpinan and W. Wang, “LASS: A simple assign-
+Results show that the optimal transportation domain                               ment model with laplacian smoothing,” in AAAI Conference on
+adaptation schemes frequently outperform the com-                                 Artificial Intelligence, 2014.
+peting state-of-the-art methods.                                             [14] N. Courty, R. Flamary, and D. Tuia, “Domain adaptation
+                                                                                  with regularized optimal transport,” in European Conference
+   We believe that the framework presented in this pa-                            on Machine Learning and Principles and Practice of Knowledge
+per will lead to a paradigm shift for the domain adap-                            Discovery in Databases (ECML PKDD), 2014.
+tation problem. Estimating a transport is much more                          [15] M. Cuturi, “Sinkhorn distances: Lightspeed computation of
+                                                                                  optimal transportation,” in Neural Information Processing Sys-
+general than finding a common subspace, but comes                                 tems (NIPS), 2013, pp. 2292–2300.
+with the problem of finding a proper regularization                          [16] M. Cuturi and D. Avis, “Ground metric learning,” Journal of
+term. The proposed class-based or Laplacian regular-                              Machine Learning Research, vol. 15, no. 1, pp. 533–564, Jan. 2014.
+                                                                             [17] M. Cuturi and A. Doucet, “Fast computation of Wasserstein
+izers show very good performances, but we believe                                 barycenters,” in International Conference on Machine Learning
+that other types of regularizer should be investigated.                           (ICML), 2014.
+Indeed, whenever the transformation is induced by                            [18] H. Daumé III, “Frustratingly easy domain adaptation,” in Ann.
+                                                                                  Meeting of the Assoc. Computational Linguistics, 2007.
+a physical process, one may want the transport map                           [19] J. Donahue, Y. Jia, O. Vinyals, J. Hoffman, N. Zhang, E. Tzeng,
+to enforce physical constraints. This can be included                             and T. Darrell, “DeCAF: a deep convolutional activation fea-
+with dedicated regularization terms. We also plan to                              ture for generic visual recognition,” in International Conference
+                                                                                  on Machine Learning (ICML), 2014, pp. 647–655.
+extend our optimal transport framework to the multi-                         [20] S. Ferradans, N. Papadakis, J. Rabin, G. Peyré, and J.-F. Aujol,
+domain adaptation problem, where the problem of                                   “Regularized discrete optimal transport,” in Scale Space and
+matching several distributions can be cast as a multi-                            Variational Methods in Computer Vision, SSVM, 2013, pp. 428–
+                                                                                  439.
+marginal optimal transport problem.                                          [21] W. Gangbo and R. J. McCann, “The geometry of optimal
+                                                                                  transportation,” Acta Mathematica, vol. 177, no. 2, pp. 113–161,
+                                                                                  1996.
+ACKNOWLEDGMENTS                                                              [22] P. Germain, A. Habrard, F. Laviolette, and E. Morvant, “A
+                                                                                  PAC-Bayesian Approach for Domain Adaptation with Spe-
+This work was partly funded by the Swiss National                                 cialization to Linear Classifiers,” in International Conference on
+Science Foundation under the grant PP00P2-150593                                  Machine Learning (ICML), Atlanta, USA, 2013, pp. 738–746.
+and by the CNRS PEPS Fascido program under the                               [23] B. Gong, Y. Shi, F. Sha, and K. Grauman, “Geodesic flow kernel
+                                                                                  for unsupervised domain adaptation.” in IEEE Conference on
+Topase project.                                                                   Computer Vision and Pattern Recognition (CVPR), 2012, pp. 2066–
+                                                                                  2073.
+R EFERENCES                                                                  [24] R. Gopalan, R. Li, and R. Chellappa, “Domain adaptation
+                                                                                  for object recognition: An unsupervised approach,” in Inter-
+[1]   R. K. Ahuja, T. L. Magnanti, and J. B. Orlin, Network Flows:                national Conference on Computer Vision (ICCV), 2011, pp. 999–
+      Theory, Algorithms, and Applications. Upper Saddle River, NJ,               1006.
+      USA: Prentice-Hall, Inc., 1993.                                        [25] G. Griffin, A. Holub, and P. Perona, “Caltech-256 Object Cat-
+[2]   S. Ben-David, T. Luu, T. Lu, and D. Pál, “Impossibility the-                egory Dataset,” California Institute of Technology, Tech. Rep.
+      orems for domain adaptation.” in Artificial Intelligence and                CNS-TR-2007-001, 2007.
+      Statistics Conference (AISTATS), 2010, pp. 129–136.                    [26] J. Ham, D. Lee, and L. Saul, “Semisupervised alignment of
+[3]   J.-D. Benamou and Y. Brenier, “A computational fluid mechan-                manifolds,” in 10th International Workshop on Artificial Intelli-
+      ics solution to the monge-kantorovich mass transfer problem,”               gence and Statistics, R. G. Cowell and Z. Ghahramani, Eds.,
+      Numerische Mathematik, vol. 84, no. 3, pp. 375–393, 2000.                   2005, pp. 120–127.
+[4]   D. P. Bertsekas, Nonlinear programming.         Athena scientific      [27] J. Hoffman, E. Rodner, J. Donahue, K. Saenko, and T. Dar-
+      Belmont, 1999.                                                              rell, “Efficient learning of domain invariant image represen-
+[5]   N. Bonneel, J. Rabin, G. Peyré, and H. Pfister, “Sliced and                 tations,” in International Conference on Learning Representations
+      radon Wasserstein barycenters of measures,” Journal of Mathe-               (ICLR), 2013.
+      matical Imaging and Vision, vol. 51, pp. 22–45, 2015.                  [28] ——, “Efficient learning of domain-invariant image represen-
+[6]   N. Bonneel, M. van de Panne, S. Paris, and W. Heidrich, “Dis-               tations,” in International Conference on Learning Representations
+      placement interpolation using Lagrangian mass transport,”                   (ICLR), 2013.
+      ACM Transaction on Graphics, vol. 30, no. 6, pp. 158:1–158:12,         [29] I.-H. Jhuo, D. Liu, D. T. Lee, and S.-F. Chang, “Robust visual
+      2011.                                                                       domain adaptation with low-rank reconstruction,” in IEEE
+[7]   K. Bredies, D. A. Lorenz, and P. Maass, “A generalized con-                 Conference on Computer Vision and Pattern Recognition (CVPR),
+      ditional gradient method and its connection to an iterative                 2012, pp. 2168–2175.
+      shrinkage method,” Computational Optimization and Applica-             [30] L. Kantorovich, “On the translocation of masses,” C.R. (Dok-
+      tions, vol. 42, no. 2, pp. 173–193, 2009.                                   lady) Acad. Sci. URSS (N.S.), vol. 37, pp. 199–201, 1942.
+[8]   K. Bredies, D. Lorenz, and P. Maass, Equivalence of a generalized      [31] P. Knight, “The sinkhorn-knopp algorithm: Convergence and
+      conditional gradient method and the method of surrogate functionals.        applications,” SIAM Journal on Matrix Analysis and Applications,
+      Zentrum für Technomathematik, 2005.                                         vol. 30, no. 1, pp. 261–275, 2008.
+IEEE TRANSACTIONS ON PATTERN ANALYSIS AND MACHINE INTELLIGENCE, VOL. X, NO. X, JANUARY XX                                       14
+
+
+
+[32] B. Kulis, K. Saenko, and T. Darrell, “What you saw is not                      Nicolas Courty is associate professor
+     what you get: domain adaptation using asymmetric kernel                        within University Bretagne-Sud since Octo-
+     transforms,” in IEEE Conference on Computer Vision and Pattern                 ber 2004. He obtained his habilitation degree
+     Recognition (CVPR), Colorado Springs, CO, 2011.                                (HDR) in 2013. His main research objec-
+[33] A. Kumar, H. Daumé III, and D. Jacobs, “Generalized multi-                     tives are data analysis/synthesis schemes,
+     view analysis: A discriminative latent space,” in IEEE Confer-                 machine learning and visualization prob-
+     ence on Computer Vision and Pattern Recognition (CVPR), 2012.                  lems, with applications in computer vision,
+[34] M. Long, J. Wang, G. Ding, J. Sun, and P. Yu, “Transfer feature                remote sensing and computer graphics. Visit
+     learning with joint distribution adaptation,” in International                 http://people.irisa.fr/Nicolas.Courty/ for more
+     Conference on Computer Vision (ICCV), Dec 2013, pp. 2200–2207.                 information.
+[35] B. Luo and R. Hancock, “Structural graph matching using
+     the em algorithm and singular value decomposition,” IEEE
+     Transactions on Pattern Analysis and Machine Intelligence, vol. 23,
+     no. 10, pp. 1120–1136, 2001.
+[36] Y. Mansour, M. Mohri, and A. Rostamizadeh, “Domain adap-
+     tation: Learning bounds and algorithms,” in Conference on
+     Learning Theory (COLT), 2009, pp. 19–30.
+[37] S. J. Pan and Q. Yang, “A survey on transfer learning,” IEEE
+     Transactions on Knowledge and Data Engineering, vol. 22, no. 10,
+     pp. 1345–1359, 2010.
+[38] ——, “Domain adaptation via transfer component analysis,”                       Rémi Flamary is Assistant Professor at Uni-
+     IEEE Transactions on Neural Networks, vol. 22, pp. 199–210, 2011.              versité Côte d’Azur (UCA) and a member
+[39] V. M. Patel, R. Gopalan, R. Li, and R. Chellappa, “Visual                      of Lagrange Laboratory/Observatoire de la
+     domain adaptation: an overview of recent advances,” IEEE                       Côte d’Azur since 2012. He received a Dipl.-
+     Signal Processing Magazine, vol. 32, no. 3, 2015.                              Ing. in electrical engineering and a M.S. de-
+[40] J. Rabin, G. Peyré, J. Delon, and M. Bernot, “Wasserstein                      grees in image processing from the Institut
+     barycenter and its application to texture mixing,” in Scale Space              National de Sciences Appliquées de Lyon in
+     and Variational Methods in Computer Vision, ser. Lecture Notes                 2008 and a Ph.D. degree from the Univer-
+     in Computer Science, 2012, vol. 6667, pp. 435–446.                             sity of Rouen in 2011. His current research
+[41] Y. Rubner, C. Tomasi, and L. Guibas, “A metric for distribu-                   interest involve signal processing, machine
+     tions with applications to image databases,” in International                  learning and image processing.
+     Conference on Computer Vision (ICCV), 1998, pp. 59–66.
+[42] K. Saenko, B. Kulis, M. Fritz, and T. Darrell, “Adapting visual
+     category models to new domains,” in European Conference on
+     Computer Vision (ECCV), ser. LNCS, 2010, pp. 213–226.
+[43] F. Santambrogio, “Optimal transport for applied mathemati-
+     cians,” Birkäuser, NY, 2015.
+[44] S. Si, D. Tao, and B. Geng, “Bregman divergence-based reg-
+     ularization for transfer subspace learning,” IEEE Transactions
+     on Knowledge and Data Engineering, vol. 22, no. 7, pp. 929–942,
+     July 2010.
+                                                                                    Devis Tuia (S’07, M’09, SM’15) received
+[45] J. Solomon, R. Rustamov, G. Leonidas, and A. Butscher,
+                                                                                    the Ph.D. from University of Lausanne in
+     “Wasserstein propagation for semi-supervised learning,” in
+                                                                                    2009. He was a Postdoc at the University of
+     International Conference on Machine Learning (ICML), 2014, pp.
+                                                                                    Valéncia, the University of Colorado, Boulder,
+     306–314.
+                                                                                    CO and EPFL Lausanne. Since 2014, he
+[46] M. Sugiyama, S. Nakajima, H. Kashima, P. Buenau, and
+                                                                                    is Assistant Professor with the Department
+     M. Kawanabe, “Direct importance estimation with model se-
+                                                                                    of Geography, University of Zurich. He is
+     lection and its application to covariate shift adaptation,” in
+                                                                                    interested in algorithms for information ex-
+     Neural Information Processing Systems (NIPS), 2008.
+                                                                                    traction and data fusion of remote sensing
+[47] D. Tuia and G. Camps-Valls, “Kernel manifold alignment for
+                                                                                    images using machine learning. More info on
+     domain adaptation,” PLoS One, vol. 11, no. 2, p. e0148655,
+                                                                                    http://devis.tuia.googlepages.com/
+     2016.
+[48] D. Tuia, R. Flamary, A. Rakotomamonjy, and N. Courty, “Mul-
+     titemporal classification without new labels: a solution with
+     optimal transport,” in 8th International Workshop on the Analysis
+     of Multitemporal Remote Sensing Images, 2015.
+[49] C. Villani, Optimal transport: old and new, ser. Grundlehren der
+     mathematischen Wissenschaften. Springer, 2009.
+[50] C. Wang, P. Krafft, and S. Mahadevan, “Manifold alignment,”
+     in Manifold Learning: Theory and Applications, Y. Ma and Y. Fu,
+     Eds. CRC Press, 2011.
+[51] C. Wang and S. Mahadevan, “Manifold alignment without                          Alain Rakotomamonjy (M’15) is Professor
+     correspondence,” in International Joint Conference on Artificial               in the Physics department at the University
+     Intelligence (IJCAI), Pasadena, CA, 2009.                                      of Rouen since 2006. He obtained his Phd
+[52] ——, “Heterogeneous domain adaptation using manifold                            on Signal processing from the university of
+     alignment,” in International Joint Conference on Artificial Intel-             Orléans in 1997. His recent research ac-
+     ligence (IJCAI). AAAI Press, 2011, pp. 1541–1546.                              tivities deal with machine learning and sig-
+[53] K. Zhang, V. W. Zheng, Q. Wang, J. T. Kwok, Q. Yang,                           nal processing with applications to brain-
+     and I. Marsic, “Covariate shift in Hilbert space: A solution                   computer interfaces and audio applications.
+     via surrogate kernels,” in International Conference on Machine                 Alain serves as a regular reviewer for ma-
+     Learning (ICML), 2013.                                                         chine learning and signal processing jour-
+[54] J. Zheng, M.-Y. Liu, R. Chellappa, and P. Phillips, “A Grass-                  nals.
+     mann manifold-based domain adaptation approach,” in Inter-
+     national Conference on Pattern Recognition (ICPR), Nov 2012, pp.
+     2095–2099.
+

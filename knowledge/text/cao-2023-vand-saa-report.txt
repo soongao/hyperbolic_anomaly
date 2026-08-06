@@ -1,0 +1,343 @@
+                                          2nd Place Winning Solution for the CVPR2023 Visual Anomaly and Novelty
+                                        Detection Challenge: Multimodal Prompting for Data-centric Anomaly Detection
+
+                                                                  Yunkang Cao1 * Xiaohao Xu1 * Chen Sun1 Yuqi Cheng1
+                                                                                Liang Gao1 Weiming Shen1§
+                                                         1
+                                                           State Key Laboratory of Digital Manufacturing Equipment and Technology,
+                                                                   Huazhong University of Science and Technology, China
+
+
+
+
+arXiv:2306.09067v2 [cs.CV] 5 Sep 2023
+                                                        {cyk_hust, sun_chen, chengyuqi, gaoliang}@hust.edu.cn
+                                                                   xxh11102019@outlook.com, wshen@ieee.org
+
+
+                                                                     Abstract
+
+                                           This technical report introduces the winning solution of
+                                        the team Segment Any Anomaly for the CVPR2023 Visual
+                                        Anomaly and Novelty Detection (VAND) challenge. Going
+                                        beyond uni-modal prompt, e.g., language prompt, we present
+                                        a novel framework, i.e., Segment Any Anomaly + (SAA+), for
+                                        zero-shot anomaly segmentation with multi-modal prompts
+                                        for the regularization of cascaded modern foundation mod-
+                                        els. Inspired by the great zero-shot generalization ability
+                                        of foundation models like Segment Anything, we first ex-
+                                        plore their assembly (SAA) to leverage diverse multi-modal
+                                        prior knowledge for anomaly localization. Subsequently,
+                                        we further introduce multimodal prompts (SAA+) derived
+                                        from domain expert knowledge and target image context to
+                                        enable the non-parameter adaptation of foundation mod-
+                                        els to anomaly segmentation. The proposed SAA+ model
+                                        achieves state-of-the-art performance on several anomaly
+                                        segmentation benchmarks, including VisA and MVTec-AD,
+                                        in the zero-shot setting. We will release the code of our
+                                        winning solution for the CVPR2023 VAND challenge at
+                                        https://github.com/caoyunkang/Segment-Any-Anomaly 1                         Figure 1. Towards segmenting any anomaly without training, we
+                                                                                                                    first construct a vanilla baseline (Segment Any Anomaly, SAA)
+                                                                                                                    by prompting into a cascade of anomaly region generator (e.g., a
+                                        1. Introduction                                                             prompt-guided object detection foundation model [2]) and anomaly
+                                                                                                                    region refiner (e.g., a segmentation foundation model [3]) mod-
+                                            Anomaly segmentation [4–7] have gained great popular-                   ules via a naive class-agnostic language prompt (e.g., “Anomaly”).
+                                        ity in industrial quality control [8], medical diagnoses [9],               However, SAA shows the severe false-alarm problem, which falsely
+                                        etc. We focus on the setting of zero-shot anomaly segmen-                   detects all the “wick” rather than the ground-truth anomaly re-
+                                        tation (ZSAS) on images, which aims at utilizing neither                    gion (the “overlong wick”). Thus, we further strengthen the
+                                        normal nor abnormal samples for segmenting any anomalies                    regularization of foundation models via multimodal prompts in
+                                        in countless objects.                                                       the revamped model (Segment Any Anomaly +, SAA+), which
+                                                                                                                    successfully helps identify the anomaly region.
+                                            Recently, foundation models, e.g., SAM [3] and
+                                        CLIP [10], exhibit great zero-shot visual perception abil-
+                                          * Equal Contribution.
+                                                                                                                    ities by retrieving prior knowledge stored in these models
+                                          § Corresponding Author.                                                   via prompting [11–15]. In this work, we first construct a
+                                          1 The extended-version paper with more details is available at [1].       vanilla baseline, i.e., Segment Any Anomaly (SAA), by cas-
+
+
+                                                                                                                1
+cading prompt-guided object detection [2] and segmentation           2.2. Baseline: Segment Any Anomaly (SAA)
+foundation models [3], which serve as Anomaly Region Gen-
+erator and Anomaly Region Refiner, respectively. Following              For ZSAS, we start by constructing a vanilla foundation
+the practice to unlock foundation model knowledge [16, 17],          model assembly, i.e., Segment Any Anomaly (SAA), as
+naive language prompts, e.g., “defect” or “anomaly”,                 shown in Fig. 1, which consists of an Anomaly Region
+are utilized to segment desired anomalies for a target im-           Generator and an Anomaly Region Refiner.
+age. In specific, the language prompt is used to prompt the
+Anomaly Region Generator to generate prompt-conditioned              2.2.1   Anomaly Region Generator
+box-level regions for desired anomaly regions. Then these re-
+gions are refined in the Anomaly Region Refiner to produce           There we base the architecture of the region detector on a
+final predictions, i.e., masks, for anomaly segmentation.            text-guided open-set object detection architecture for visual
+    However, as is shown in Figure 1, vanilla foundation             grounding. Specifically, given the bounding-box-level region
+model assembly (SAA) tends to cause significant false                set RB , and their corresponding confidence score set S, the
+alarms, e.g., SAA wrongly refers to all wicks as anoma-              module of anomaly region generator (Generator) can be
+lies whereas only the overlong wick is a real anomaly, which         formulated as,
+we attribute to the ambiguity brought by naive language
+prompts. Firstly, conventional language prompts may be-                                \label {eq:det} \mathcal {R}^B, \mathcal {S} := \mathrm {Generator}(\mathbf {I},\mathcal {T})    (1)
+come ineffective when facing the domain shift between pre-
+training data distribution of foundation models and down-
+                                                                     2.2.2   Anomaly Region Refiner
+stream datasets for anomaly segmentation. Secondly, the
+degree of “anomaly” for a target depends on the object               To generate pixel-wise anomaly segmentation results, we
+context, which is hard for coarse-grained language prompts,          propose Anomaly Region Refiner to refine the bounding-
+e.g., “an anomaly region”, to express exactly.                       box-level anomaly region candidates into an anomaly seg-
+    Thus, to reduce the language ambiguity, we incorporate           mentation mask set through SAM [3]. SAM accepts the
+domain expert knowledge and target image context in our re-          bounding box candidates RB as prompts and obtain pixel-
+vamped framework, i.e., Segment Any Anomaly + (SAA+).                wise segmentation masks R. The module of the Anomaly
+Specifically, expert knowledge provides detailed descriptions        Region Refiner (Refiner) can be formulated as follows,
+of anomalies that are relevant to the target in open-world
+scenarios. We utilize more specific descriptions as in-context                                   \mathcal {R} := \mathrm {Refiner}(\mathbf {I}, \mathcal {R}^B)                         (2)
+prompts, effectively aligning the image content in both pre-
+trained and target datasets. Besides, we utilize target image           Till then, we obtain the set of regions in the form of
+context to reliably identify and adaptively calibrate anomaly        high-quality segmentation masks R with corresponding con-
+segmentation predictions [18, 19]. By leveraging the rich            fidence scores S. We summarize the framework (SAA) as
+contextual information present in the target image, we can           follows,
+accurately associate the object context with the final anomaly                                    \mathcal {R}, \mathcal {S} := \mathrm {SAA}(\mathbf {I}, \mathcal {T}_n)              (3)
+predictions.
+                                                                     where Tn is a naive class-agnostic language prompt, e.g.,
+                                                                     “anomaly”, utilized in SAA.
+2. Starting from Vanilla Foundation Model As-
+                                                                     2.3. Observation: Vanilla Language Prompt Fails
+    sembly with Language Prompt                                            to Unleash the Power of Foundation Models
+2.1. Problem Definition: Zero-shot Anomaly Seg-                          We present some preliminary experiments to evaluate the
+      mentation (ZSAS)                                               efficacy of vanilla foundation model assembly for ZSAS.
+                                                                     Despite the simplicity and intuitiveness of the solution, we
+    The goal of ZSAS is to perform anomaly segmentation              observe a language ambiguity issue. Specifically, certain
+on new objects without requiring any corresponding object            language prompts, such as “anomaly”, may fail to detect
+training data. ZSAS seeks to create an anomaly map A ∈               the desired anomaly regions. For instance, as depicted in Fig.
+[0, 1]h×w×1 based on an empty training set ∅, in order to            1, all “wick” is erroneously identified as an anomaly by the
+identify the anomaly degree for individual pixels in an image        SAA with the “anomaly” prompt. We propose introducing
+I ∈ Rh×w×3 that includes novel objects. The ZSAS task                multimodal prompts generated by domain expert knowledge
+has the potential to significantly reduce data requirements          and the target image context to reduce language ambiguity,
+and lower real-world inspection deployment costs.                    thereby achieving better ZSAS performance.
+
+
+                                                                 2
+Figure 2. Overview of the proposed Segment Any Anomaly + (SAA+) framework. We adapt foundation models to zero-shot anomaly
+segmentation via multimodal prompt regularization. In specific, apart from naive class-agnostic language prompts, the regularization comes
+from both domain expert knowledge, including more detailed class-specific language and object property prompts, and target image context,
+including visual saliency and confidence ranking-related prompts.
+
+
+3. Adapting Foundation Models to Anomaly                                3.1.1   Anomaly Language Expression as Prompt
+   Segmentation with Multi-modal Prompts
+   To address language ambiguity in SAA and improve its                 To describe potential open-world anomalies, we propose
+ability on ZSAS, we propose an upgraded version called                  designing more precise language prompts. These prompts
+SAA+, incorporating multimodal prompts, as shown in Fig.                are categorized into two types: class-agnostic and class-
+2. In addition to leveraging the knowledge gained from                  specific prompts.
+pre-trained foundation models, SAA+ utilizes both domain
+expert knowledge and target image context to generate more              Class-agnostic prompts (Ta ) are general prompts that de-
+accurate anomaly region masks. We provide further details               scribe anomalies that are not specific to any particular cate-
+on these multimodal prompts below.                                      gory, e.g., “anomaly” and “defect”.
+
+3.1. Prompts Generated from Domain Expert                               Class-specific prompts (Ts ) are designed based on expert
+     Knowledge                                                          knowledge of abnormal patterns with similar products to
+                                                                        supplement more specific anomaly details. We use prompts
+   To address language ambiguity, we leverage domain ex-                already employed in the pre-trained visual-linguistic dataset,
+pert knowledge that contains useful prior information about             e.g., “black hole” and “white bubble”, to query the
+the target anomaly regions. Specifically, although experts              desired regions. This approach reformulates the task of find-
+may not provide a comprehensive list of potential open-                 ing an anomaly region into locating objects with a specific
+world anomalies for a new product, they can identify some               anomaly state expression, which is more straightforward
+candidates based on their past experiences with similar prod-           to utilize foundation models than identifying “anomaly”
+ucts. Domain expert knowledge enables us to refine the naive            within an object context.
+“anomaly” prompt into more specific prompts that describe
+the anomaly state in greater detail. In addition to language               By prompting SAA with anomaly language prompts
+prompts, we introduce property prompts to complement the                P L = {Ta , Ts } derived from domain expert knowledge,
+lack of awareness on specific properties like “count” and               we generate finer anomaly region candidates R and corre-
+“area” [20] in existing foundation models [20].                         sponding confidence scores S.
+
+
+                                                                    3
+3.1.2   Anomaly Object Property as Prompt                                                                        (f ) and its N nearest neighbors,
+
+Current foundation models [2] have limitations when                                                                                                 \label {eq:saliency-map} \mathbf {s}_{ij} := \frac {1}{N}\sum \limits _{\mathbf {f}\in N_p(\mathbf {f}_{ij})}(1- \langle \mathbf {f}_{ij},\mathbf {f} \rangle )                                        (5)
+it comes to referring to objects with specific property
+descriptions, such as size or location [20], which
+are important for describing anomalies, such as                                                                  where (i, j) denotes to the pixel location, Np (fij ) denotes to
+“The small black hole on the left.”                          To                                                  the N nearest neighbors of the corresponding pixel, and ⟨·, ·⟩
+incorporate this critical expert knowledge, we propose using                                                     refers to the cosine similarity. We use pre-trained CNNs from
+anomaly property prompts formulated as rules rather than                                                         large-scale image datasets [24] to extract image features,
+language. Specifically, we consider the location and area of                                                     ensuring the descriptiveness of features. The saliency map
+anomalies.                                                                                                       indicates how different a region is from other regions. The
+Anomaly Location. Anomalies typically locate within                                                              saliency prompts P S are defined as the exponential average
+the inspected objects. To guarantee this, we calculate                                                           saliency value within the corresponding region masks,
+the intersection over union (IoU) between the potential
+anomaly regions and the inspected object. By applying an
+expert-derived IoU threshold, denoted as θIoU , we filter out                                                               \label {eq:score_saliency} \mathcal {P}^{S} := \left \{ \exp (\frac {\sum _{i j}\mathbf {r}_{i j}\mathbf {s}_{i j}}{\sum _{i j}\mathbf {r}_{i j}}) \quad | \quad \mathbf {r} \in \mathcal {R}^P \right \}                      (6)
+anomaly candidates with IoU values below this threshold,
+retaining regions that are more likely to be abnormal.
+                                                                                                                    The saliency prompts provide reliable indications of the
+Anomaly Area. The size of an anomaly, as reflected by its                                                        confidence of anomaly regions. These prompts are employed
+area, is also a property that can provide useful information.                                                    to recalibrate the confidence scores generated by the foun-
+In general, anomalies should be smaller than the size of the                                                     dation models, yielding new rescaled scores S S based on
+inspected object. Experts can provide a suitable threshold                                                       the anomaly saliency prompts P S . These rescaled scores
+value θarea for the specific type of anomaly being considered.                                                   provide a combined measure that takes into account both
+Candidates with areas unmatched with θarea · ObjectArea                                                          the confidence derived from the foundation models and the
+can then be filtered out.                                                                                        saliency of the region candidate. The process is formulated
+   By combining the two property prompts P P =                                                                   as follows,
+{θarea , θIoU }, we can filter the set of candidate regions R to
+obtain a subset of selected candidates RP with correspond-                                                                               \label {eq:rescore} \mathcal {S}^{S} := \left \{ p \cdot s \quad | \quad p \in \mathcal {P}^{S}, s \in \mathcal {S}^P \right \}                                                                                   (7)
+ing confidence scores S P using the filter function (Filter),
+                                                                                                                 3.2.2   Anomaly Confidence as Prompt
+                   \mathcal {R}^P, \mathcal {S}^P := \mathrm {Filter}(\mathcal {R}, \mathcal {P}^P)    (4)
+                                                                                                                 Typically, the number of anomaly regions in an inspected
+                                                                                                                 object is limited. Therefore, we propose anomaly confidence
+3.2. Prompts Derived from Target Image Context
+                                                                                                                 prompts P C to identify the K candidates with the highest
+    Besides incorporating domain expert knowledge, we can                                                        confidence scores based on the image content and use their
+leverage the information provided by the input image itself                                                      average values for final anomaly region detection. This is
+to improve the accuracy of anomaly region detection. In this                                                     achieved by selecting the top K candidate regions based
+regard, we propose two prompts induced by image context.                                                         on their corresponding confidence scores, as shown in the
+                                                                                                                 following,
+
+3.2.1   Anomaly Saliency as Prompt                                                                                                                           \label {eq:confidence-prompts} \mathcal {R}^C, \mathcal {S}^C := \mathrm {Top}_K(\mathcal {R}^P,\mathcal {S}^S)                                                                               (8)
+
+Predictions generated by foundation models like [2] using                                                           Denote a single region and its corresponding score as rC
+the prompt “defect” can be unreliable due to the domain                                                          and sC , we then use these K candidate regions to estimate
+gap between pre-trained language-vision datasets [21] and                                                        the final anomaly map,
+targeted anomaly segmentation datasets [8, 22]. To calibrate
+the confidence scores of individual predictions, we propose                                                                                                       \label {eq:fusion} \mathbf {A}_{ij} := \frac { \sum _{\mathbf {r}^C \in \mathcal {R}^C} \mathbf {r}^C_{i j} \cdot s^C}{ \sum _{\mathbf {r}^C \in \mathcal {R}^C} \mathbf {r}^C_{i j}}    (9)
+Anomaly Saliency Prompt mimicking human intuition. In
+specific, humans can recognize anomaly regions by their
+discrepancy with their surrounding regions [23], i.e., visual                                                       With the proposed multimodal prompts (P L , P P , P S ,
+saliency could indicate the anomaly degree. Hence, we calcu-                                                     and P C ), SAA is regularized and updated into our final
+late a saliency map (s) for the input image by computing the                                                     framework, i.e., Segment Any Anomaly + (SAA+), which
+average distances between the corresponding pixel feature                                                        makes more reliable anomaly predictions.
+
+
+                                                                                                             4
+Table 1. Quantitative comparisons between SAA+ and other con-
+current methods on zero-shot anomaly segmentation. Best scores
+are highlighted in bold.
+
+   Dataset   WinClip [17]   ClipSeg [16]   UTAD [23]   SAA     SAA+
+   MVTec        31.65          25.42         23.48     23.44   39.40
+    VisA        14.82          14.32         6.95      12.76   27.07
+
+
+
+4. Experiments
+  In this section, we first assess the performance of
+SAA/SAA+ on several anomaly segmentation benchmarks.
+Then, we extensively study the effectiveness of individual
+multimodal prompts.
+
+4.1. Experimental Setup
+Datasets. We leverage two datasets with pixel-level an-                    Figure 3. Qualitative comparisons on zero-shot anomaly segmenta-
+notations: VisA [22] and MVTec-AD [8], both of which                       tion for ClipSeg [16], UTAD [23], SAA, and SAA+ on VisA [22],
+                                                                           and MVTec-AD [8].
+comprise a variety of object subsets, e.g., circuit boards.
+Evaluation Metrics. ZSAS performance is evaluated in
+                                                                             Table 2. Ablation Study. Best scores are highlighted in bold.
+terms of max-F1-pixel (Fp ) [17], which measures the F1-
+score for pixel-wise segmentation at the optimal threshold.                        Model Variants            VisA         MVTec-AD
+Implementation Details. We adopt the official implementa-                              w/o P L               23.29          36.49
+                                                                                       w/o P P               19.28          24.43
+tions of GroundingDINO [2] and SAM [3] to construct the
+                                                                                       w/o P S               19.39          38.79
+vanilla baseline (SAA). Details about the prompts derived                              w/o P C               26.70          38.68
+from domain expert knowledge are explained in the supple-                        Full Model (SAA+)           27.07          39.40
+mentary material. For the saliency prompts induced from
+image content, we utilize the WideResNet50 [25] network,
+pre-trained on ImageNet [24], and set N = 400 in line with                 4.3. Ablation study
+prior studies [23]. For anomaly confidence prompts, we set
+                                                                              In Table 2, we perform component-wise analysis to ablate
+the hyperparameter K as 5 by default. Input images are fixed
+                                                                           specific prompt designs in our framework, which verifies the
+at a resolution of 400 × 400.
+                                                                           effectiveness of all the multimodal prompts, including lan-
+4.2. Main Results                                                          guage prompt (P L ), property prompt (P P ), saliency prompt
+                                                                           (P S ), and confidence prompt (P C ).
+Methods for Comparison. We compare our final model,
+i.e., Segment Any Anomaly + (SAA+) with several con-                       5. Conclusion
+current state-of-the-art methods, including WinClip [17],
+UTAD [23], ClipSeg [16], and our vanilla baseline (SAA).                      In this work, we explore how to segment any anomaly
+For WinClip, we report its official results on VisA and                    without any further training by unleashing the full power of
+MVTec-AD. For the other three methods, we use official                     modern foundation models. We owe the struggle of adapting
+implementations and adapt them to the ZSAS task.                           foundation model assembly to anomaly segmentation to the
+Quantitative Results: As is shown in Table 1, SAA+                         prompt design, which is the key to controlling the function
+method outperforms other methods in Fp by a significant                    of off-the-shelf foundation models. Thus, we propose a
+margin. Although WinClip [17], ClipSeg [16], and SAA also                  novel framework, i.e., Segment Any Anomaly +, to leverage
+use foundation models, SAA+ better unleash the capacity                    multimodal prompts derived from both expert knowledge
+of foundation models and adapts them to tackle ZSAS. The                   and target image context to regularize foundation models
+remarkable performance of SAA+ meets the expectation to                    free of training. Finally, we successfully adapt multiple
+segment any anomaly without training.                                      foundation models to tackle zero-shot anomaly segmentation,
+Qualitative Results: Fig. 3 presents qualitative compar-                   achieving new SoTA results on several benchmarks.
+isons between SAA+ and previous competitive methods,
+where SAA+ achieves better performance. Moreover, the
+                                                                           References
+visualization shows SAA+ is capable of detecting all kinds                  [1] Yunkang Cao, Xiaohao Xu, Chen Sun, Yuqi Cheng, Zongwei
+of anomalies.                                                                   Du, Liang Gao, and Weiming Shen. Segment any anomaly
+
+
+                                                                       5
+     without training via hybrid prompt regularization. arXiv            [14] Sheng Shen, Shijia Yang, Tianjun Zhang, Bohan Zhai,
+     preprint arXiv:2305.10724, 2023.                                         Joseph E Gonzalez, Kurt Keutzer, and Trevor Darrell.
+ [2] Shilong Liu, Zhaoyang Zeng, Tianhe Ren, Feng Li, Hao                     Multitask vision-language prompt tuning. arXiv preprint
+     Zhang, Jie Yang, Chunyuan Li, Jianwei Yang, Hang Su, Jun                 arXiv:2211.11720, 2022.
+     Zhu, et al. Grounding dino: Marrying dino with grounded             [15] Kaiyang Zhou, Jingkang Yang, Chen Change Loy, and Ziwei
+     pre-training for open-set object detection. arXiv preprint               Liu. Learning to prompt for vision-language models. Int J
+     arXiv:2303.05499, 2023.                                                  Comput Vis, 130(9):2337–2348, 2022.
+ [3] Alexander Kirillov, Eric Mintun, Nikhila Ravi, Hanzi Mao,           [16] Timo Lüddecke and Alexander Ecker. Image segmentation us-
+     Chloe Rolland, Laura Gustafson, Tete Xiao, Spencer White-                ing text and image prompts. In Proceedings of the IEEE/CVF
+     head, Alexander C Berg, Wan-Yen Lo, et al. Segment any-                  Conference on Computer Vision and Pattern Recognition,
+     thing. arXiv preprint arXiv:2304.02643, 2023.                            pages 7086–7096, 2022.
+ [4] Hanqiu Deng and Xingyu Li. Anomaly detection via reverse            [17] Jongheon Jeong, Yang Zou, Taewan Kim, Dongqing Zhang,
+     distillation from one-class embedding. In Proceedings of                 Avinash Ravichandran, and Onkar Dabeer. Winclip: Zero-
+     the IEEE/CVF Conference on Computer Vision and Pattern                   /few-shot anomaly classification and segmentation. arXiv
+     Recognition, pages 9737–9746, 2022.                                      preprint arXiv:2303.14814, 2023.
+ [5] Yunkang Cao, Qian Wan, Weiming Shen, and Liang Gao.                 [18] Xiaohao Xu, Jinglu Wang, Xiang Ming, and Yan Lu. To-
+     Informative knowledge distillation for image anomaly seg-                wards robust video object segmentation with adaptive object
+     mentation. Knowledge-Based Systems, 248:108846, 2022.                    calibration. In Proceedings of the 30th ACM International
+ [6] Qian Wan, Yunkang Cao, Liang Gao, Weiming Shen, and                      Conference on Multimedia, pages 1–10, 2022.
+     Xinyu Li. Position encoding enhanced feature mapping for            [19] Xiaohao Xu, Jinglu Wang, Xiao Li, and Yan Lu. Reliable
+     image anomaly detection. In 2022 IEEE 18th International                 propagation-correction modulation for video object segmen-
+     Conference on Automation Science and Engineering (CASE),                 tation. In Proceedings of the AAAI Conference on Artificial
+     pages 876–881. IEEE, 2022.                                               Intelligence, pages 2946–2954, 2022.
+ [7] Yunkang Cao, Xiaohao Xu, Zhaoge Liu, and Weiming Shen.
+                                                                         [20] Roni Paiss, Ariel Ephrat, Omer Tov, Shiran Zada, Inbar
+     Collaborative discrepancy optimization for reliable image
+                                                                              Mosseri, Michal Irani, and Tali Dekel. Teaching clip to count
+     anomaly localization. IEEE Transactions on Industrial Infor-
+                                                                              to ten. arXiv preprint arXiv:2302.12066, 2023.
+     matics, pages 1–10, 2023.
+                                                                         [21] Christoph Schuhmann, Robert Kaczmarczyk, Aran Komat-
+ [8] Paul Bergmann, Michael Fauser, David Sattlegger, and
+                                                                              suzaki, Aarush Katta, Richard Vencu, Romain Beaumont, Je-
+     Carsten Steger. MVTec AD – A comprehensive real-world
+                                                                              nia Jitsev, Theo Coombes, and Clayton Mullis. Laion-400m:
+     dataset for unsupervised anomaly detection. In Proceedings
+                                                                              Open dataset of clip-filtered 400 million image-text pairs. In
+     of the IEEE/CVF conference on Computer Vision and Pattern
+                                                                              NeurIPS Workshop Datacentric AI. Jülich Supercomputing
+     Recognition, pages 9592–9600, 2019.
+                                                                              Center, 2021.
+ [9] Christoph Baur, Stefan Denner, Benedikt Wiestler, Nassir
+     Navab, and Shadi Albarqouni. Autoencoders for unsupervised          [22] Yang Zou, Jongheon Jeong, Latha Pemula, Dongqing Zhang,
+     anomaly segmentation in brain mr images: a comparative                   and Onkar Dabeer. SPot-the-Difference self-supervised pre-
+     study. Medical Image Analysis, 69:101952, 2021.                          training for anomaly detection and segmentation. In Pro-
+                                                                              ceedings of the European Conference on Computer Vision,
+[10] Alec Radford, Jong Wook Kim, Chris Hallacy, Aditya                       2022.
+     Ramesh, Gabriel Goh, Sandhini Agarwal, Girish Sastry,
+     Amanda Askell, Pamela Mishkin, Jack Clark, et al. Learning          [23] Toshimichi Aota, Lloyd Teh Tzer Tong, and Takayuki Okatani.
+     transferable visual models from natural language supervision.            Zero-shot versus many-shot: Unsupervised texture anomaly
+     In International Conference on Machine Learning, pages                   detection. In Proceedings of the IEEE/CVF Winter Confer-
+     8748–8763. PMLR, 2021.                                                   ence on Applications of Computer Vision, pages 5564–5572,
+                                                                              2023.
+[11] Chen Ju, Tengda Han, Kunhao Zheng, Ya Zhang, and Weidi
+     Xie. Prompting visual-language models for efficient video           [24] Geoffrey E Hinton, Alex Krizhevsky, and Ilya Sutskever. Ima-
+     understanding. In Computer Vision–ECCV 2022: 17th Eu-                    geNet classification with deep convolutional neural networks.
+     ropean Conference, Tel Aviv, Israel, October 23–27, 2022,                Advances in Neural Information Processing Systems, 25(1106-
+     Proceedings, Part XXXV, pages 105–124. Springer, 2022.                   1114):1, 2012.
+[12] Menglin Jia, Luming Tang, Bor-Chun Chen, Claire Cardie,             [25] Sergey Zagoruyko and Nikos Komodakis. Wide residual net-
+     Serge Belongie, Bharath Hariharan, and Ser-Nam Lim. Vi-                  works. In Edwin R. Hancock Richard C. Wilson and William
+     sual prompt tuning. In Computer Vision–ECCV 2022: 17th                   A. P. Smith, editors, Proceedings of the British Machine Vi-
+     European Conference, Tel Aviv, Israel, October 23–27, 2022,              sion Conference (BMVC), pages 87.1–87.12. BMVA Press,
+     Proceedings, Part XXXIII, pages 709–727. Springer, 2022.                 September 2016.
+[13] Yuhang Zang, Wei Li, Kaiyang Zhou, Chen Huang, and
+     Chen Change Loy. Unified vision and language prompt learn-
+     ing. arXiv preprint arXiv:2210.07225, 2022.
+
+
+                                                                     6
+

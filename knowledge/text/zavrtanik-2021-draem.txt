@@ -1,0 +1,562 @@
+                                              DRÆM – A discriminatively trained reconstruction embedding for surface
+                                                                       anomaly detection
+
+                                                                  Vitjan Zavrtanik         Matej Kristan        Danijel Skočaj
+                                                              University of Ljubljana, Faculty of Computer and Information Science
+                                                              {vitjan.zavrtanik, matej.kristan, danijel.skocaj}@fri.uni-lj.si
+
+
+
+
+arXiv:2108.07610v2 [cs.CV] 27 Sep 2021
+                                                                  Abstract                                                                                     Mo
+
+
+                                             Visual surface anomaly detection aims to detect local
+                                         image regions that significantly deviate from normal ap-
+                                         pearance. Recent surface anomaly detection methods rely
+                                         on generative models to accurately reconstruct the nor-
+                                         mal areas and to fail on anomalies. These methods are
+                                         trained only on anomaly-free images, and often require
+                                         hand-crafted post-processing steps to localize the anoma-
+                                         lies, which prohibits optimizing the feature extraction for
+                                         maximal detection capability. In addition to reconstruc-
+                                         tive approach, we cast surface anomaly detection primar-
+                                         ily as a discriminative problem and propose a discrimi-
+                                         natively trained reconstruction anomaly embedding model
+                                         (DRÆM). The proposed method learns a joint representa-
+                                         tion of an anomalous image and its anomaly-free recon-
+                                         struction, while simultaneously learning a decision bound-             Figure 1. DRÆM estimates the decision boundary between the
+                                         ary between normal and anomalous examples. The method                  normal an anomalous pixels solely by training on synthetic anoma-
+                                         enables direct anomaly localization without the need for               lies automatically generated on anomaly-free images (left) and
+                                         additional complicated post-processing of the network out-             generalizes to a variety of real-world anomalies (right). The re-
+                                         put and can be trained using simple and general anomaly                sult (Mo ) closely matches the ground truth (GT).
+                                         simulations. On the challenging MVTec anomaly detec-
+                                         tion dataset, DRÆM outperforms the current state-of-the-
+                                         art unsupervised methods by a large margin and even de-                larly challenging task, which is common in quality control
+                                         livers detection performance close to the fully-supervised             and surface defect localization applications.
+                                         methods on the widely used DAGM surface-defect detection                   In practice, anomaly appearances may significantly vary,
+                                         dataset, while substantially outperforming them in localiza-           and in applications like quality control, images with anoma-
+                                         tion accuracy.                                                         lies present are rare and manual annotation may be overly
+                                                                                                                time consuming. This leads to highly imbalanced training
+                                                                                                                sets, often containing only anomaly-free images. Signifi-
+                                         1. Introduction                                                        cant effort has thus been recently invested in designing ro-
+                                                                                                                bust surface anomaly detection methods that preferably re-
+                                            Surface anomaly detection addresses localization of im-             quire minimal supervision from manual annotation.
+                                         age regions that deviate from a normal appearance (Fig-                    Reconstructive methods, such as Autoencoders [5, 1, 2,
+                                         ure 1). A closely related general anomaly detection prob-              26] and GANs [24, 23], have been extensively explored
+                                         lem considers anomalies as entire images that significantly            since they enable learning of a powerful reconstruction sub-
+                                         differ from the non-anomalous training set images. In con-             space, using only anomaly-free images. Relying on poor re-
+                                         trast, in surface anomaly detection problems, the anomalies            construction capability of anomalous regions, not observed
+                                         occupy only a small fraction of image pixels and are typi-             in training, the anomalies can then be detected by thresh-
+                                         cally close to the training set distribution. This is a particu-       olding the difference between the input image and its re-
+
+
+                                                                                                            1
+                                                                          synthetic appearance, but rather learns a local-appearance-
+                                                                          conditioned distance function between the original and re-
+                                                                          constructed anomaly appearance, which generalizes well
+                                                                          over a range of real anomalies (see Figure 2, bottom).
+                                                                              To validate our hypothesis, we propose, as our main con-
+                                                                          tribution, a new deep surface anomaly detection network,
+                                                                          discriminatively trained in an end-to-end manner on syn-
+                                                                          thetically generated just-out-of-distribution patterns, which
+                                                                          do not have to faithfully represent the target-domain anoma-
+                                                                          lies. The network is composed of a reconstructive sub-
+                                                                          network, followed by a discriminative sub-network (Fig-
+                                                                          ure 3). The reconstructive sub-network is trained to learn
+                                                                          anomaly-free reconstruction, while the discriminative sub-
+                                                                          network learns a discriminative model over the joint appear-
+                                                                          ance of the original and reconstructed images, producing a
+                                                                          high-fidelity per-pixel anomaly detection map (Figure 1).
+                                                                              In contrast to related approaches that learn surrogate
+                                                                          generative tasks, the proposed model is trained discrimina-
+                                                                          tively, yet does not require the synthetic anomaly appear-
+                                                                          ances to closely match the anomalies at test time and out-
+                                                                          performs the recent, more complex, state-of-the-art meth-
+Figure 2. Autoencoders over-generalize to anomalies, while dis-           ods by a large margin.
+criminative approaches over-fit to the synthetic anomalies and do
+not generalize to real data. Our approach jointly discriminatively
+                                                                          2. Related work
+learns the reconstruction subspace and a hyper-plane over the joint
+original and reconstructed space using the simulated anomalies                Many surface anomaly detection methods focus on im-
+and leads to substantially better generalization to real anomalies.       age reconstruction and detect anomalies based on image re-
+                                                                          construction error [1, 2, 5, 24, 23, 26, 31]. Auto-encoders
+                                                                          are commonly used for image reconstruction [5]. In [1,
+construction. However, determining the presence of anoma-                 2, 26] auto-encoders are trained with adversarial losses.
+lies that are not substantially different from normal appear-             The anomaly score of the image is then based on the im-
+ance remains challenging, since these are often well recon-               age reconstruction quality or in the case of adversarially
+structed, as depicted in Figure 2, top-left.                              trained auto-encoders, the discriminator output. In [24, 23]
+    Recent improvements thus consider the difference be-                  a GAN [13] is trained to generate images that fit the train-
+tween deep features extracted from a general-purpose net-                 ing distribution. In [23] an encoder network is additionally
+work and a network specialized for anomaly-free im-                       trained that finds the latent representation of the input image
+ages [4]. Discrimination can also be formulated as a de-                  that minimizes the reconstruction loss when used as the in-
+viation from a dense clustering of non-anomalous textures                 put by the pretrained generator. The anomaly score is then
+within the deep subspace [22, 7], as forming such a com-                  based on the reconstruction quality and the discriminator
+pact subspace prevents anomalies from being mapped close                  output. In [29] an interpolation auto-encoder is trained to
+to anomaly-free samples. A common drawback of the gen-                    learn a dense representation space of in-distribution sam-
+erative methods is that they only learn the model from                    ples. The anomaly score is then based on a discrimina-
+anomaly-free data, and are not explicitly optimized for                   tor, trained to estimate the distance between the input-input
+discriminative anomaly detection, since positive examples                 and input-output joint distributions, however the approach
+(i.e., anomalies) are not available at training time. Syn-                to surface anomaly detection remains generative as the dis-
+thetic anomalies could be considered to train discriminative              criminator evaluates the reconstruction quality.
+segmentation methods [8, 21], but this leads to over-fitting                  Instead of the commonly used image space reconstruc-
+to synthetic appearances and results in a learned decision                tion, the reconstruction of pretrained network features can
+boundary that generalizes poorly to real anomalies (Figure                also be used for surface anomaly detection [4, 25]. Anoma-
+2, top-right).                                                            lies are detected based on the assumption that features of
+    We hypothesize that over-fitting can be substantially re-             a pre-trained network will not be faithfully reconstructued
+duced by training a discriminative model over the joint, re-              by another network trained only on anomaly-free images.
+constructed and original, appearance along with the recon-                Alternatively [20, 11] propose surface anomaly detection as
+struction subspace. This way the model does not overfit to                identifying significant deviations from a Gaussian fitted to
+
+
+                                                                      2
+anomaly-free features of a pre-trained network. This re-            Ir , centered at image coordinates (i, j). The reconstruction
+quires a unimodal distribution of the anomaly-free visual           loss is therefore:
+features which is problematic on diverse datasets. [16] pro-
+pose a one-class variational auto-encoder gradient-based at-                Lrec (I, Ir ) = λLSSIM (I, Ir ) + l2 (I, Ir ),    (2)
+tention maps as output anomaly maps. However the method
+is sensitive to subtle anomalies close to the normal sample         where λ is a loss balancing hyper-parameter.
+distribution.                                                          Note that an additional training signal is acquired
+    Recently Patch-based one-class classification methods           from the downstream discriminative network (Section 3.2),
+have been considered for surface anomaly detection [30].            which performs anomaly localization by detecting the re-
+These are based on one-class methods [22, 7] which at-              construction difference.
+tempt to estimate a decision boundary around anomaly-free           3.2. Discriminative sub-network
+data that separates it from anomalous samples by assum-
+ing a unimodal distribution of the anomaly-free data. This              The discriminative sub-network uses U-Net [21]-like
+assumption is often violated in surface anomaly data.               architecture. The sub-network input Ic is defined as
+                                                                    the channel-wise concatenation of the reconstructive sub-
+3. DRÆM                                                             network output Ir and the input image I. Due to the
+                                                                    normality-restoring property of the reconstructive sub-
+   The proposed discriminative joint reconstruction-                network, the joint appearance of I and Ir differs signifi-
+anomaly embedding method (DRÆM) is composed from                    cantly in anomalous images, providing the information nec-
+a reconstructive and a discriminative sub-networks (see             essary for anomaly segmentation. In reconstruction-based
+Figure 3). The reconstructive sub-network is trained                anomaly detection methods anomaly maps are obtained
+to implicitly detect and reconstruct the anomalies with             using similarity functions such as SSIM [27] to compare
+semantically plausible anomaly-free content, while keeping          the original image to its reconstruction, however a surface
+the non-anomalous regions of the input image unchanged.             anomaly detection-specific similarity measure is difficult
+Simultaneously, the discriminative sub-network learns a             to hand-craft. In contrast, the discriminative sub-network
+joint reconstruction-anomaly embedding and produces ac-             learns the appropriate distance measure automatically. The
+curate anomaly segmentation maps from the concatenated              network outputs an anomaly score map Mo of the same size
+reconstructed and original appearance. Anomalous training           as I. Focal Loss [14] (Lseg ) is applied on the discriminative
+examples are created by a conceptually simple process               sub-network output to increase robustness towards accurate
+that simulates anomalies on anomaly-free images. This               segmentation of hard examples.
+anomaly generation method provides an arbitrary amount                  Considering both the segmentation and the reconstruc-
+of anomalous samples as well as pixel-perfect anomaly               tive objectives of the two sub-networks, the total loss used
+segmentation maps which can be used for training the                in training DRÆM is
+proposed method without real anomalous samples.
+                                                                       L(I, Ir , Ma , M ) = Lrec (I, Ir ) + Lseg (Ma , M ),   (3)
+3.1. Reconstructive sub-network
+   The reconstructive sub-network is formulated as an               where Ma and M are the ground truth and the output
+encoder-decoder architecture that converts the local patterns       anomaly segmentation masks, respectively.
+of an input image into patterns closer to the distribution of
+                                                                    3.3. Simulated anomaly generation
+normal samples. The network is trained to reconstruct the
+original image I from an artificially corrupted version Ia              DRÆM does not require simulations to realistically re-
+obtained by a simulator (see Section 3.3).                          flect the real anomaly appearance in the target domain,
+   An l2 loss is often used in reconstruction based anomaly         but rather to generate just-out-of-distribution appearances,
+detection methods [1, 2], however this assumes an indepen-          which allow learning the appropriate distance function to
+dence between neighboring pixels, therefore a patch based           recognize the anomaly by its deviation from normality. The
+SSIM [27] loss is additionally used as in [5, 31]:                  proposed anomaly simulator follows this paradigm.
+                                                                        A noise image is generated by a Perlin noise genera-
+                        H W
+                    1 XX                                           tor [18] to capture a variety of anomaly shapes (Figure 4,
+ LSSIM (I, Ir ) =              1 − SSIM I, Ir (i,j) , (1)
+                    Np i=1 j=1                                      P ) and binarized by a threshod sampled uniformly at ran-
+                                                                    dom (Figure 4, Ma ) into an anomaly map Ma . The anomaly
+where H and W are the height and width of image I,                  texture source image A is sampled from an anomaly source
+respectively. Np is equal to the number of pixels in                image dataset which is unrelated to the input image dis-
+I. Ir is the reconstructed image output by the network.             tribution (Figure 4, A). Random augmentation sampling,
+SSIM (I, Ir )(i,j) is the SSIM value for patches of I and           inspired by RandAugment [10], is then applied by a set
+
+
+                                                                3
+                          Reconstructive sub-network                    Discriminative sub-network
+
+
+
+
+                                   Anomaly generation
+
+
+
+
+Figure 3. The anomaly detection process of the proposed method. First anomalous regions are implicitly detected and inpainted by the
+reconstructive sub-network trained using Lrec . The output of the reconstructive sub-network and the input image are then concatenated
+and fed into the discriminative sub-network. The segmentation network, trained using the Focal loss Lf ocal [14], localizes the anomalous
+region and produces an anomaly map. The image level anomaly score η is acquired from the anomaly score map.
+
+
+of 3 random augmentation functions sampled from the                                              Ma               Ma
+
+set: {posterize, sharpness, solarize, equalize, brightness
+change, color change, auto-contrast}. The augmented tex-
+ture image A is masked with the anomaly map Ma and
+blended with I to create anomalies that are just-out-of-
+                                                                               A
+distribution, and thus help tighten the decision boundary in
+the trained network. The augmented training image Ia is                                              A Ma   Ma
+
+therefore defined as
+   Ia = M a      I + (1 − β)(Ma       I) + β(Ma         A),   (4)
+                                                                                                                          Ma
+where M a is the inverse of Ma ,          is the element-wise
+multiplication operation and β is the opacity parameter in
+blending. This parameter is sampled uniformly from an in-
+terval, i.e., β ∈ [0.1, 1.0]. The randomized blending and
+augmentation afford generating diverse anomalous images
+from as little as a single texture (see Figure 5).
+                                                                        Figure 4. Simulated anomaly generation process. The binary
+    The above described simulator thus generates training
+                                                                        anomaly mask Ma is generated from Perlin noise P . The anoma-
+sample triplets containing the original anomaly-free image              lous regions are sampled from A according to Ma and placed on
+I, the augmented image containing simulated anomalies Ia                the anomaly free image I to generate the anomalous image Ia .
+and the pixel-perfect anomaly mask Ma .
+3.4. Surface anomaly localization and detection
+   The output of the discriminative sub-network is a pixel-
+level anomaly detection mask Mo , which can be interpreted
+in a straight-forward way for the image-level anomaly score
+estimation, i.e., whether an anomaly is present in the image.
+   First, Mo is smoothed by a mean filter convolution layer
+to aggregate the local anomaly response information. The
+final image-level anomaly score η is computed by taking the
+maximum value of the smoothed anomaly score map:
+                                         
+                  η = max Mo ∗ fsf ×sf ,                  (5)
+                                                                        Figure 5. The original anomaly source image (left) can be aug-
+where fsf ×sf is a mean filter of size sf × sf and ∗ is the             mented several times (center) to generate a wide variety of simu-
+convolution operator. In a preliminary study, we trained a              lated anomalous regions (right).
+classification network for the image-level anomaly classi-
+fication, but did not observe improvements over the direct
+score estimation method (5).
+
+
+                                                                    4
+4. Experiments                                                             Class      [1]   [26]    [4]   [31]   [20]   [11]   DRÆM
+                                                                           bottle    79.4   98.3   99.0   99.9   100    99.9     99.2
+   DRÆM is extensively evaluated and compared with the                   capsule     72.1   68.7   86.1   88.4   92.3   91.3    98.5
+recent state-of-the-art on unsupervised surface anomaly de-                 grid     74.3   86.7   81.0   99.6   92.9   96.7    99.9
+                                                                          leather    80.8   94.4   88.2   100    100    100      100
+tection and localization. Additionally, individual compo-
+                                                                            pill     67.1   76.8   87.9   83.8   83.4   93.3    98.9
+nents of the proposed method and the effectiveness of train-                tile     72.0   96.1   99.1   98.7   97.4   98.1    99.6
+ing on simulated anomalies are evaluated by an ablation                 transistor   80.8   79.4   81.8   90.9   95.9   97.4    93.1
+study. Finally, the results are placed in a broader perspec-              zipper     74.4   78.1   91.9   98.1   97.9   90.3     100
+tive by comparing DRÆM with state-of-the-art weakly-                       cable     71.1   66.5   86.2   81.9   94.0   92.7     91.8
+                                                                           carpet    82.1   90.3   91.6   84.2   95.5   99.8    97.0
+supervised and fully-supervised surface-defect detection                 hazelnut    87.4   100    93.1   83.3   98.7   92.0    100.0
+methods.                                                                metal nut    69.4   81.5   82.0   88.5   93.1   98.7     98.7
+                                                                           screw     100    100    54.9   84.5   81.2   85.8    93.9
+4.1. Comparison with unsupervised methods                              toothbrush    70.0   95.0   95.3   100    95.8   96.1     100
+                                                                           wood      92.0   97.9   97.7   93.0   97.6   99.2    99.1
+    DRÆM is evaluated on the recent challenging MVTec
+                                                                            avg      78.2   87.3   87.7   91.7   94.4   95.5    98.0
+anomaly detection dataset [3], which has been established
+as a standard benchmark dataset for evaluating unsuper-              Table 1. Results for the task of surface anomaly detection on the
+vised surface anomaly detection methods. We evaluate                 MVTec dataset (AUROC). An average score over all classes is also
+DRÆM on the tasks of surface anomaly detection and lo-               reported the last row (avg).
+calisation. The MVTec dataset contains 15 object classes
+with a diverse set anomalies which enables a general eval-
+uation of surface anomaly detection methods. Anomalous               tion methods, achieving the highest AUROC in 9 out of
+examples of the MVTec dataset are shown in Figure 8. For             15 classes and achieving comparable results in the other
+evaluation, the standard metric in anomaly detection, AU-            classes. It surpasses the previous best state-of-the-art ap-
+ROC, is used. Image-level AUROC is used for anomaly de-              proach by 2.5 percentage points. The reduced performance
+tection and a pixel-based AUROC for evaluating anomaly               in some classes could be explained by particularly diffi-
+localization [5, 24, 17, 26]. The AUROC, however, does               cult anomalies that are close to the normal image distri-
+not reflect the localization accuracy well in surface anomaly        bution. The absence of a part of the object is especially
+detection setups, where only a small fraction of pixels are          difficult to detect. Regions, where the object features are
+anomalous. The reason is that false positive rate is domi-           missing, usually contain other commonly occurring fea-
+nated by the a-priori very high number of non-anomalous              tures. This makes such anomalies difficult to distinguish
+pixels and is thus kept low despite of false positive detec-         from anomaly-free regions. An example of this can be seen
+tions. We thus additionally report the pixel-wise average            in Figure 6, where some of the transistor leads had been
+precision metric (AP), which is more appropriate for highly          cut. The ground truth marks the area where the broken lead
+imbalanced classes and in particular for surface anomaly             should be as anomalous. DRÆM only detects anomalous
+detection, where the precision plays an important role.              features in a small region of the cut lead, as the background
+    In our experiments, the network is trained for 700 epochs        features are common during training.
+on the MVTec anomaly detection dataset [3]. The learning                Anomaly Localization. Table 2 compares DRÆM to
+rate is set to 10−4 and is multiplied by 0.1 after 400 and 600       the recent state-of-the-art on the task of pixel-level surface
+epochs. Image rotation in the range of (−45, 45) degrees is          anomaly detection. DRÆM achieves comparable results to
+used as a data augmentation method on anomaly free im-               the previous best-performing methods in terms of AUROC
+ages during training to alleviate overfitting due to the rela-       scores and surpasses the state-of-the-art by 13.4 percentage
+tively small anomaly-free training set size. The Describable         points in terms of AP. A better AP score is achieved in 11
+Textures Dataset [9] is used as the anomaly source dataset.          out of 15 classes and is comparable to the state-of-the-art
+    A number of obtained qualitative examples are presented          in other classes. A qualitative comparison with the state-of-
+in Figure 8. As one can observe, the obtained anomaly                the-art method Uninformed Students [4] and PaDim [11] is
+masks are very detailed and resemble the given ground                shown in Figure 7. DRÆM achieves a significant improve-
+truth labels to a high degree of accuracy. Consequently,             ment in anomaly segmentation accuracy.
+DRÆM achieves state-of-the-art quantitative results across              A detailed inspection showed that some of the detection
+all MVTec classes for surface anomaly detection as well as           errors can be attributed to the inaccurate ground truth labels
+localization.                                                        on ambiguous anomalies. An example of this is shown in
+    Surface Anomaly Detection. Table 1 quantitatively                Figure 6, where the ground truth covers the entire surface
+compares DRÆM with recent approaches on the task                     of the pill, yet only the yellow dots are anomalous. DRÆM
+of image-level surface anomaly detection. DRÆM sig-                  produces an anomaly map that correctly localizes the yel-
+nificantly outperforms all recent surface anomaly detec-             low dots, but the discrepancy with the ground truth mask
+
+
+                                                                 5
+                                                                             4.2. Ablation Study
+                                                                                 The DRÆM design choices are analyzed by groups of
+                                                                             experiments evaluating (i) the method architecture, (ii) the
+                                                                             choice of anomaly appearance patterns and (iii) low pertur-
+                                                                             bation example generation. Results are visually grouped by
+                                                                             shades of gray in Table 3.
+                                                                                 Architecture. The DRÆM reconstructive sub-network
+Figure 6. The original image (a) contains anomalies which are dif-           impact on the downstream surface anomaly detection per-
+ficult to mark in the ground truth mask (b) which causes a dis-              formance is evaluated by removing it from the pipeline and
+crepancy between the ground truth and the output anomaly map                 training the discriminative sub-network alone. The results
+(c,d).                                                                       are shown in Table 3, experiment Disc. Note a reduction in
+                                                                             performance in comparison to the full DRÆM architecture
+                                                                             (Table 3, experiment DRÆM). The performance drop is due
+                                                                             to overfitting of the discriminative sub-network to the sim-
+                                                                             ulated anomalies, which are not a faithful representation of
+                                                                             the real ones.
+                                                                                 Next, the discriminative power of the reconstructive sub-
+                                                                             network alone is analyzed by evaluating it as an auto-
+                                                                             encoder-based surface anomaly detector. The reconstructed
+                                                                             image output of the sub-network is compared to the input
+                                                                             image using the SSIM function [27] to generate the anomaly
+                                                                             map. The results of this approach are shown in Table 3,
+                                                                             experiment Recon.-AE. Recon.-AE outperforms the recent
+                                                                             auto-encoder-based surface anomaly detection method AE-
+                                                                             SSIM[5] (see results in Table 2) This suggests that sim-
+                                                                             ulated anomaly training introduces additional information
+Figure 7. The anomalous images are shown in the first row. The               into the auto-encoder-based training, but judging by the per-
+middle three rows show the anomaly maps generated by our imple-              formance gap to DRÆM, the SSIM similarity function may
+mentation of Uninformed Students [4], PaDim [11] and DRÆM,
+                                                                             not be optimal for extraction of the anomaly information.
+respectively. The last row shows the direct anomaly map output of
+                                                                             Indeed, using the recently proposed similarity function MS-
+DRÆM.
+                                                                             GMS [31] (Recon.-AEM SGM S ) improves the performance,
+                                                                             but the results are still significantly worse than when using
+increases the performance error. These annotation ambigu-                    the entire DRÆM architecture, which indicates that both
+ities also impact the AP score of the evaluated methods.                     reconstructive and discriminative parts are required for op-
+                                                                             timal results.
+       Class       US[4]       RIAD[31]      PaDim[11]      DRÆM                 To further emphasize the contribution of the DRÆM
+       bottle    97.8 / 74.2   98.4 / 76.4   98.2 / 77.3   99.1 / 86.5       backbone, we replace it entirely by the recent state-of-the-
+     capsule     96.8 / 25.9   92.8 / 38.2   98.6 / 46.7   94.3 / 49.4       art supervised discriminative surface anomaly detection net-
+        grid     89.9 / 10.1   98.8 / 36.4   97.1 / 35.7   99.7 / 65.7
+      leather    97.8 / 40.9   99.4 / 49.1   99.0 / 53.5   98.6 / 75.3
+                                                                             work [6] and re-train with the simulated anomalies (Table 3,
+        pill     96.5 / 62.0   95.7 / 51.6   95.7 / 61.2   97.6 / 48.5       Božič et al.). Performance substantially drops, which fur-
+        tile     92.5 / 65.3   89.1 / 52.6   94.1 / 52.4   99.2 / 92.3       ther supports the power of learning the anomaly deviation
+    transistor   73.7 / 27.1   87.7 / 39.2   97.6 / 72.0   90.9 / 50.7       extent from normality rather than the anomaly or normality
+      zipper     95.6 / 36.1   97.8 / 63.4   98.4 / 58.2   98.8 / 81.5       appearance.
+       cable     91.9 / 48.2   84.2 / 24.4   96.7 / 45.4   94.7 / 52.4
+       carpet    93.5 / 52.2   96.3 / 61.4   99.0 / 60.7   95.5 / 53.5           Anomaly appearance patterns. DRÆM is re-trained
+     hazelnut    98.2 / 57.8   96.1 / 33.8   98.1 / 61.1   99.7 / 92.9       using ImageNet [12] as the texture source in the anomaly
+    metal nut    97.2 / 83.5   92.5 / 64.3   97.3 / 77.4   99.5 / 96.3       simulator to study the influence of the anomaly generation
+       screw      97.4 / 7.8   98.8 / 43.9   98.4 / 21.7   97.6 / 58.2       dataset (DRÆMImageN et in Table 3). Results are compa-
+   toothbrush    97.9 / 37.7   98.9 / 50.6   98.8 / 54.7   98.1 / 44.7
+       wood      92.1 / 53.3   85.8 / 38.2   94.1 / 46.3   96.4 / 77.7
+                                                                             rable to using the much smaller DTD [9] dataset. Figure 9
+        avg      93.9 / 45.5   94.2 / 48.2   97.4 / 55.0   97.3 / 68.4       shows the performance at various anomaly source dataset
+                                                                             sizes. Results suggest that the augmentation and opacity
+Table 2. Results for the task of anomaly localization on the MVTec           randomization substantially contribute to performance al-
+dataset (AUROC / AP).                                                        lowing remarkably small number of texture images (less
+                                                                             than 10). As an extreme case, the anomaly textures are
+
+
+                                                                         6
+Figure 8. Qualitative examples. The original image, the anomaly map overlay, the anomaly map and the ground truth map are shown.
+
+                                      Architecture                             Anomaly Generation                            Results
+              Method            Recon. Net. Discr. Net.   Augmentation       β  ImageNet DTD Perlin       Rectangle   Det.       Loc.
+                Disc.                              X          X              X              X     X                   93.9    92.7 / 62.5
+            Recon.-AE               X                         X              X              X     X                   83.9    89.7 / 47.5
+         Recon.-AEM SGM S           X                         X              X              X     X                   90.7    93.4 / 50.9
+           Božič et al. [6]                                 X              X              X     X                   92.8    93.9 / 60.7
+          DRÆMImageN et             X            X            X              X     X              X                   97.9    97.0 / 67.9
+            DRÆMcolor               X            X                           X                    X                   96.2    92.6 / 56.5
+            DRÆMrect                X            X             X             X              X                 X       96.9    96.8 / 65.1
+           DRÆMno aug               X            X                                          X     X                   97.4    94.5 / 64.3
+           DRÆMimg aug              X            X             X                            X     X                   97.4    95.0 / 64.5
+             DRÆMβ                  X            X                           X              X     X                   97.9    97.1 / 68.4
+              DRÆM                  X            X             X             X              X     X                   98.0    97.3 / 68.4
+
+Table 3. Surface anomaly detection (Det.) and localization (Loc.) experiments of the ablation study grouped by shades of gray into
+(i) method architecture, (ii) anomaly source dataset, (iii) hard simulated anomaly generation, (iv) simulated anomaly shape, and (v) the
+performance of DRÆM for reference.
+
+
+generated as homogeneous regions of a randomly sampled                           sponsible for tightening the decision boundary around the
+color (DRÆMcolor ). Note that DRÆMcolor still achieves                           anomaly-free training distribution. Table 3 reports the re-
+state-of-the-art results, further suggesting that DRÆM does                      sults of DRÆM variants trained (i) without image augmen-
+not require simulations to closely match the real anomalies.                     tation and opacity randomization (DRÆMno aug ), (ii) using
+   The impact of the anomaly shape generator is evalu-                           only image augmentation (DRÆMimg aug ) and (iii) using
+ated by replacing the Perlin noise generator by a rectangu-                      only opacity randomization (DRÆMβ ). There is a signif-
+lar region generator. The anomaly mask is thus generated                         icant localization performance gap between DRÆMno aug
+by sampling multiple rectangular areas for the anomalous                         and DRÆM, however, this can be significantly narrowed
+regions (DRÆMrect in Table 3). Training on rectangular                           by using the opacity randomization in training even without
+anomalies causes only a slight performance drop and sug-                         image data augmentation.
+gests that the simulated anomaly shape does not have to be
+realistic to generalize well to real world anomalies. Exam-                      4.3. Comparison with supervised methods
+ples of anomalies generated in anomaly appearance ablation                           Supervised methods require anomaly annotations at
+experiments are shown in Figure 10.                                              training time and cannot be evaluated on MVTec. We
+   Low perturbation examples. The anomaly source im-                             thus compare DRÆM with the supervised methods on the
+age augmentation and the opacity randomization are re-                           DAGM dataset [28] that contains 10 textured object classes
+
+
+                                                                         7
+                                                                                                       Methods          AUROC   TPR    TNR    CA
+                                                                                                     RIAD [31]           78.6   79.2   69.1   70.4
+                                                                                          Unsup.        US [4]           72.5   72.6   65.3   66.2
+                                                                                                     MAD [20]            82.4   78.7   85.7   66.2
+                                                                                                     PaDim [11]          95.0   83.3   97.5   95.7
+                                                                                                       DRÆM              99.0   96.5   99.4   98.5
+                                                                                                     CADN [32]            -      -      -     89.1
+                                                                                                   Rački et al. [19]    99.6   99.9   99.5    -
+                                                                                          Sup.      Lin et al. [15]      99.0   99.4   99.9    -
+                                                                                                   Božič et al. [6]    100    100    100    100
+                                                                                 Table 4. DRÆM outperforms unsupervised methods on DAGM
+                                                                                 dataset and performs on par with fully supervised ones.
+
+
+
+
+Figure 9. DRÆM achieves a remarkable detection and localization
+performance already at as low as 10 texture source images in the
+simulator when augmentation is applied.
+
+
+
+
+Figure 10. Anomalies simulated using the DTD [9] (DRÆM),
+ImageNet [12] (DRÆMImageN et ), homogeneous color regions
+(DRÆMcolor ) and rectangular masks (DRÆMrect ), from left to
+right.                                                                           Figure 11. Supervised methods replicate the approximate ground
+                                                                                 truth training annotations, leading to a low localization accuracy.
+                                                                                 DRÆM does not use the ground truth, yet produces far better lo-
+with small anomalies visually very similar to the back-                          calization.
+ground, which makes the dataset particularly challenging
+for the unsupervised methods.
+    DRÆM is trained only on anomaly-free training samples                        5. Conclusion
+using the same parameters as in previous experiments. The
+                                                                                    A discriminative end-to-end trainable surface anomaly
+standard evaluation protocol on this dataset [19, 32, 15, 6]
+                                                                                 detection and localization method DRÆM was presented.
+is used – the challenge is to classify whether the image con-
+                                                                                 DRÆM outperforms the current state-of-the-art on the
+tains the anomaly; localization accuracy is not measured,
+                                                                                 MVTec dataset [3] by 2.5 AUROC points on the surface
+since the anomalies are only coarsely labeled.
+                                                                                 anomaly detection task and by 13.5 AP points on the
+    Table 4 shows that the best fully supervised methods
+                                                                                 localization task. On the DAGM dataset [28], DRÆM
+nearly perfectly classify anomalous images, while the state-
+                                                                                 delivers anomalous image classification accuracy close to
+of-the-art unsupervised methods like RIAD [31] and US [4]
+                                                                                 fully supervised methods, while outperforming them in
+struggle with subtle anomalies on highly textured regions1 .
+                                                                                 localization accuracy. This is a remarkable result since
+DRÆM significantly outperforms these methods, and even
+                                                                                 DRÆM is not trained on real anomalies. In fact, a detailed
+the weakly supervised CADN [32] by a large margin, ob-
+                                                                                 analysis shows that our paradigm of learning a joint
+taining classification performance close to the best fully-
+                                                                                 reconstruction-anomaly embedding through a reconstruc-
+supervised methods, which is a remarkable result.
+                                                                                 tive sub-network significantly improves the results over
+    Furthermore, DRÆM outperforms all supervised meth-
+                                                                                 standard methods and that an accurate decision boundary
+ods in terms of anomaly localization accuracy on this
+                                                                                 can be well estimated by learning the extent of deviation
+dataset. Since the training images are only coarsely anno-
+                                                                                 from reconstruction on simple simulations rather than
+tated with ellipses that approximately cover the surface de-
+                                                                                 learning either the normality or real anomaly appearance.
+fects and contain background, the supervised methods pro-
+duce inaccurate localization in test images as well. In con-
+trast, DRÆM does not use the labels at all, and thus pro-
+duces more accurate anomaly maps, as shown in Figure 11.                         References
+    1 Please see the supplementary material for additional qualitative re-        [1] Samet Akcay, Amir Atapour-Abarghouei, and Toby P
+sults.                                                                                Breckon. GANomaly: Semi-supervised anomaly detection
+
+
+                                                                             8
+     via adversarial training. In Asian Conference on Computer               in neural information processing systems, pages 2672–2680,
+     Vision, pages 622–637. Springer, 2018. 1, 2, 3, 5                       2014. 2
+ [2] Samet Akçay, Amir Atapour-Abarghouei, and Toby P                  [14] Tsung-Yi Lin, Priya Goyal, Ross Girshick, Kaiming He, and
+     Breckon. Skip-GANomaly: Skip connected and adversari-                   Piotr Dollár. Focal loss for dense object detection. In Pro-
+     ally trained encoder-decoder anomaly detection. In 2019 In-             ceedings of the IEEE international conference on computer
+     ternational Joint Conference on Neural Networks (IJCNN),                vision, pages 2980–2988, 2017. 3, 4
+     pages 1–8. IEEE, jul 2019. 1, 2, 3                                 [15] Zesheng Lin, Hongxia Ye, Bin Zhan, and Xiaofeng Huang.
+ [3] Paul Bergmann, Michael Fauser, David Sattlegger, and                    An efficient network for surface defect detection. Applied
+     Carsten Steger. MVTec AD – A Comprehensive Real-World                   Sciences, 10(17):6085, 2020. 8
+     Dataset for Unsupervised Anomaly Detection. In Proceed-            [16] Wenqian Liu, Runze Li, Meng Zheng, Srikrishna Karanam,
+     ings of the IEEE Conference on Computer Vision and Pattern              Ziyan Wu, Bir Bhanu, Richard J Radke, and Octavia Camps.
+     Recognition, pages 9592–9600, 2019. 5, 8                                Towards visually explaining variational autoencoders. In
+ [4] Paul Bergmann, Michael Fauser, David Sattlegger, and                    Proceedings of the IEEE/CVF Conference on Computer Vi-
+     Carsten Steger. Uninformed students: Student-teacher                    sion and Pattern Recognition, pages 8642–8651, 2020. 3
+     anomaly detection with discriminative latent embeddings. In        [17] Wen Liu, Weixin Luo, Dongze Lian, and Shenghua Gao. Fu-
+     Proceedings of the IEEE/CVF Conference on Computer Vi-                  ture frame prediction for anomaly detection–a new baseline.
+     sion and Pattern Recognition, pages 4183–4192, 2020. 2, 5,              In Proceedings of the IEEE Conference on Computer Vision
+     6, 8                                                                    and Pattern Recognition, pages 6536–6545, 2018. 5
+ [5] Paul Bergmann, Sindy Löwe, Michael Fauser, David Sattleg-         [18] Ken Perlin. An image synthesizer. ACM Siggraph Computer
+     ger, and Carsten Steger. Improving unsupervised defect seg-             Graphics, 19(3):287–296, 1985. 3
+     mentation by applying structural similarity to autoencoders.       [19] Domen Rački, Dejan Tomaževič, and Danijel Skočaj. A
+     In 14th International Joint Conference on Computer Vision,              compact convolutional neural network for textured surface
+     Imaging and Computer Graphics theory and Applications,                  anomaly detection. In 2018 IEEE Winter Conference on Ap-
+     volume 5, pages 372–380, 2018. 1, 2, 3, 5, 6                            plications of Computer Vision (WACV), pages 1331–1339,
+ [6] Jakob Božič, Domen Tabernik, and Danijel Skočaj. End-to-             2018. 8
+     end training of a two-stage neural network for defect detec-       [20] Oliver Rippel, Patrick Mertens, and Dorit Merhof. Modeling
+     tion. 25th International Conference on Pattern Recognition              the distribution of normal data in pre-trained deep features
+     ICPR, 2020. 6, 7, 8                                                     for anomaly detection. ICPR, 2020. 2, 5, 8
+ [7] Raghavendra Chalapathy, Aditya Krishna Menon, and San-             [21] Olaf Ronneberger, Philipp Fischer, and Thomas Brox. U-
+     jay Chawla. Anomaly detection using one-class neural net-               net: Convolutional networks for biomedical image segmen-
+     works. arXiv preprint arXiv:1802.06360, 2018. 2, 3                      tation. In International Conference on Medical image com-
+ [8] Liang-Chieh Chen, George Papandreou, Florian Schroff, and               puting and computer-assisted intervention, pages 234–241.
+     Hartwig Adam. Rethinking atrous convolution for seman-                  Springer, 2015. 2, 3
+     tic image segmentation. arXiv preprint arXiv:1706.05587,           [22] Lukas Ruff, Robert Vandermeulen, Nico Goernitz, Lucas
+     2017. 2                                                                 Deecke, Shoaib Ahmed Siddiqui, Alexander Binder, Em-
+ [9] Mircea Cimpoi, Subhransu Maji, Iasonas Kokkinos, Sammy                  manuel Müller, and Marius Kloft. Deep one-class classifi-
+     Mohamed, and Andrea Vedaldi. Describing textures in the                 cation. In Proceedings of the 35th International Conference
+     wild. In Proceedings of the IEEE Conference on Computer                 on Machine Learning, volume 80, pages 4393–4402, 2018.
+     Vision and Pattern Recognition, pages 3606–3613, 2014. 5,               2, 3
+     6, 8                                                               [23] Thomas Schlegl, Philipp Seeböck, Sebastian M Waldstein,
+[10] Ekin D Cubuk, Barret Zoph, Jonathon Shlens, and Quoc V                  Georg Langs, and Ursula Schmidt-Erfurth. f-anogan: Fast
+     Le. Randaugment: Practical automated data augmenta-                     unsupervised anomaly detection with generative adversarial
+     tion with a reduced search space. In Proceedings of the                 networks. Medical image analysis, 54:30–44, 2019. 1, 2
+     IEEE/CVF Conference on Computer Vision and Pattern                 [24] Thomas Schlegl, Philipp Seeböck, Sebastian M Waldstein,
+     Recognition Workshops, pages 702–703, 2020. 3                           Ursula Schmidt-Erfurth, and Georg Langs. Unsupervised
+[11] Thomas Defard, Aleksandr Setkov, Angelique Loesch, and                  anomaly detection with generative adversarial networks to
+     Romaric Audigier. Padim: a patch distribution modeling                  guide marker discovery. In International Conference on In-
+     framework for anomaly detection and localization. In 1st In-            formation Processing in Medical Imaging, pages 146–157.
+     ternational Workshop on Industrial Machine Learning, ICPR               Springer, 2017. 1, 2, 5
+     2020, 2020. 2, 5, 6, 8                                             [25] Yong Shi, Jie Yang, and Zhiquan Qi. Unsupervised anomaly
+[12] Jia Deng, Wei Dong, Richard Socher, Li-Jia Li, Kai Li,                  segmentation via deep feature reconstruction. Neurocomput-
+     and Li Fei-Fei. Imagenet: A large-scale hierarchical image              ing, 424:9–22, 2021. 2
+     database. In 2009 IEEE conference on computer vision and           [26] Ta-Wei Tang, Wei-Han Kuo, Chien-Fang Lan, Jauh-Hsiang
+     pattern recognition, pages 248–255. Ieee, 2009. 6, 8                    nad Ding, Hakiem Hsu, and Hong-Tsu Young. Anomaly de-
+[13] Ian Goodfellow, Jean Pouget-Abadie, Mehdi Mirza, Bing                   tection neural network with dual auto-encoders gan and its
+     Xu, David Warde-Farley, Sherjil Ozair, Aaron Courville, and             industrial inspection applications. Sensors, 20(12), 2020. 1,
+     Yoshua Bengio. Generative adversarial nets. In Advances                 2, 5
+
+
+                                                                    9
+[27] Zhou Wang, Alan C Bovik, Hamid R Sheikh, and Eero P Si-
+     moncelli. Image quality assessment: from error visibility to
+     structural similarity. IEEE transactions on image processing,
+     13(4):600–612, 2004. 3, 6
+[28] M Wieler and T Hahn. Weakly supervised learning for in-
+     dustrial optical inspection, 2007. 7, 8
+[29] Yexin Wu, Yogesh Balaji, Bhanukiran Vinzamuri, and Soheil
+     Feizi. Mirrored autoencoders with simplex interpolation for
+     unsupervised anomaly detection. Proceedings of the Euro-
+     pean Conference on Computer Vision (ECCV), 2020. 2
+[30] Jihun Yi and Sungroh Yoon. Patch svdd: Patch-level svdd
+     for anomaly detection and segmentation. In Proceedings of
+     the Asian Conference on Computer Vision, 2020. 3
+[31] Vitjan Zavrtanik, Matej Kristan, and Danijel Skočaj. Recon-
+     struction by inpainting for visual anomaly detection. Pattern
+     Recognition, 2020. 2, 3, 5, 6, 8
+[32] Jiabin Zhang, Hu Su, Wei Zou, Xinyi Gong, Zhengtao
+     Zhang, and Fei Shen. Cadn: A weakly supervised learning-
+     based category-aware object detection network for surface
+     defect detection. Pattern Recognition, 109:107571, 2021. 8
+
+
+
+
+                                                                     10
+

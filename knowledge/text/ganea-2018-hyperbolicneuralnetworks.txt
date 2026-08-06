@@ -1,0 +1,1215 @@
+                                                                       Hyperbolic Neural Networks
+
+
+                                                          Octavian-Eugen Ganea∗                            Gary Bécigneul∗
+                                                       Department of Computer Science               Department of Computer Science
+                                                                ETH Zürich                                   ETH Zürich
+                                                             Zurich, Switzerland                          Zurich, Switzerland
+                                                       octavian.ganea@inf.ethz.ch                   gary.becigneul@inf.ethz.ch
+
+
+
+
+arXiv:1805.09112v2 [cs.LG] 28 Jun 2018
+                                                                                   Thomas Hofmann
+                                                                             Department of Computer Science
+                                                                                      ETH Zürich
+                                                                                   Zurich, Switzerland
+                                                                             thomas.hofmann@inf.ethz.ch
+
+
+
+                                                                                         Abstract
+                                                      Hyperbolic spaces have recently gained momentum in the context of machine
+                                                      learning due to their high capacity and tree-likeliness properties. However, the
+                                                      representational power of hyperbolic geometry is not yet on par with Euclidean
+                                                      geometry, mostly because of the absence of corresponding hyperbolic neural
+                                                      network layers. This makes it hard to use hyperbolic embeddings in downstream
+                                                      tasks. Here, we bridge this gap in a principled manner by combining the formalism
+                                                      of Möbius gyrovector spaces with the Riemannian geometry of the Poincaré model
+                                                      of hyperbolic spaces. As a result, we derive hyperbolic versions of important deep
+                                                      learning tools: multinomial logistic regression, feed-forward and recurrent neural
+                                                      networks such as gated recurrent units. This allows to embed sequential data and
+                                                      perform classification in the hyperbolic space. Empirically, we show that, even if
+                                                      hyperbolic optimization tools are limited, hyperbolic sentence embeddings either
+                                                      outperform or are on par with their Euclidean variants on textual entailment and
+                                                      noisy-prefix recognition tasks.
+
+
+                                         1       Introduction
+                                         It is common in machine learning to represent data as being embedded in the Euclidean space Rn . The
+                                         main reason for such a choice is simply convenience, as this space has a vectorial structure, closed-
+                                         form formulas of distance and inner-product, and is the natural generalization of our intuition-friendly,
+                                         visual three-dimensional space. Moreover, embedding entities in such a continuous space allows to
+                                         feed them as input to neural networks, which has led to unprecedented performance on a broad range
+                                         of problems, including sentiment detection [15], machine translation [3], textual entailment [22] or
+                                         knowledge base link prediction [20, 6].
+                                         Despite the success of Euclidean embeddings, recent research has proven that many types of com-
+                                         plex data (e.g. graph data) from a multitude of fields (e.g. Biology, Network Science, Computer
+                                         Graphics or Computer Vision) exhibit a highly non-Euclidean latent anatomy [8]. In such cases, the
+                                         Euclidean space does not provide the most powerful or meaningful geometrical representations. For
+                                         example, [10] shows that arbitrary tree structures cannot be embedded with arbitrary low distortion
+                                         (i.e. almost preserving their metric) in the Euclidean space with unbounded number of dimensions,
+                                         but this task becomes surprisingly easy in the hyperbolic space with only 2 dimensions where the
+                                         exponential growth of distances matches the exponential growth of nodes with the tree depth.
+                                             ∗
+                                                 Equal contribution.
+The adoption of neural networks and deep learning in these non-Euclidean settings has been rather
+limited until very recently, the main reason being the non-trivial or impossible principled general-
+izations of basic operations (e.g. vector addition, matrix-vector multiplication, vector translation,
+vector inner product) as well as, in more complex geometries, the lack of closed form expressions for
+basic objects (e.g. distances, geodesics, parallel transport). Thus, classic tools such as multinomial
+logistic regression (MLR), feed forward (FFNN) or recurrent neural networks (RNN) did not have a
+correspondence in these geometries.
+How should one generalize deep neural models to non-Euclidean domains ? In this paper we address
+this question for one of the simplest, yet useful, non-Euclidean domains: spaces of constant negative
+curvature, i.e. hyperbolic. Their tree-likeness properties have been extensively studied [12, 13, 26]
+and used to visualize large taxonomies [18] or to embed heterogeneous complex networks [17]. In
+machine learning, recently, hyperbolic representations greatly outperformed Euclidean embeddings
+for hierarchical, taxonomic or entailment data [21, 10, 11]. Disjoint subtrees from the latent hierar-
+chical structure surprisingly disentangle and cluster in the embedding space as a simple reflection of
+the space’s negative curvature. However, appropriate deep learning tools are needed to embed feature
+data in this space and use it in downstream tasks. For example, implicitly hierarchical sequence data
+(e.g. textual entailment data, phylogenetic trees of DNA sequences or hierarchial captions of images)
+would benefit from suitable hyperbolic RNNs.
+The main contribution of this paper is to bridge the gap between hyperbolic and Euclidean geometry
+in the context of neural networks and deep learning by generalizing in a principled manner both the
+basic operations as well as multinomial logistic regression (MLR), feed-forward (FFNN), simple and
+gated (GRU) recurrent neural networks (RNN) to the Poincaré model of the hyperbolic geometry.
+We do it by connecting the theory of gyrovector spaces and generalized Möbius transformations
+introduced by [2, 26] with the Riemannian geometry properties of the manifold. We smoothly
+parametrize basic operations and objects in all spaces of constant negative curvature using a unified
+framework that depends only on the curvature value. Thus, we show how Euclidean and hyperbolic
+spaces can be continuously deformed into each other. On a series of experiments and datasets we
+showcase the effectiveness of our hyperbolic neural network layers compared to their "classic"
+Euclidean variants on textual entailment and noisy-prefix recognition tasks. We hope that this paper
+will open exciting future directions in the nascent field of Geometric Deep Learning.
+
+2     The Geometry of the Poincaré Ball
+2.1   Basics of Riemannian geometry
+
+We briefly introduce basic concepts of differential geometry largely needed for a principled general-
+ization of Euclidean neural networks. For more rigorous and in-depth expositions, see [23, 14].
+An n-dimensional manifold M is a space that can locally be approximated by Rn : it is a generalization
+to higher dimensions of the notion of a 2D surface. For x ∈ M, one can define the tangent space
+Tx M of M at x as the first order linear approximation of M around x. A Riemannian metric
+g = (gx )x∈M on M is a collection of inner-products gx : Tx M × Tx M → R varying smoothly
+with x. A Riemannian manifold (M, g) is a manifold M equipped with a Riemannian metric g.
+Although a choice of a Riemannian metric g on M only seems to define the geometry locally on M,
+it induces global distances by integrating the length (of the speed vector living in the tangent space)
+of a shortest path between two points:
+                                             Z 1q
+                               d(x, y) = inf        gγ(t) (γ̇(t), γ̇(t))dt,                         (1)
+                                           γ   0
+             ∞
+where γ ∈ C ([0, 1], M) is such that γ(0) = x and γ(1) = y. A smooth path γ of minimal length
+between two points x and y is called a geodesic, and can be seen as the generalization of a straight-line
+in Euclidean space. The parallel transport Px→y : Tx M → Ty M is a linear isometry between
+tangent spaces which corresponds to moving tangent vectors along geodesics and defines a canonical
+way to connect tangent spaces. The exponential map expx at x, when well-defined, gives a way to
+project back a vector v of the tangent space Tx M at x, to a point expx (v) ∈ M on the manifold.
+This map is often used to parametrize a geodesic γ starting from γ(0) := x ∈ M with unit-norm
+direction γ̇(0) := v ∈ Tx M as t 7→ expx (tv). For geodesically complete manifolds, such as the
+Poincaré ball considered in this work, expx is well-defined on the full tangent space Tx M. Finally, a
+
+
+                                                   2
+metric g̃ is said to be conformal to another metric g if it defines the same angles, i.e.
+
+                                       g̃x (u, v)             gx (u, v)
+                                 p           p          =p         p          ,                      (2)
+                                  g̃x (u, u) g̃x (v, v)   gx (u, u) gx (v, v)
+
+for all x ∈ M, u, v ∈ Tx M \ {0}. This is equivalent to the existence of a smooth function
+λ : M → R, called the conformal factor, such that g̃x = λ2x gx for all x ∈ M.
+
+2.2        Hyperbolic space: the Poincaré ball
+
+The hyperbolic space has five isometric models that one can work with [9]. Similarly as in [21] and
+[11], we choose to work in the Poincaré ball. The Poincaré ball model (Dn , g D ) is defined by the
+manifold Dn = {x ∈ Rn : kxk < 1} equipped with the following Riemannian metric:
+                                                                          2
+                                      gxD = λ2x g E ,   where λx :=            ,                     (3)
+                                                                      1 − kxk2
+
+g E = In being the Euclidean metric tensor. Note that the hyperbolic metric tensor is conformal to
+the Euclidean one. The induced distance between two points x, y ∈ Dn is known to be given by
+
+                                                        kx − yk2
+                                                                       
+                                      −1
+                      dD (x, y) = cosh      1+2                           .                    (4)
+                                                 (1 − kxk2 )(1 − kyk2 )
+
+Since the Poincaré ball is conformal to Euclidean space, the angle between two vectors u, v ∈
+Tx Dn \ {0} is given by
+
+                                                   gxD (u, v)         hu, vi
+                               cos(∠(u, v)) = p          p         =         .                       (5)
+                                               gx (u, u) gx (v, v)
+                                                D            D       kukkvk
+
+2.3        Gyrovector spaces
+
+In Euclidean space, natural operations inherited from the vectorial structure, such as vector addition,
+subtraction and scalar multiplication are often useful. The framework of gyrovector spaces provides
+an elegant non-associative algebraic formalism for hyperbolic geometry just as vector spaces provide
+the algebraic setting for Euclidean geometry [2, 25, 26].
+In particular, these operations are used in special relativity, allowing to add speed vectors belonging
+to the Poincaré ball of radius c (the celerity, i.e. the speed of light) so that they remain in the ball,
+hence not exceeding the speed of light.
+We will make extensive use of these operations in our definitions of hyperbolic neural networks.
+For c ≥ 0, denote2 by Dnc := {x ∈ R   n        2                                  n  n
+                                     √ | ckxk < 1}. Note that if c = 0, then Dcn = R ; if c > 0,
+      n
+then Dc is the open ball of radius 1/ c. If c = 1 then we recover the usual ball D .
+
+Möbius addition. The Möbius addition of x and y in Dnc is defined as
+
+                                          (1 + 2chx, yi + ckyk2 )x + (1 − ckxk2 )y
+                              x ⊕c y :=                                            .                 (6)
+                                                1 + 2chx, yi + c2 kxk2 kyk2
+In particular, when c = 0, one recovers the Euclidean addition of two vectors in Rn . Note that
+without loss of generality, the case c > 0 can be reduced to c = 1. Unless stated otherwise, we
+will use ⊕ as ⊕1 to simplify notations. For general c > 0, this operation is not commutative nor
+associative. However, it satisfies x ⊕c 0 = 0 ⊕c x = 0. Moreover, for any x, y ∈ Dnc , we have
+(−x) ⊕c x = x ⊕c (−x) = 0 and (−x) ⊕c (x ⊕c y) = y (left-cancellation law). The Möbius
+substraction is then defined by the use of the following notation: x c y := x ⊕c (−y). See [29,
+section 2.1] for a geometric interpretation of the Möbius addition.
+
+      2                                                                      √
+          We take different notations as in [25] where the author uses s = 1/ c.
+
+
+                                                           3
+Möbius scalar multiplication. For c > 0, the Möbius scalar multiplication of x ∈ Dnc \ {0} by
+r ∈ R is defined as
+                                    √                  √         x
+                       r ⊗c x := (1/ c) tanh(r tanh−1 ( ckxk))      ,                     (7)
+                                                                kxk
+and r ⊗c 0 := 0. Note that similarly as for the Möbius addition, one recovers the Euclidean scalar
+multiplication when c goes to zero: limc→0 r ⊗c x = rx. This operation satisfies desirable properties
+such as n ⊗c x = x ⊕c · · · ⊕c x (n additions), (r + r0 ) ⊗c x = r ⊗c x ⊕c r0 ⊗c x (scalar distributivity3 ),
+(rr0 ) ⊗c x = r ⊗c (r0 ⊗c x) (scalar associativity) and |r| ⊗c x/kr ⊗c xk = x/kxk (scaling property).
+
+Distance. If one defines the generalized hyperbolic metric tensor g c as the metric conformal to the
+Euclidean one, with conformal factor λcx := 2/(1 − ckxk2 ), then the induced distance function on
+(Dnc , g c ) is given by4
+                                         √           √
+                          dc (x, y) = (2/ c) tanh−1
+                                                                       
+                                                       ck − x ⊕c yk .                            (8)
+Again, observe that limc→0 dc (x, y) = 2kx − yk, i.e. we recover Euclidean geometry in the limit5 .
+Moreover, for c = 1 we recover dD of Eq. (4).
+
+Hyperbolic trigonometry. Similarly as in the Euclidean space, one can define the notions of
+hyperbolic angles or gyroangles (when using the ⊕c ), as well as hyperbolic law of sines in the
+generalized Poincaré ball (Dnc , g c ). We make use of these notions in our proofs. See Appendix A.
+
+2.4       Connecting Gyrovector spaces and Riemannian geometry of the Poincaré ball
+
+In this subsection, we present how geodesics in the Poincaré ball model are usually described with
+Möbius operations, and push one step further the existing connection between gyrovector spaces and
+the Poincaré ball by finding new identities involving the exponential map, and parallel transport.
+In particular, these findings provide us with a simpler formulation of Möbius scalar multiplication,
+yielding a natural definition of matrix-vector multiplication in the Poincaré ball.
+
+Riemannian gyroline element. The Riemannian gyroline element is defined for an infinitesimal
+dx as ds := (x + dx) c x, and its size is given by [26, section 3.7]:
+                                                                        2
+                            kdsk = k(x + dx)       c xk = kdxk/(1 − ckxk ).                              (9)
+What is remarkable is that it turns out to be identical, up to a scaling factor of 2, to the usual line
+element 2kdxk/(1 − ckxk2 ) of the Riemannian manifold (Dnc , g c ).
+
+Geodesics. The geodesic connecting points x, y ∈ Dnc is shown in [2, 26] to be given by:
+  γx→y (t) := x ⊕c (−x ⊕c y) ⊗c t,        with γx→y : R → Dnc s.t. γx→y (0) = x and γx→y (1) = y.
+                                                                                               (10)
+Note that when c goes to 0, geodesics become straight-lines, recovering Euclidean geometry. In the
+remainder of this subsection, we connect the gyrospace framework with Riemannian geometry.
+Lemma 1. For any x ∈ Dn and v ∈ Tx Dnc s.t. gxc (v, v) = 1, the unit-speed geodesic starting from
+x with direction v is given by:
+                          √ t
+                                      
+                                     v
+γx,v (t) = x ⊕c tanh        c     √        , where γx,v : R → Dn s.t. γx,v (0) = x and γ̇x,v (0) = v.
+                              2     ckvk
+                                                                                                 (11)
+
+Proof. One can use Eq. (10) and reparametrize it to unit-speed using Eq. (8). Alternatively, direct
+computation and identification with the formula in [11, Thm. 1] would give the same result. Using
+Eq. (8) and Eq. (11), one can sanity-check that dc (γ(0), γ(t)) = t, ∀t ∈ [0, 1].
+      3
+     ⊗c has priority over ⊕c in the sense that a ⊗c b ⊕c c := (a ⊗c b) ⊕c c and a ⊕c b ⊗c c := a ⊕c (b ⊗c c).
+      4
+     The notation −x ⊕c y should always be read as (−x) ⊕c y and not −(x ⊕c y).
+   5
+     The factor 2 comes from the conformal factor λx = 2/(1 − kxk2 ), which is a convention setting the
+curvature to −1.
+
+
+                                                     4
+  Exponential and logarithmic maps.         The following lemma gives the closed-form derivation of
+  exponential and logarithmic maps.
+  Lemma 2. For any point x ∈ Dnc , the exponential map expcx : Tx Dnc → Dnc and the logarithmic
+  map logcx : Dnc → Tx Dnc are given for v 6= 0 and y 6= x by:
+                          √ λcx kvk                                        √
+                                            
+                                          v                     2                           −x ⊕c y
+   c
+expx (v) = x ⊕c tanh        c          √         , logcx (y) = √ c tanh−1 ( ck − x ⊕c yk)             .
+                                2        ckvk                   cλx                       k − x ⊕c yk
+                                                                                             (12)
+
+  Proof. Following the proof of [11, Cor. 1.1], one gets expcx (v) = γx, λc vkvk (λcx kvk) . Using Eq. (11)
+                                                                              x
+  gives the formula for expcx . Algebraic check of the identity logcx (expcx (v)) = v concludes.
+
+ The above maps have more appealing forms when x = 0, namely for v ∈ T0 Dnc \ {0}, y ∈ Dnc \ {0}:
+
+                                  √         v                         √         y
+                 expc0 (v) = tanh( ckvk) √      , logc0 (y) = tanh−1 ( ckyk) √      .                 (13)
+                                           ckvk                                ckyk
+
+  Moreover, we still recover Euclidean geometry in the limit c → 0, as limc→0 expcx (v) = x + v is the
+  Euclidean exponential map, and limc→0 logcx (y) = y − x is the Euclidean logarithmic map.
+
+  Möbius scalar multiplication using exponential and logarithmic maps. We studied the expo-
+  nential and logarithmic maps in order to gain a better understanding of the Möbius scalar multiplica-
+  tion (Eq. (7)). We found the following:
+  Lemma 3. The quantity r ⊗ x can actually be obtained by projecting x in the tangent space at 0
+  with the logarithmic map, multiplying this projection by the scalar r in T0 Dnc , and then projecting it
+  back on the manifold with the exponential map:
+                             r ⊗c x = expc0 (r logc0 (x)),   ∀r ∈ R, x ∈ Dnc .                        (14)
+  In addition, we recover the well-known relation between geodesics connecting two points and the
+  exponential map:
+                   γx→y (t) = x ⊕c (−x ⊕c y) ⊗c t = expcx (t logcx (y)),       t ∈ [0, 1].            (15)
+
+ This last result enables us to generalize scalar multiplication in order to define matrix-vector multipli-
+ cation between Poincaré balls, one of the essential building blocks of hyperbolic neural networks.
+
+  Parallel transport. Finally, we connect parallel transport (from T0 Dnc ) to gyrovector spaces with
+  the following theorem, which we prove in appendix B.
+ Theorem 4. In the manifold (Dnc , g c ), the parallel transport w.r.t. the Levi-Civita connection of a
+ vector v ∈ T0 Dnc to another tangent space Tx Dnc is given by the following isometry:
+                                                                      λc0
+                                 c
+                                P0→x (v) = logcx (x ⊕c expc0 (v)) =       v.                          (16)
+                                                                      λcx
+
+ As we’ll see later, this result is crucial in order to define and optimize parameters shared between
+ different tangent spaces, such as biases in hyperbolic neural layers or parameters of hyperbolic MLR.
+
+  3   Hyperbolic Neural Networks
+  Neural networks can be seen as being made of compositions of basic operations, such as linear
+  maps, bias translations, pointwise non-linearities and a final sigmoid or softmax layer. We first
+  explain how to construct a softmax layer for logits lying in a Poincaré ball. Then, we explain how
+  to transform a mapping between two Euclidean spaces as one between Poincaré balls, yielding
+  matrix-vector multiplication and pointwise non-linearities in the Poincaré ball. Finally, we present
+  possible adaptations of various recurrent neural networks to the hyperbolic domain.
+
+
+                                                     5
+3.1     Hyperbolic multiclass logistic regression
+
+In order to perform multi-class classification on the Poincaré ball, one needs to generalize multinomial
+logistic regression (MLR) − also called softmax regression − to the Poincaré ball.
+
+Reformulating Euclidean MLR. Let’s first reformulate Euclidean MLR from the perspective of
+distances to margin hyperplanes, as in [19, Section 5]. This will allow us to easily generalize it.
+Given K classes, one learns a margin hyperplane for each such class using softmax probabilities:
+      ∀k ∈ {1, ..., K},    p(y = k|x) ∝ exp ((hak , xi − bk )) ,       where bk ∈ R, x, ak ∈ Rn .    (17)
+
+Note that any affine hyperplane in Rn can be written with a normal vector a and a scalar shift b:
+                Ha,b = {x ∈ Rn : ha, xi − b = 0},            where a ∈ Rn \ {0}, and b ∈ R.          (18)
+As in [19, Section 5], we note that ha, xi − b = sign(ha, xi − b)kakd(x, Ha,b ). Using Eq. (17):
+             p(y = k|x) ∝ exp(sign(hak , xi − bk )kak kd(x, Hak ,bk )), bk ∈ R, x, ak ∈ Rn .         (19)
+
+As it is not immediately obvious how to generalize the Euclidean hyperplane of Eq. (18) to other
+spaces such as the Poincaré ball, we reformulate it as follows:
+           H̃a,p = {x ∈ Rn : h−p + x, ai = 0} = p + {a}⊥ , where p ∈ Rn , a ∈ Rn \ {0}.              (20)
+
+This new definition relates to the previous one as H̃a,p = Ha,ha,pi . Rewriting Eq. (19) with b = ha, pi:
+
+           p(y = k|x) ∝ exp(sign(h−pk + x, ak i)kak kd(x, H̃ak ,pk )), with pk , x, ak ∈ Rn .        (21)
+
+It is now natural to adapt the previous definition to the hyperbolic setting by replacing + by ⊕c :
+Definition 3.1 (Poincaré hyperplanes). For p ∈ Dnc , a ∈ Tp Dnc \ {0}, let {a}⊥ := {z ∈ Tp Dnc :
+gpc (z, a) = 0} = {z ∈ Tp Dnc : hz, ai = 0}. Then, we define Poincaré hyperplanes as
+        c
+      H̃a,p := {x ∈ Dnc : hlogcp (x), aip = 0} = expcp ({a}⊥ ) = {x ∈ Dnc : h−p ⊕c x, ai = 0}.       (22)
+
+                                             c
+The last equality is shown appendix C. H̃a,p    can also be described as the union of images of
+                  n
+all geodesics in Dc orthogonal to a and containing p. Notice that our definition matches that of
+hypergyroplanes, see [27, definition 5.8]. A 3D hyperplane example is depicted in Fig. 1.
+Next, we need the following theorem, proved in appendix D:
+Theorem 5.
+                                                             √                   
+                   c                          1      −1      2 c|h−p ⊕c x, ai|
+          dc (x, H̃a,p ) := inf dc (x, w) = √ sinh                                  .                (23)
+                               c
+                           w∈H̃a,p             c          (1 − ck − p ⊕c xk2 )kak
+
+Final formula for MLR in the Poincaré ball. Putting together Eq. (21) and Thm. 5, we get the
+hyperbolic MLR formulation. Given K classes and k ∈ {1, . . . , K}, pk ∈ Dnc , ak ∈ Tpk Dnc \ {0}:
+                                           q
+     p(y = k|x) ∝ exp(sign(h−pk ⊕c x, ak i) gpck (ak , ak )dc (x, H̃ack ,pk )), ∀x ∈ Dnc ,    (24)
+
+or, equivalently
+                                                          √
+                              λcpk kak k
+                                                                               
+                                                         2 ch−pk ⊕c x, ak i
+       p(y = k|x) ∝ exp          √       sinh−1                                     ,   ∀x ∈ Dnc .   (25)
+                                    c                 (1 − ck − pk ⊕c xk2 )kak k
+Notice that when c goes to zero, this goes to p(y = k|x) ∝ exp(4h−pk + x, ak i) =
+exp((λ0pk )2 h−pk + x, ak i) = exp(h−pk + x, ak i0 ), recovering the usual Euclidean softmax.
+However, at this point it is unclear how to perform optimization over ak , since it lives in Tpk Dnc and
+                                                                    c
+hence depends on pk . The solution is that one should write ak = P0→p   k
+                                                                          (a0k ) = (λc0 /λcpk )a0k , where
+ 0       n      n                   0
+ak ∈ T0 Dc = R , and optimize ak as a Euclidean parameter.
+
+
+                                                         6
+3.2   Hyperbolic feed-forward layers
+
+In order to define hyperbolic neural networks, it is crucial to de-
+fine a canonically simple parametric family of transformations,
+playing the role of linear mappings in usual Euclidean neural
+networks, and to know how to apply pointwise non-linearities.
+Inspiring ourselves from our reformulation of Möbius scalar
+multiplication in Eq. (14), we define:
+Definition 3.2 (Möbius version). For f : Rn → Rm , we define       Figure 1: An example of a hyper-
+the Möbius version of f as the map from Dnc to Dm
+                                                c by:              bolic hyperplane in D31 plotted us-
+                                                                   ing sampling. The red point is p.
+                 f ⊗c (x) := expc0 (f (logc0 (x))),           (26) The shown normal axis to the hy-
+where expc0 : T0m Dm    m        c    n        n                   perplane through p is parallel to a.
+                   c → Dc and log0 : Dc → T0n Dc .
+
+Note that similarly as for other Möbius operations, we recover
+the Euclidean mapping in the limit c → 0 if f is continuous, as limc→0 f ⊗c (x) = f (x). This
+definition satisfies a few desirable properties too, such as: (f ◦ g)⊗c = f ⊗c ◦ g ⊗c for f : Rm → Rl
+and g : Rn → Rm (morphism property), and f ⊗c (x)/kf ⊗c (x)k = f (x)/kf (x)k for f (x) 6= 0
+(direction preserving). It is then straight-forward to prove the following result:
+Lemma 6 (Möbius matrix-vector multiplication). If M : Rn → Rm is a linear map, which we
+identify with its matrix representation, then ∀x ∈ Dnc , if M x 6= 0 we have
+                                    √                             √
+                                                                        
+                                                kM xk                        Mx
+                    M ⊗c (x) = (1/ c) tanh              tanh−1 ( ckxk)            , (27)
+                                                 kxk                        kM xk
+
+and M ⊗c (x) = 0 if M x = 0. Moreover, if we define the Möbius matrix-vector multiplication of
+M ∈ Mm,n (R) and x ∈ Dnc by M ⊗c x := M ⊗c (x), then we have (M M 0 ) ⊗c x = M ⊗c (M 0 ⊗c x)
+for M ∈ Ml,m (R) and M 0 ∈ Mm,n (R) (matrix associativity), (rM ) ⊗c x = r ⊗c (M ⊗c x) for
+r ∈ R and M ∈ Mm,n (R) (scalar-matrix associativity) and M ⊗c x = M x for all M ∈ On (R)
+(rotations are preserved).
+
+Pointwise non-linearity. If ϕ : Rn → Rn is a pointwise non-linearity, then its Möbius version
+ϕ⊗c can be applied to elements of the Poincaré ball.
+
+Bias translation. The generalization of a translation in the Poincaré ball is naturally given by
+moving along geodesics. But should we use the Möbius sum x ⊕c b with a hyperbolic bias b or the
+exponential map expcx (b0 ) with a Euclidean bias b0 ? These views are unified with parallel transport
+(see Thm 4). Möbius translation of a point x ∈ Dnc by a bias b ∈ Dnc is given by
+                                                                   c           
+                                      c    c       c            c   λ0     c
+                 x ← x ⊕c b = expx (P0→x (log0 (b))) = expx             log0 (b) .                (28)
+                                                                    λcx
+We recover Euclidean translations in the limit c → 0. Note that bias translations play a particular
+role in this model. Indeed, consider multiple layers of the form fk (x) = ϕk (Mk x), each of
+which having Möbius version fk⊗c (x) = ϕ⊗   k (Mk ⊗c x). Then their composition can be re-written
+                                              c
+
+  ⊗c          ⊗c        c                     c
+fk ◦ · · · ◦ f1 = exp0 ◦fk ◦ · · · ◦ f1 ◦ log0 . This means that these operations can essentially be
+performed in Euclidean space. Therefore, it is the interposition between those with the bias translation
+of Eq. (28) which differentiates this model from its Euclidean counterpart.
+
+Concatenation of multiple input vectors. If a vector x ∈ Rn+p is the (vertical) concatenation
+of two vectors x1 ∈ Rn , x2 ∈ Rp , and M ∈ Mm,n+p (R) can be written as the (horizontal)
+concatenation of two matrices M1 ∈ Mm,n (R) and M2 ∈ Mm,p (R), then M x = M1 x1 + M2 x2 .
+We generalize this to hyperbolic spaces: if we are given x1 ∈ Dnc , x2 ∈ Dpc , x = (x1 x2 )T ∈ Dnc ×Dpc ,
+and M, M1 , M2 as before, then we define M ⊗c x := M1 ⊗c x1 ⊕c M2 ⊗c x2 . Note that when c goes
+to zero, we recover the Euclidean formulation, as limc→0 M ⊗c x = limc→0 M1 ⊗c x1 ⊕c M2 ⊗c x2 =
+M1 x1 + M2 x2 = M x. Moreover, hyperbolic vectors x ∈ Dnc can also be "concatenated" with real
+features y ∈ R by doing: M ⊗c x ⊕c y ⊗c b with learnable b ∈ Dm      c and M ∈ Mm,n (R).
+
+
+                                                      7
+3.3        Hyperbolic RNN
+
+Naive RNN. A simple RNN can be defined by ht+1 = ϕ(W ht + U xt + b) where ϕ is a pointwise
+non-linearity, typically tanh, sigmoid, ReLU, etc. This formula can be naturally generalized to the
+hyperbolic space as follows. For parameters W ∈ Mm,n (R), U ∈ Mm,d (R), b ∈ Dm      c , we define:
+
+                         ht+1 = ϕ⊗c (W ⊗c ht ⊕c U ⊗c xt ⊕c b),              ht ∈ Dnc , xt ∈ Ddc .                  (29)
+Note that if inputs xt ’s are Euclidean, one can write x̃t := expc0 (xt ) and use the above formula, since
+expcW ⊗c ht (P0→W
+               c                                      c
+                    ⊗c ht (U xt )) = W ⊗c ht ⊕c exp0 (U xt ) = W ⊗c ht ⊕c U ⊗c x̃t .
+
+GRU architecture. One can also adapt the GRU architecture:
+                     rt = σ(W r ht−1 + U r xt + br ),            zt = σ(W z ht−1 + U z xt + bz ),
+                                                                                                                   (30)
+                     h̃t = ϕ(W (rt      ht−1 ) + U xt + b),      ht = (1 − zt )     ht−1 + zt       h̃t ,
+where denotes pointwise product. First, how should we adapt the pointwise multiplication by a
+scaling gate? Note that the definition of the Möbius version (see Eq. (26)) can be naturally extended
+to maps f : Rn × Rp → Rm as f ⊗c : (h, h0 ) ∈ Dnc × Dpc 7→ expc0 (f (logc0 (h), logc0 (h0 ))). In
+particular, choosing f (h, h0 ) := σ(h) h0 yields6 f ⊗c (h, h0 ) = expc0 (σ(logc0 (h)) logc0 (h0 )) =
+diag(σ(logc0 (h))) ⊗c h0 . Hence we adapt rt ht−1 to diag(rt ) ⊗c ht−1 and the reset gate rt to:
+                                   rt = σ logc0 (W r ⊗c ht−1 ⊕c U r ⊗c xt ⊕c br ),                                 (31)
+and similarly for the update gate zt . Note that as the argument of σ in the above is unbounded, rt and
+zt can a priori take values onto the full range (0, 1). Now the intermediate hidden state becomes:
+
+                                h̃t = ϕ⊗c ((W diag(rt )) ⊗c ht−1 ⊕c U ⊗c xt ⊕ b),                                  (32)
+where Möbius matrix associativity simplifies W ⊗c (diag(rt ) ⊗c ht−1 ) into (W diag(rt )) ⊗c ht−1 .
+Finally, we propose to adapt the update-gate equation as
+                                     ht = ht−1 ⊕c diag(zt ) ⊗c (−ht−1 ⊕c h̃t ).                                    (33)
+Note that when c goes to zero, one recovers the usual GRU. Moreover, if zt = 0 or zt = 1, then ht
+becomes ht−1 or h̃t respectively, similarly as in the usual GRU. This adaptation was obtained by
+adapting [24]: in this work, the authors re-derive the update-gate mechanism from a first principle
+called time-warping invariance. We adapted their derivation to the hyperbolic setting by using the
+notion of gyroderivative [4] and proving a gyro-chain-rule (see appendix E).
+
+4         Experiments
+SNLI task and dataset. We evaluate our method on two tasks. The first is natural language
+inference, or textual entailment. Given two sentences, a premise (e.g. "Little kids A. and B. are
+playing soccer.") and a hypothesis (e.g. "Two children are playing outdoors."), the binary classification
+task is to predict whether the second sentence can be inferred from the first one. This defines a partial
+order in the sentence space. We test hyperbolic networks on the biggest real dataset for this task,
+SNLI [7]. It consists of 570K training, 10K validation and 10K test sentence pairs. Following [28],
+we merge the "contradiction" and "neutral" classes into a single class of negative sentence pairs, while
+the "entailment" class gives the positive pairs.
+
+PREFIX task and datasets. We conjecture that the improvements of hyperbolic neural networks
+are more significant when the underlying data structure is closer to a tree. To test this, we design a
+proof-of-concept task of detection of noisy prefixes, i.e. given two sentences, one has to decide if the
+second sentence is a noisy prefix of the first, or a random sentence. We thus build synthetic datasets
+PREFIX-Z% (for Z being 10, 30 or 50) as follows: for each random first sentence of random length
+at most 20 and one random prefix of it, a second positive sentence is generated by randomly replacing
+Z% of the words of the prefix, and a second negative sentence of same length is randomly generated.
+Word vocabulary size is 100, and we generate 500K training, 10K validation and 10K test pairs.
+      6
+          If x has n coordinates, then diag(x) denotes the diagonal matrix of size n with xi ’s on its diagonal.
+
+
+                                                             8
+Models architecture. Our neural network layers can be used in a plug-n-play manner exactly like
+standard Euclidean layers. They can also be combined with Euclidean layers. However, optimization
+w.r.t. hyperbolic parameters is different (see below) and based on Riemannian gradients which
+are just rescaled Euclidean gradients when working in the conformal Poincaré model [21]. Thus,
+back-propagation can be applied in the standard way.
+In our setting, we embed the two sentences using two distinct hyperbolic RNNs or GRUs. The
+sentence embeddings are then fed together with their squared distance (hyperbolic or Euclidean,
+depending on their geometry) to a FFNN (Euclidean or hyperbolic, see Sec. 3.2) which is further
+fed to an MLR (Euclidean or hyperbolic, see Sec. 3.1) that gives probabilities of the two classes
+(entailment vs neutral). We use cross-entropy loss on top. Note that hyperbolic and Euclidean layers
+can be mixed, e.g. the full network can be hyperbolic and only the last layer be Euclidean, in which
+case one has to use log0 and exp0 functions to move between the two manifolds in a correct manner
+as explained for Eq. 26.
+
+Optimization. Our models have both Euclidean (e.g. weight matrices in both Euclidean and
+hyperbolic FFNNs, RNNs or GRUs) and hyperbolic parameters (e.g. word embeddings or biases for
+the hyperbolic layers). We optimize the Euclidean parameters with Adam [16] (learning rate 0.001).
+Hyperbolic parameters cannot be updated with an equivalent method that keeps track of gradient
+history due to the absence of a Riemannian Adam. Thus, they are optimized using full Riemannian
+stochastic gradient descent (RSGD) [5, 11]. We also experiment with projected RSGD [21], but
+optimization was sometimes less stable. We use a different constant learning rate for word embeddings
+(0.1) and other hyperbolic weights (0.01) because words are updated less frequently.
+
+Numerical errors. Gradients of the basic operations defined above (e.g. ⊕c√    , exponential map) are
+not defined when the hyperbolic argument vectors are on the ball border, i.e. ckxk = 1. Thus, we
+always project results of these operations in the ball of radius 1 − , where  = 10−5 . Numerical
+errors also appear when hyperbolic vectors get closer to 0, thus we perturb them with an 0 = 10−15
+before they are used in any of the above operations. Finally, arguments of the tanh function are
+clipped between ±15 to avoid numerical errors, while arguments of tanh−1 are clipped to at most
+1 − 10−5 .
+
+Hyperparameters. For all methods, baselines and datasets, we use c = 1, word and hidden state
+embedding dimension of 5 (we focus on the low dimensional setting that was shown to already
+be effective [21]), batch size of 64. We ran all methods for a fixed number of 30 epochs. For all
+models, we experiment with both identity (no non-linearity) or tanh non-linearity in the RNN/GRU
+cell, as well as identity or ReLU after the FFNN layer and before MLR. As expected, for the fully
+Euclidean models, tanh and ReLU respectively surpassed the identity variant by a large margin. We
+only report the best Euclidean results. Interestingly, for the hyperbolic models, using only identity for
+both non-linearities works slightly better and this is likely due to two facts: i) our hyperbolic layers
+already contain non-linearities by their nature, ii) tanh is limiting the output domain of the sentence
+embeddings, but the hyperbolic specific geometry is more pronounced at the ball border, i.e. at the
+hyperbolic "infinity", compared to the center of the ball.
+For the results shown in Tab. 1, we run each model (baseline or ours) exactly 3 times and report the
+test result corresponding to the best validation result from these 3 runs. We do this because the highly
+non-convex spectrum of hyperbolic neural networks sometimes results in convergence to poor local
+minima, suggesting that initialization is very important.
+
+Results. Results are shown in Tab. 1. Note that the fully Euclidean baseline models might have
+an advantage over hyperbolic baselines because more sophisticated optimization algorithms such
+as Adam do not have a hyperbolic analogue at the moment. We first observe that all GRU models
+overpass their RNN variants. Hyperbolic RNNs and GRUs have the most significant improvement
+over their Euclidean variants when the underlying data structure is more tree-like, e.g. for PREFIX-
+10% − for which the tree relation between sentences and their prefixes is more prominent − we
+reduce the error by a factor of 3.35 for hyperbolic vs Euclidean RNN, and by a factor of 1.5 for
+hyperbolic vs Euclidean GRU. As soon as the underlying structure diverges more and more from
+a tree, the accuracy gap decreases − for example, for PREFIX-50% the noise heavily affects the
+representational power of hyperbolic networks. Also, note that on SNLI our methods perform
+similarly as with their Euclidean variants. Moreover, hyperbolic and Euclidean MLR are on par when
+
+
+                                                   9
+                                                SNLI      PREFIX-10%        PREFIX-30%        PREFIX-50%
+       F ULLY E UCLIDEAN RNN                  79.34 %        89.62 %           81.71 %           72.10 %
+ H YPERBOLIC RNN+FFNN, E UCL MLR              79.18 %        96.36 %           87.83 %           76.50 %
+       F ULLY H YPERBOLIC RNN                 78.21 %        96.91 %           87.25 %           62.94 %
+        F ULLY E UCLIDEAN GRU                 81.52 %        95.96 %           86.47 %           75.04 %
+ H YPERBOLIC GRU+FFNN, E UCL MLR              79.76 %        97.36 %           88.47 %           76.87 %
+       F ULLY H YPERBOLIC GRU                 81.19 %        97.14 %           88.26 %           76.44 %
+Table 1: Test accuracies for various models and four datasets. "Eucl" denotes Euclidean. All word
+and sentence embeddings have dimension 5. We highlight in bold the best baseline (or baselines, if
+the difference is less than 0.5%).
+
+
+used in conjunction with hyperbolic sentence embeddings, suggesting further empirical investigation
+is needed for this direction (see below).
+We also observe that, in the hyperbolic setting, accuracy tends to increase when sentence embeddings
+start increasing, and gets better as their norms converge towards 1 (the ball border for c = 1). Unlike
+in the Euclidean case, this behavior does happen only after a few epochs and suggests that the model
+should first adjust the angular layout in order to disentangle the representations, before increasing their
+norms to fully exploit the strong clustering property of the hyperbolic geometry. Similar behavior
+was observed in the context of embedding trees by [21]. Details in appendix F.
+
+MLR classification experiments.
+For the sentence entailment classi-
+fication task we do not see a clear
+advantage of hyperbolic MLR com-
+pared to its Euclidean variant. A pos-
+sible reason is that, when trained end-
+to-end, the model might decide to
+place positive and negative embed-
+dings in a manner that is already well
+separated with a classic MLR. As a
+consequence, we further investigate
+MLR for the task of subtree classifi-
+cation. Using an open source imple- Figure 2: Hyperbolic (left) vs Direct Euclidean (right) binary
+mentation7 of [21], we pre-trained MLR used to classify nodes as being part in the GROUP. N .01
+Poincaré embeddings of the Word- subtree of the WordNet noun hierarchy solely based on their
+Net noun hierarchy (82,115 nodes). Poincaré embeddings. The positive points (from the subtree)
+We then choose one node in this tree are in blue, the negative points (the rest) are in red and the
+(see Table 2) and classify all other trained positive separation hyperplane is depicted in green.
+nodes (solely based on their embed-
+dings) as being part of the subtree
+rooted at this node. All nodes in such a subtree are divided into positive training nodes (80%) and
+positive test nodes (20%). The same splitting procedure is applied for the remaining WordNet nodes
+that are divided into a negative training and negative test set respectively. Three variants of MLR
+are then trained on top of pre-trained Poincaré embeddings [21] to solve this binary classification
+task: hyperbolic MLR, Euclidean MLR applied directly on the hyperbolic embeddings and Euclidean
+MLR applied after mapping all embeddings in the tangent space at 0 using the log0 map. We use
+different embedding dimensions : 2, 3, 5 and 10. For the hyperbolic MLR, we use full Riemannian
+SGD with a learning rate of 0.001. For the two Euclidean models we use ADAM optimizer and the
+same learning rate. During training, we always sample the same number of negative and positive
+nodes in each minibatch of size 16; thus positive nodes are frequently resampled. All methods are
+trained for 30 epochs and the final F1 score is reported (no hyperparameters to validate are used, thus
+we do not require a validation set). This procedure is repeated for four subtrees of different sizes.
+Quantitative results are presented in Table 2. We can see that the hyperbolic MLR overpasses
+its Euclidean variants in almost all settings, sometimes by a large margin. Moreover, to provide
+   7
+       https://github.com/dalab/hyperbolic_cones
+
+
+                                                    10
+ W ORD N ET
+                      M ODEL            D=2                 D=3               D=5                D = 10
+  SUBTREE
+
+                    H YPERBOLIC     47.43 ± 1.07%     91.92 ± 0.61%      98.07 ± 0.55%      99.26 ± 0.59%
+ANIMAL . N .01
+                    D IRECT E UCL    41.69 ± 0.19%    68.43 ± 3.90%      95.59 ± 1.18%      99.36 ± 0.18%
+ 3218 / 798
+                    log 0 + E UCL    38.89 ± 0.01%    62.57 ± 0.61%      89.21 ± 1.34%       98.27 ± 0.70%
+                    H YPERBOLIC     81.72 ± 0.17%     89.87 ± 2.73%      87.89 ± 0.80%      91.91 ± 3.07%
+ GROUP. N .01
+                    D IRECT E UCL    61.13 ± 0.42%    63.56 ± 1.22%      67.82 ± 0.81%      91.38 ± 1.19%
+ 6649 / 1727
+                    log 0 + E UCL    60.75 ± 0.24%    61.98 ± 0.57%      67.92 ± 0.74%      91.41 ± 0.18%
+                    H YPERBOLIC     12.68 ± 0.82%     24.09 ± 1.49%      55.46 ± 5.49%      66.83 ± 11.38%
+WORKER . N .01
+                    D IRECT E UCL    10.86 ± 0.01%     22.39 ± 0.04%     35.23 ± 3.16%       47.29 ± 3.93%
+  861 / 254
+                    log 0 + E UCL     9.04 ± 0.06%    22.57 ± 0.20%       26.47 ± 0.78%      36.66 ± 2.74%
+                    H YPERBOLIC     32.01 ± 17.14%    87.54 ± 4.55%      88.73 ± 3.22%      91.37 ± 6.09%
+MAMMAL . N .01
+                    D IRECT E UCL    15.58 ± 0.04%    44.68 ± 1.87%      59.35 ± 1.31%       77.76 ± 5.08%
+  953 / 228
+                    log 0 + E UCL    13.10 ± 0.13%    44.89 ± 1.18%      52.51 ± 0.85%       56.11 ± 2.21%
+
+    Table 2: Test F1 classification scores for four different subtrees of WordNet noun tree. All nodes
+    in such a subtree are divided into positive training nodes (80%) and positive test nodes (20%);
+    these counts are shown below each subtree root. The same splitting procedure is applied for the
+    remaining nodes to obtain negative training and test sets. Three variants of MLR are then trained on
+    top of pre-trained Poincaré embeddings [21] to solve this binary classification task: hyperbolic MLR,
+    Euclidean MLR applied directly on the hyperbolic embeddings and Euclidean MLR applied after
+    mapping all embeddings in the tangent space at 0 using the log0 map. 95% confidence intervals for 3
+    different runs are shown for each method and each different embedding dimension (2, 3, 5 or 10).
+
+    further understanding, we plot the 2-dimensional embeddings and the trained separation hyperplanes
+    (geodesics in this case) in Figure 2. We can see that respecting the hyperbolic geometry is very
+    important for a quality classification model.
+
+
+    5       Conclusion
+
+    We showed how classic Euclidean deep learning tools such as MLR, FFNNs, RNNs or GRUs can be
+    generalized in a principled manner to all spaces of constant negative curvature combining Riemannian
+    geometry with the elegant theory of gyrovector spaces. Empirically we found that our models
+    outperform or are on par with corresponding Euclidean architectures on sequential data with implicit
+    hierarchical structure. We hope to trigger exciting future research related to better understanding
+    of the hyperbolic non-convexity spectrum and development of other non-Euclidean deep learning
+    methods.
+    Our data and Tensorflow [1] code are publicly available8 .
+
+
+    Acknowledgements
+
+    We thank Igor Petrovski for useful pointers regarding the implementation.
+    This research is funded by the Swiss National Science Foundation (SNSF) under grant agreement
+    number 167176. Gary Bécigneul is also funded by the Max Planck ETH Center for Learning
+    Systems.
+
+
+    References
+     [1] Martín Abadi, Paul Barham, Jianmin Chen, Zhifeng Chen, Andy Davis, Jeffrey Dean, Matthieu
+         Devin, Sanjay Ghemawat, Geoffrey Irving, Michael Isard, et al. Tensorflow: A system for
+         large-scale machine learning. 2016.
+
+     [2] Ungar Abraham Albert. Analytic hyperbolic geometry and Albert Einstein’s special theory of
+         relativity. World scientific, 2008.
+        8
+            https://github.com/dalab/hyperbolic_nn
+
+
+                                                     11
+ [3] Dzmitry Bahdanau, Kyunghyun Cho, and Yoshua Bengio. Neural machine translation by jointly
+     learning to align and translate. In Proceedings of the International Conference on Learning
+     Representations (ICLR), 2015.
+
+ [4] Graciela S Birman and Abraham A Ungar. The hyperbolic derivative in the poincaré ball model
+     of hyperbolic geometry. Journal of mathematical analysis and applications, 254(1):321–333,
+     2001.
+
+ [5] S. Bonnabel. Stochastic gradient descent on riemannian manifolds. IEEE Transactions on
+     Automatic Control, 58(9):2217–2229, Sept 2013.
+
+ [6] Antoine Bordes, Nicolas Usunier, Alberto Garcia-Duran, Jason Weston, and Oksana Yakhnenko.
+     Translating embeddings for modeling multi-relational data. In Advances in neural information
+     processing systems (NIPS), pages 2787–2795, 2013.
+
+ [7] Samuel R. Bowman, Gabor Angeli, Christopher Potts, and Christopher D. Manning. A large
+     annotated corpus for learning natural language inference. In Proceedings of the 2015 Conference
+     on Empirical Methods in Natural Language Processing (EMNLP), pages 632–642. Association
+     for Computational Linguistics, 2015.
+
+ [8] Michael M Bronstein, Joan Bruna, Yann LeCun, Arthur Szlam, and Pierre Vandergheynst.
+     Geometric deep learning: going beyond euclidean data. IEEE Signal Processing Magazine,
+     34(4):18–42, 2017.
+
+ [9] James W Cannon, William J Floyd, Richard Kenyon, Walter R Parry, et al. Hyperbolic geometry.
+     Flavors of geometry, 31:59–115, 1997.
+
+[10] Christopher De Sa, Albert Gu, Christopher Ré, and Frederic Sala. Representation tradeoffs for
+     hyperbolic embeddings. arXiv preprint arXiv:1804.03329, 2018.
+
+[11] Octavian-Eugen Ganea, Gary Bécigneul, and Thomas Hofmann. Hyperbolic entailment cones
+     for learning hierarchical embeddings. In Proceedings of the thirty-fifth international conference
+     on machine learning (ICML), 2018.
+
+[12] Mikhael Gromov. Hyperbolic groups. In Essays in group theory, pages 75–263. Springer, 1987.
+
+[13] Matthias Hamann. On the tree-likeness of hyperbolic spaces. Mathematical Proceedings of the
+     Cambridge Philosophical Society, page 1–17, 2017.
+
+[14] Christopher Hopper and Ben Andrews. The Ricci flow in Riemannian geometry. Springer, 2010.
+
+[15] Yoon Kim. Convolutional neural networks for sentence classification. In Proceedings of the
+     2014 Conference on Empirical Methods in Natural Language Processing (EMNLP), pages
+     1746–1751. Association for Computational Linguistics, 2014.
+
+[16] Diederik P Kingma and Jimmy Ba. Adam: A method for stochastic optimization. In Proceedings
+     of the International Conference on Learning Representations (ICLR), 2015.
+
+[17] Dmitri Krioukov, Fragkiskos Papadopoulos, Maksim Kitsak, Amin Vahdat, and Marián Boguná.
+     Hyperbolic geometry of complex networks. Physical Review E, 82(3):036106, 2010.
+
+[18] John Lamping, Ramana Rao, and Peter Pirolli. A focus+ context technique based on hyperbolic
+     geometry for visualizing large hierarchies. In Proceedings of the SIGCHI conference on Human
+     factors in computing systems, pages 401–408. ACM Press/Addison-Wesley Publishing Co.,
+     1995.
+
+[19] Guy Lebanon and John Lafferty. Hyperplane margin classifiers on the multinomial manifold. In
+     Proceedings of the international conference on machine learning (ICML), page 66. ACM, 2004.
+
+[20] Maximilian Nickel, Volker Tresp, and Hans-Peter Kriegel. A three-way model for collective
+     learning on multi-relational data. In Proceedings of the international conference on machine
+     learning (ICML), volume 11, pages 809–816, 2011.
+
+
+                                                 12
+[21] Maximillian Nickel and Douwe Kiela. Poincaré embeddings for learning hierarchical repre-
+     sentations. In Advances in Neural Information Processing Systems (NIPS), pages 6341–6350,
+     2017.
+[22] Tim Rocktäschel, Edward Grefenstette, Karl Moritz Hermann, Tomáš Kočiskỳ, and Phil Blun-
+     som. Reasoning about entailment with neural attention. In Proceedings of the International
+     Conference on Learning Representations (ICLR), 2015.
+[23] Michael Spivak. A comprehensive introduction to differential geometry. Publish or perish, 1979.
+[24] Corentin Tallec and Yann Ollivier. Can recurrent neural networks warp time? In Proceedings of
+     the International Conference on Learning Representations (ICLR), 2018.
+[25] Abraham A Ungar. Hyperbolic trigonometry and its application in the poincaré ball model of
+     hyperbolic geometry. Computers & Mathematics with Applications, 41(1-2):135–147, 2001.
+[26] Abraham Albert Ungar. A gyrovector space approach to hyperbolic geometry. Synthesis
+     Lectures on Mathematics and Statistics, 1(1):1–194, 2008.
+[27] Abraham Albert Ungar. Analytic hyperbolic geometry in n dimensions: An introduction. CRC
+     Press, 2014.
+[28] Ivan Vendrov, Ryan Kiros, Sanja Fidler, and Raquel Urtasun. Order-embeddings of images and
+     language. In Proceedings of the International Conference on Learning Representations (ICLR),
+     2016.
+[29] J Vermeer. A geometric interpretation of ungar’s addition and of gyration in the hyperbolic
+     plane. Topology and its Applications, 152(3):226–242, 2005.
+
+
+
+
+                                                13
+A        Hyperbolic Trigonometry
+Hyperbolic angles. For A, B, C ∈ Dnc , we denote by ∠A := ∠BAC the angle between the two
+geodesics starting from A and ending at B and C respectively. This angle can be defined in two
+equivalent ways: i) either using the angle between the initial velocities of the two geodesics as given
+by Eq. 5, or ii) using the formula
+                                                                         
+                                           (−A) ⊕c B       (−A) ⊕c C
+                            cos(∠A) =                   ,                    ,                     (34)
+                                         k(−A) ⊕c Bk k(−A) ⊕c Ck
+In this case, ∠A is also called a gyroangle in the work of [26, section 4].
+
+
+Hyperbolic law of sines. We state here the hyperbolic law of sines. If for A, B, C ∈ Dnc , we
+denote by ∠B := ∠ABC the angle between the two geodesics starting from B and ending at A and
+C respectively, and by c̃ = dc (B, A) the length of the hyperbolic segment BA (and similarly for
+others), then we have:
+                                     sin(∠A)      sin(∠B)      sin(∠C)
+                                         √     =      √     =       √ .                                 (35)
+                                    sinh( cã)   sinh( cb̃)   sinh(  cc̃)
+
+Note that one can also adapt the hyperbolic law of cosines to the hyperbolic space.
+
+B        Proof of Theorem 4
+Theorem 4.
+In the manifold (Dnc , g c ), the parallel transport w.r.t. the Levi-Civita connection of a vector v ∈ T0 Dnc
+to another tangent space Tx Dnc is given by the following isometry:
+                                                                            λc0
+                                     c
+                                    P0→x (v) = logcx (x ⊕c expc0 (v)) =         v.                      (36)
+                                                                            λcx
+
+Proof. The geodesic in Dnc from 0 to x is given in Eq. (10) by γ(t) = x ⊗c t, for t ∈ [0, 1]. Let
+v ∈ T0 Dnc . Then it is of common knowledge that there exists a unique parallel9 vector field X along
+γ (i.e. X(t) ∈ Tγ(t) Dnc , ∀t ∈ [0, 1]) such that X(0) = v. Let’s define:
+                            X : t ∈ [0, 1] 7→ logcγ(t) (γ(t) ⊕c expc0 (v)) ∈ Tγ(t) Dnc .                (37)
+Clearly, X is a vector field along γ such that X(0) = v. Now define
+                               c
+                              P0→x : v ∈ T0 Dnc 7→ logcx (x ⊕c expc0 (v)) ∈ Tx Dnc .                    (38)
+                                         c                 λc0 c
+From Eq. (12), it is easily seen that P0→x    (v) = v, hence P0→x
+                                                           λcx      is a linear isometry from T0 Dnc
+        n           c
+to Tx Dc . Since P0→x (v) = X(1), it is enough to prove that X is parallel in order to guarantee that
+  c
+P0→x   is the parallel transport from T0 Dnc to Tx Dnc .
+Since X is a vector field along γ, its covariant derivative can be expressed with the Levi-Civita
+connection ∇c associated to g c :
+                                          DX
+                                                 = ∇cγ̇(t) X.                                     (39)
+                                            ∂t
+Let’s compute the Levi-Civita connection from its Christoffel symbols. In a local coordinate system,
+they can be written as
+                                      1
+                               Γijk = (g c )il (∂j glk
+                                                    c        c
+                                                       + ∂k glj       c
+                                                                − ∂l gjk ),                       (40)
+                                      2
+                                                                                        c
+where superscripts denote the inverse metric tensor and using Einstein’s notations. As gij = (λc )2 δij ,
+at γ(t) ∈ Dnc this yields:
+                                Γijk = cλcγ(t) (δik γ(t)j + δij γ(t)k − δjk γ(t)i ).                    (41)
+    9
+        i.e. that DX
+                  ∂t
+                                               D
+                     = 0 for t ∈ [0, 1], where ∂t denotes the covariant derivative.
+
+
+                                                          14
+On the other hand, since X(t) = (λc0 /λcγ(t) )v, we have
+                                                                    !                                     !
+                                                          λc0                                  λc0
+              ∇cγ̇(t) X = γ̇(t)i ∇ci X = γ̇(t)i ∇ci             v       = v j γ̇(t)i ∇ci             ej       .   (42)
+                                                         λcγ(t)                               λcγ(t)
+                   √                   √
+Since γ(t) = (1/ c) tanh(t tanh−1 ( ckxk)) kxk    x
+                                                    , it is easily seen that γ̇(t) is colinear to γ(t).
+                     x                          x
+Hence there exists Kt ∈ R such that γ̇(t) = Kt γ(t). Moreover, we have the following Leibniz rule:
+                                    !                                    !
+                        c   λc0            λc0    c         ∂        λc0
+                       ∇i         ej = c ∇ i ej +                          ej .                   (43)
+                           λcγ(t)         λγ(t)          ∂γ(t)i λcγ(t)
+Combining these yields
+                                                                                         !        !
+                     DX                            λc0             ∂             λc0
+                        = Ktx v j γ(t)i                 ∇c e j +                             ej       .           (44)
+                     ∂t                           λcγ(t) i       ∂γ(t)i         λcγ(t)
+
+Replacing with the Christoffel symbols of ∇c at γ(t) gives
+                  λc0           λc
+                  c    ∇ci ej = c 0 Γkij ek = 2c[δjk γ(t)i + δik γ(t)j − δij γ(t)k ]ek .                          (45)
+                 λγ(t)         λγ(t)
+
+Moreover,                              !
+                     ∂         λc0                  ∂
+                                                         −ckγ(t)k2 ej = −2cγ(t)i ej .
+                                                                  
+                                           ej =                                                                   (46)
+                   ∂γ(t)i     λcγ(t)              ∂γ(t)i
+Putting together everything, we obtain
+               DX
+                  = Ktx v j γ(t)i 2c[δjk γ(t)i + δik γ(t)j − δij γ(t)k ]ek − 2cγ(t)i ej
+                                                                                        
+                                                                                                                  (47)
+               ∂t
+                  = 2cKtx v j γ(t)i γ(t)j ei − δij γ(t)k ek
+                                                            
+                                                                                                                  (48)
+                  = 2cKtx v j γ(t)j γ(t)i ei − γ(t)i δij γ(t)k ek
+                                                                  
+                                                                                                                  (49)
+                  = 2cKtx v j γ(t)j γ(t)i ei − γ(t)j γ(t)k ek
+                                                               
+                                                                                                                  (50)
+                     = 0,                                                                                         (51)
+which concludes the proof.
+
+C    Proof of Eq. (22)
+Proof. Two steps proof:
+i) expcp ({a}⊥ ) ⊆ {x ∈ Dnc : h−p ⊕c x, ai = 0}:
+Let z ∈ {a}⊥ . From Eq. (12), we have that:
+                              expcp (z) = −p ⊕c βz,           for some β ∈ R.                                     (52)
+This, together with the left-cancellation law in gyrospaces (see section 2.3), implies that
+                                  h−p ⊕c expcp (z), ai = hβz, ai = 0                                              (53)
+which is what we wanted.
+
+ii) {x ∈ Dnc : h−p ⊕c x, ai = 0} ⊆ expcp ({a}⊥ ):
+Let x ∈ Dnc s.t. h−p ⊕c x, ai = 0. Then, using Eq. (12), we derive that:
+                             logcp (x) = β(−p ⊕c x),           for some β ∈ R,                                    (54)
+
+which is orthogonal to a, by assumption. This implies logcp (x) ∈ {a}⊥ , hence x ∈ expcp ({a}⊥ ).
+
+
+                                                        15
+D    Proof of Theorem 5
+Theorem 5.
+                                                                         √                   
+                                                   1                     2 c|h−p ⊕c x, ai|
+                       c
+              dc (x, H̃a,p ) :=    inf dc (x, w) = √ sinh−1                                     .      (55)
+                                      c
+                                  w∈H̃a,p           c                 (1 − ck − p ⊕c xk2 )kak
+Proof. We first need to prove the following lemma, trivial in the Euclidean space, but not in the
+Poincaré ball:
+Lemma 7. (Orthogonal projection on a geodesic) Any point in the Poincaré ball has a unique
+orthogonal projection on any given geodesic that does not pass through the point. Formally, for all
+y ∈ Dnc and for all geodesics γx→z (·) s.t. y ∈
+                                              / Im γx→z , there exists an unique w ∈ Im γx→z s.t.
+∠(γw→y , γx→z ) = π/2.
+
+Proof. We first note that any geodesic in Dnc has the form γ(t) = u ⊕c v ⊗c t as given by Eq. 11,
+and has two "points at infinity" lying on the ball border (v 6= 0):
+                                                     ±v
+                                       γ(±∞) = u ⊕c √      ∈ ∂Dnc .                                    (56)
+                                                      ckvk
+
+Using the notations in the lemma statement, the closed-form of γx→z is given by Eq. (10):
+                                       γx→z (t) = x ⊕c (−x ⊕c z) ⊗c t
+                  0   0
+We denote by x , z        ∈ ∂Dnc its points at infinity as described by Eq. (56). Then, the hyperbolic angle
+∠ywx0 is well defined from Eq. (34):
+                                                                   h−w ⊕c y, −w ⊕c z 0 i
+                 cos(∠(γw→y , γx→z )) = cos(∠ywz 0 ) =                                       .         (57)
+                                                                k − w ⊕c yk · k − w ⊕c z 0 k
+We now perform 2 steps for this proof.
+i) Existence of w:
+The angle function from Eq. (57) is continuous w.r.t t when w = γx→z (t). So we first prove existence
+of an angle of π/2 by continuously moving w from x0 to z 0 when t goes from −∞ to ∞, and
+observing that cos(∠ywz 0 ) goes from −1 to 1 as follows:
+                               cos(∠yx0 z 0 ) = 1   &    lim cos(∠ywz 0 ) = −1.                        (58)
+                                                        w→z 0
+
+The left part of Eq. (58) follows from Eq.√
+                                          (57) and from the fact (easy to show from the definition
+of ⊕c ) that a ⊕c b = a, when kak = 1/ c (which is the case of x0 ). The right part of Eq. (58)
+follows from the fact that ∠ywz 0 = π − ∠ywx0 (from the conformal property, or from Eq. (34)) and
+cos(∠yz 0 x0 ) = 1 (proved as above).
+Hence cos(∠ywz 0 ) has to pass through 0 when going from −1 to 1, which achieves the proof of
+existence.
+ii) Uniqueness of w:
+Assume by contradiction that there are two w and w0 on γx→z that form angles ∠ywx0 and ∠yw0 x0
+of π/2. Since w, w0 , x0 are on the same geodesic, we have
+                                π/2 = ∠yw0 x0 = ∠yw0 w = ∠ywx0 = ∠yw0 w                                (59)
+          0
+So ∆yww has two right angles, but in the Poincaré ball this is impossible.
+
+Now, we need two more lemmas:
+Lemma 8. (Minimizing distance from point to geodesic) The orthogonal projection of a point to
+a geodesic (not passing through the point) is minimizing the distance between the point and the
+geodesic.
+
+Proof. The proof is similar with the Euclidean case and it’s based on hyperbolic sine law and the fact
+that in any right hyperbolic triangle the hypotenuse is strictly longer than any of the other sides.
+
+
+                                                        16
+                                        c                                                c
+Lemma 9. (Geodesics through p) Let H̃a,p   be a Poincaré hyperplane. Then, for any w ∈ H̃a,p \ {p},
+                                                  c
+all points on the geodesic γp→w are included in H̃a,p .
+
+Proof. γp→w (t) = p ⊕c (−p ⊕c w) ⊗c t. Then, it is easy to check the condition in Eq. (22):
+                h−p ⊕c γp→w (t), ai = h(−p ⊕c w) ⊗c t, ai ∝ h−p ⊕c w, ai = 0.                  (60)
+
+
+                                                                            c
+We now turn back to our proof. Let x ∈ Dnc be an arbitrary point and H̃a,p    a Poincaré hyperplane.
+We prove that there is at least one point w∗ ∈ H̃a,p
+                                                 c
+                                                     that achieves the infimum distance
+                                   dc (x, w∗ ) =     inf     dc (x, w),                        (61)
+                                                       c
+                                                   w∈H̃a,p
+
+and, moreover, that this distance is the same as the one in the theorem’s statement.
+                                       c
+We first note that for any point w ∈ H̃a,p , if ∠xwp 6= π/2, then w 6= w∗ . Indeed, using Lemma 8
+and Lemma 9, it is obvious that the projection of x to γp→w will give a strictly lower distance.
+                             c
+Thus, we only consider w ∈ H̃a,p such that ∠xwp = π/2. Applying hyperbolic sine law in the right
+triangle ∆xwp, one gets:
+                                 √               √
+                 dc (x, w) = (1/ c) sinh−1 sinh( c dc (x, p)) · sin(∠xpw) .
+                                                                          
+                                                                                            (62)
+
+One of the above quantities does not depend on w:
+
+                                                                  √
+               √                              √                  2 ck − p ⊕c xk
+          sinh( c dc (x, p)) = sinh(2 tanh−1 ( ck − p ⊕c xk)) =                   .            (63)
+                                                                1 − ck − p ⊕c xk2
+
+The other quantity is sin(∠xpw) which is minimized when the angle ∠xpw is minimized (be-
+cause ∠xpw < π/2 for the hyperbolic right triangle ∆xwp), or, alternatively, when cos(∠xpw) is
+maximized. But, we already have from Eq. (34) that:
+                                               h−p ⊕c x, −p ⊕c wi
+                            cos(∠xpw) =                               .                        (64)
+                                            k − p ⊕c xk · k − p ⊕c wk
+To maximize the above, the constraint on the right angle at w can be dropped because cos(∠xpw)
+depends only on the geodesic γp→w and not on w itself, and because there is always an orthogonal
+projection from any point x to any geodesic as stated by Lemma 7. Thus, it remains to find the
+                                  c                              c
+maximum of Eq. (64) when w ∈ H̃a,p   . Using the definition of H̃a,p from Eq. (22), one can easily
+prove that
+                                  {logcp (w) : w ∈ H̃a,p
+                                                     c
+                                                         } = {a}⊥ .                            (65)
+Using that fact that logcp (w)/k logcp (w)k = −p ⊕c w/k − p ⊕c wk, we just have to find
+                                                                   
+                                                  h−p ⊕c x, zi
+                                    max                                 ,                      (66)
+                                   z∈{a}⊥       k − p ⊕c xk · kzk
+and we are left with a well known Euclidean problem which is equivalent to finding the minimum
+angle between the vector −p ⊕c x (viewed as Euclidean) and the hyperplane {a}⊥ . This angle
+is given by the Euclidean orthogonal projection whose sin value is the distance from the vector’s
+endpoint to the hyperplane divided by the vector’s length:
+                                                                a
+                                                    |h−p ⊕c x, kak i|
+                                 sin(∠xpw∗ ) =                              .                  (67)
+                                                         k − p ⊕c xk
+
+It follows that a point w∗ ∈ H̃a,p
+                               c
+                                   satisfying Eq. (67) exists (but might not be unique). Combining
+Eqs. (61),(62),(63) and (67) concludes the proof.
+
+                                                                                                 
+
+
+                                                    17
+E    Derivation of the Hyperbolic GRU Update-gate
+
+In [24], the authors recover the update/forget-gate mechanism of a GRU/LSTM by requiring that the
+class of neural networks given by the chosen architecture be invariant to time-warpings. The idea is
+the following.
+
+Recovering the update-gate from time-warping. A naive RNN is given by the equation
+
+                                h(t + 1) = ϕ(W h(t) + U x(t) + b)                                 (68)
+
+Let’s drop the bias b to simplify notations. If h is seen as a differentiable function of time, then a
+first-order Taylor development gives h(t + δt) ≈ h(t) + δt dh  dt (t) for small δt. Combining this for
+δt = 1 with the naive RNN equation, one gets
+                                dh
+                                   (t) = ϕ(W h(t) + U x(t)) − h(t).                               (69)
+                                dt
+As this is written for any t, one can replace it by t ← α(t) where α is a (smooth) increasing function
+of t called the time-warping. Denoting by h̃(t) := h(α(t)) and x̃(t) := x(α(t)), using the chain rule
+dh̃       dα     dh
+dt (t) = dt (t) dt (α(t)), one gets
+
+                         dh̃       dα                           dα
+                             (t) =    (t)ϕ(W h̃(t) + U x̃(t)) −    (t)h̃(t).                      (70)
+                         dt        dt                           dt
+Removing the tildas to simplify notations, discretizing back with dh
+                                                                  dt (t) ≈ h(t + 1) − h(t) yields
+                                                                         
+                               dα                                  dα
+                  h(t + 1) =      (t)ϕ(W h(t) + U x(t)) + 1 −          (t) h(t).               (71)
+                               dt                                  dt
+Requiring that our class of neural networks be invariant to time-warpings means that this class should
+contain RNNs defined by Eq. (71), i.e. that dαdt (t) can be learned. As this is a positive quantity, we
+can parametrize it as z(t) = σ(W z h(t) + U z x(t)), recovering the forget-gate equation:
+
+                       h(t + 1) = z(t)ϕ(W h(t) + U x(t)) + (1 − z(t))h(t).                        (72)
+
+Adapting this idea to hyperbolic RNNs. The gyroderivative [4] of a map h : R → Dnc is defined
+as
+                          dh            1
+                             (t) = lim     ⊗c (−h(t) ⊕c h(t + δt)).                      (73)
+                          dt       δt→0 δt
+
+Using Möbius scalar associativity and the left-cancellation law leads us to
+                                                              dh
+                                 h(t + δt) ≈ h(t) ⊕c δt ⊗c       (t),                             (74)
+                                                              dt
+for small δt. Combining this with the equation of a simple hyperbolic RNN of Eq. (29) with δt = 1,
+one gets
+                       dh
+                          (t) = −h(t) ⊕c ϕ⊗c (W ⊗c h(t) ⊕c U ⊗c x(t)).                        (75)
+                       dt
+For the next step, we need the following lemma:
+Lemma 10 (Gyro-chain-rule). For α : R → R differentiable and h : R → Dnc with a well-defined
+gyro-derivative, if h̃ := h ◦ α, then we have
+
+                                    dh̃       dα        dh
+                                        (t) =    (t) ⊗c    (α(t)),                                (76)
+                                    dt        dt        dt
+where dα
+      dt (t) denotes the usual derivative.
+
+
+                                                  18
+Proof.
+ dh̃             1
+     (t) = lim      ⊗c [−h̃(t) ⊕c h̃(t + δt)]                                               (77)
+ dt        δt→0 δt
+                 1
+         = lim      ⊗c [−h(α(t)) ⊕c h(α(t) + δt(α0 (t) + O(δt)))]                           (78)
+           δt→0 δt
+                     0
+                   α (t) + O(δt)
+         = lim                      ⊗c [−h(α(t)) ⊕c h(α(t) + δt(α0 (t) + O(δt)))]           (79)
+           δt→0 δt(α0 (t) + O(δt))
+
+                        α0 (t)
+         = lim                      ⊗c [−h(α(t)) ⊕c h(α(t) + δt(α0 (t) + O(δt)))]           (80)
+           δt→0 δt(α0 (t) + O(δt))
+
+                α0 (t)
+         = lim         ⊗c [−h(α(t)) ⊕c h(α(t) + u)]                                         (81)
+           u→0 u
+           dα          dh
+         =     (t) ⊗c     (α(t))                              (Möbius scalar associativity) (82)
+            dt         dt
+where we set u = δt(α0 (t) + O(δt)), with u → 0 when δt → 0, which concludes.
+
+Using lemma 10 and Eq. (75), with similar notations as in Eq. (70) we have
+                    dh̃       dα
+                        (t) =    (t) ⊗c (−h̃(t) ⊕c ϕ⊗c (W ⊗c h̃(t) ⊕c U ⊗c x̃(t))).                 (83)
+                    dt        dt
+Finally, discretizing back with Eq. (74), using the left-cancellation law and dropping the tildas yields
+                                 dα
+            h(t + 1) = h(t) ⊕c       (t) ⊗c (−h(t) ⊕c ϕ⊗c (W ⊗c h(t) ⊕c U ⊗c x(t))).            (84)
+                                  dt
+Since α is a time-warping, by definition its derivative is positive and one can choose to parametrize
+it with an update-gate zt (a scalar) defined with a sigmoid. Generalizing this scalar scaling by the
+Möbius version of the pointwise scaling yields the Möbius matrix scaling diag(zt ) ⊗c ·, leading to
+our proposed Eq. (33) for the hyperbolic GRU.
+
+F    More Experimental Investigations
+The following empirical facts were observed for both hyperbolic RNNs and GRUs.
+We observed that, in the hyperbolic setting, accuracy is often much higher when sentence embeddings
+can go close to the border (hyperbolic "infinity"), hence exploiting the hyperbolic nature of the space.
+Moreover, the faster the two sentence norms go to 1, the more it’s likely that a good local minima
+was reached. See figures 3 and 5.
+We often observe that test accuracy starts increasing exactly when sentence embedding norms do.
+However, in the hyperbolic setting, the sentence embeddings norms remain close to 0 for a few
+epochs, which does not happen in the Euclidean case. See figures 3, 5 and 4. This mysterious fact
+was also exhibited in a similar way by [21] which suggests that the model first has to adjust the
+angular layout in the almost Euclidean vicinity of 0 before increasing norms and fully exploiting
+hyperbolic geometry.
+
+
+
+
+                                                  19
+                                             (a) Test accuracy
+
+
+
+
+                (b) Norm of the first sentence. Averaged over all sentences in the test set.
+Figure 3: PREFIX-30% accuracy and first (premise) sentence norm plots for different runs of the same
+architecture: hyperbolic GRU followed by hyperbolic FFNN and hyperbolic/Euclidean (half-half)
+MLR. The X axis shows millions of training examples processed.
+
+
+
+
+                                             (a) Test accuracy
+
+
+
+
+                (b) Norm of the first sentence. Averaged over all sentences in the test set.
+Figure 4: PREFIX-30% accuracy and first (premise) sentence norm plots for different runs of the
+same architecture: Euclidean GRU followed by Euclidean FFNN and Euclidean MLR. The X axis
+shows millions of training examples processed.
+
+
+
+
+                                                    20
+                                             (a) Test accuracy
+
+
+
+
+                (b) Norm of the first sentence. Averaged over all sentences in the test set.
+Figure 5: PREFIX-30% accuracy and first (premise) sentence norm plots for different runs of the
+same architecture: hyperbolic RNN followed by hyperbolic FFNN and hyperbolic MLR. The X axis
+shows millions of training examples processed.
+
+
+
+
+                                                    21
+
