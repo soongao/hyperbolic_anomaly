@@ -56,14 +56,15 @@
 \clip{} 零样本异常定位通常沿用图文匹配的闭集比较语法：为 normal 与 anomaly 构造文本提示，再由 patch--text 相似度差生成异常图。
 本文主张，这一语法并不是该任务的正确基本单位。
 工业缺陷很少构成稳定、可枚举的异常语义类；它们更准确地表现为正常外观、材料状态和结构约束在局部证据上的失效。
-因此，异常 patch 的定义不在于它是否更接近通用的 ``abnormal'' 文本，而在于它是否仍可被正常性模型低代价接收。
+因此，异常 patch 的定义不在于它是否更接近通用的 ``abnormal'' 文本，而在于它是否仍是 learned normal concept 的合法特化。
 基于这一任务重构，本文提出可拒绝双曲正常性接收框架 \method{}。
-\method{} 以 AnomalyCLIP 的 learned normal prompt 作为正常性参考，用双曲锥将点式文本原型提升为结构化接收域，并通过非平衡最优传输实现 patch 级可拒绝接收。
+\method{} 将 AnomalyCLIP 的 learned normal prompt 解释为语义可接收性锚点，而不是正常类中心；normal concept 到 patch 的接收关系是非对称的，normal concept 约束哪些局部证据可被视为正常，patch 不能反向定义 normal concept。
+基于这一非对称性，\method{} 用双曲锥刻画从 normal anchor 指向可接收局部证据的方向性合法特化关系，并通过非平衡最优传输实现 patch 级可拒绝接收。
 该推断过程给出两个具有明确含义的异常证据：未接收比例刻画局部证据被正常性拒绝的程度，条件接收代价刻画已接收证据仍付出的解释成本。
 在 MVTec AD 和 VisA 上，\method{} 在像素级定位上取得一致提升；传输模式、代价形式、锚点替换和证据分解实验进一步对应验证了正常性接收命题导出的四项机制预期。
 \end{abstract}
 
-\noindent\textbf{关键词：} 零样本异常定位；视觉语言模型；正常性接收；双曲几何；非平衡最优传输
+\noindent\textbf{关键词：} 零样本异常定位；视觉语言模型；正常性接收；语义可接收性；双曲几何；非平衡最优传输
 
 \section{引言}
 
@@ -74,25 +75,28 @@
 现有 \clip{} 异常定位方法据此构造 normal/anomaly prompts，将局部视觉特征与文本特征进行相似度比较，并由相似度差生成像素级异常图 \cite{AnomalyCLIP, WinCLIP, PromptAD, APRILGAN, VAND}。
 这一范式有效利用了 \clip{} 的跨模态对齐能力，却同时继承了闭集识别中的对称比较假设：normal 与 anomaly 被当作两个可并列竞争的文本语义。
 
-本文的出发点是：\clip{} 零样本异常定位的基本对象不是异常语义类，而是正常性模型的可接收集合。
+本文的出发点是：\clip{} 零样本异常定位的基本对象不是异常语义类，而是 normal concept 对局部证据的语义可接收性。
 异常 patch 不必比 normal patch 更接近通用的 ``abnormal'' 文本。
-它之所以成为异常，是因为正常性参考无法用低代价解释它。
-这一重构把 anomaly scoring 从“正常/异常文本分类”转化为“局部证据是否仍被正常性接收”的判别。
+它之所以成为异常，是因为它不再是 learned normal concept 的合法特化，正常性参考无法用低代价解释它。
+这一重构把 anomaly scoring 从“正常/异常文本分类”转化为“局部证据是否仍被正常概念接收”的判别。
 在该视角下，模型不再试图穷举异常的名称，而是估计正常性在何处失去解释力。
 
 这一命题重新定义了 learned normal prompt 的角色。
 在 prompt scoring 中，normal prompt 通常只是二分类比较中的一个文本原型。
-在正常性接收中，它是局部证据的接收参考：正常 patch 落入由该参考诱导的低代价区域；异常 patch 则表现为接收失败。
+在正常性接收中，它是语义可接收性锚点：它不是正常类中心，而是规定哪些局部证据可作为该正常概念的合法特化。
+正常 patch 沿着该锚点诱导的可接收方向被解释；异常 patch 则表现为方向违背或接收失败。
 接收失败具有两种可分解形态。
-一类证据无法进入正常性接收域，形成未接收质量；另一类证据仍被接收，却伴随较高解释代价。
+一类证据不再满足正常概念到局部证据的合法特化关系，形成未接收质量；另一类证据仍被接收，却伴随较高解释代价。
 前者对应显式拒绝，后者对应困难接收。
 两者共同构成异常定位中比单一相似度差更可审计的证据结构。
 
-正常性接收还要求 normal prompt 从点式原型升级为接收域。
-点到点相似度只刻画局部特征与文本原型的邻近性，难以表达正常结构中的方向、包含和尺度约束。
-正常对象由部件、表面、纹理、边界和材料状态构成；缺陷通常是这些约束在局部区域的违背。
-双曲几何适合表示层级和蕴含式关系 \cite{PoincareEmbeddings, HyperbolicNeuralNetworks, HyperbolicVisionLanguage}。
-本文因此将 learned normal prompt 解释为双曲空间中的接收锥：锥内区域表示可被该 normal anchor 接收的局部证据，锥外偏离对应结构化接收代价。
+正常性接收还要求 normal prompt 从点式原型升级为方向性接收锚点。
+将 normal prompt 视为正常类中心时，欧氏球、余弦邻域或双曲距离只能表达“靠近正常”。
+但 CLIP-ZSAD 中的 learned normal prompt 更接近一个正常概念约束：它描述“正常表面”“正常边界”或“正常材料状态”可以接受哪些局部表现，而不是枚举这些表现的中心。
+这种关系是非对称的：normal concept 约束 patch 是否可作为其合法特化，patch 不能反向定义 normal concept。
+点到点距离无法表达这种从语义锚点到局部证据的方向性可接收关系。
+双曲几何适合表示层级和蕴含式关系 \cite{PoincareEmbeddings, HyperbolicNeuralNetworks, HyperbolicVisionLanguage}；其中锥结构能够把锚点到实例的非对称约束显式化。
+本文因此将 learned normal prompt 解释为双曲空间中的语义可接收锥：锥内区域表示 normal anchor 允许的局部特化，锥外偏离表示方向性违背，而不是单纯距离变远。
 
 最后，正常性接收必须具备拒绝机制。
 在平衡匹配中，所有 patch 质量都会被分配给某个 normal anchor，缺陷区域也被强行解释为正常证据。
@@ -100,18 +104,18 @@
 在本文中，UOT 不是附加的匹配模块，而是正常性接收命题的推断形式：低代价证据被接收，无法被解释的证据保留为未接收质量。
 
 基于上述任务重构，本文提出 \method{}，即 Rejectable Hyperbolic Normality Acceptance。
-\method{} 使用 \clip{}/AnomalyCLIP 提取 patch 特征，以 learned normal prompt 构建正常性参考，通过双曲锥代价形成结构化接收域，并用 UOT 估计每个 patch 的接收状态。
-这一命题直接推出四项可观测预期：可拒绝接收优于强制接收；双曲锥优于点式距离；未接收比例与条件接收代价提供互补证据；learned normal prompt 优于 anomaly 或错配锚点。
+\method{} 使用 \clip{}/AnomalyCLIP 提取 patch 特征，以 learned normal prompt 构建语义可接收性锚点，通过双曲锥代价刻画方向性合法特化，并用 UOT 估计每个 patch 的接收状态。
+这一命题直接推出四项可观测预期：可拒绝接收优于强制接收；双曲锥优于点式距离，因为异常体现为方向性违背而不只是远离锚点；未接收比例与条件接收代价提供互补证据；learned normal prompt 优于 anomaly 或错配锚点。
 本文的实验围绕这些预期组织，并将每项结果对应到可观察的接收状态。
 
 本文贡献如下：
 \begin{enumerate}[leftmargin=*]
-    \item 提出 \clip{} 零样本异常定位的可拒绝正常性接收命题，将异常从可枚举语义类重写为不能被 learned normal prompt 低代价接收的局部证据。
-    \item 提出双曲正常性接收域，用双曲锥将 learned normal prompt 从点式文本原型提升为带有方向约束的结构化接收集合。
+    \item 提出 \clip{} 零样本异常定位的可拒绝正常性接收命题，将异常从可枚举语义类重写为不能作为 learned normal concept 合法特化的局部证据。
+    \item 提出双曲语义可接收锥，将 learned normal prompt 从点式文本原型提升为语义可接收性锚点，并用锥内包含刻画 normal concept 到 patch 的方向性合法特化。
     \item 提出基于非平衡最优传输的可拒绝接收推断，并将异常证据分解为未接收比例和条件接收代价两个可观测量。
 \end{enumerate}
 
-\schematicfigure{motivation}{动机示意。Prompt scoring 将异常定位压缩为 normal/anomaly 相对相似度；平衡接收把所有 patch 强行解释为正常性证据；可拒绝正常性接收以正常性参考定义接收集合，并将缺陷表现为未接收比例升高或条件接收代价升高。}
+\schematicfigure{motivation}{动机示意。Prompt scoring 将异常定位压缩为 normal/anomaly 相对相似度；点式接收只判断 patch 是否接近 normal 文本点；可拒绝双曲正常性接收把 normal prompt 视为语义可接收性锚点，将正常 patch 解释为锥内合法特化，将缺陷表现为方向性违背、未接收比例升高或条件接收代价升高。}
 
 \section{相关工作}
 
@@ -122,7 +126,7 @@
 后续工作通过 prompt learning、局部特征对齐、多尺度融合和对象无关提示进一步增强跨类别泛化 \cite{APRILGAN, VAND}。
 
 本文继承这一路线中最有价值的部分，即 learned normal prompt 对跨类别正常性的抽象能力，同时改变其判别角色。
-在 \method{} 中，normal prompt 不是与 anomaly prompt 竞争的分类原型，而是定义 patch 可接收集合的正常性参考。
+在 \method{} 中，normal prompt 不是与 anomaly prompt 竞争的分类原型，而是定义局部证据合法特化范围的语义可接收性锚点。
 这一转变使异常分数从相对相似度扩展为显式的接收状态估计。
 
 \subsection{双曲表征与结构化语义}
@@ -131,9 +135,9 @@
 在视觉和视觉语言任务中，双曲几何已用于类别层级建模、视觉蕴含、跨模态对齐和结构化语义推理 \cite{HyperbolicVision, HyperbolicCLIP}。
 异常检测中也存在使用双曲距离或双曲表征的相关工作 \cite{HyperbolicAnomaly}。
 
-\method{} 不把双曲几何作为孤立的距离替换。
-本文使用双曲锥刻画 normal prompt 诱导的正常性接收域，使几何结构服务于正常性约束本身。
-这种设计关注 patch 是否满足 normal anchor 的方向约束，而不只是距离某个文本点的远近。
+在 \method{} 中，双曲几何承担语义可接收性的结构角色。
+本文使用双曲锥刻画 normal prompt 诱导的语义可接收性，使几何结构服务于正常概念到局部证据的非对称约束。
+这种设计关注 patch 是否是 normal anchor 的合法特化，而不只是距离某个文本点的远近。
 
 \subsection{最优传输与拒绝式推断}
 
@@ -149,7 +153,7 @@
 一类异常检测以正常数据建立判别边界，并将偏离正常分布的样本识别为异常 \cite{OneClassAD}。
 开放集识别同样要求模型拒绝不属于已知类别的样本 \cite{OpenSetRecognition}。
 \method{} 与这些思想共享“由正常性定义接受集合”的原则，但它不依赖目标域正常样本来估计密度。
-本文在 \clip{} 零样本设定下，通过 learned normal prompt、双曲接收域和可拒绝传输构造 patch 级正常性接收函数。
+本文在 \clip{} 零样本设定下，通过 learned normal prompt、双曲语义可接收锥和可拒绝传输构造 patch 级正常性接收函数。
 
 \section{方法}
 
@@ -166,12 +170,12 @@ AnomalyCLIP 的文本编码器和 prompt learner 产生 $M$ 个 learned normal p
 主设定使用 \texttt{anchor\_mode=normal}，即仅使用 learned normal prompt 作为正常性锚点。
 目标是在零样本条件下为每个 patch 估计异常分数 $s_i$，并上采样得到像素级 anomaly map。
 
-\method{} 将 $T$ 解释为正常性接收参考。
-当 $p_i$ 可被 $T$ 低代价接收时，该 patch 倾向于正常；当 $p_i$ 被拒绝或仅能高代价接收时，该 patch 提供异常证据。
+\method{} 将 $T$ 解释为语义可接收性参考。
+当 $p_i$ 可作为 $T$ 的低代价合法特化被接收时，该 patch 倾向于正常；当 $p_i$ 违背该可接收方向、被拒绝或仅能高代价接收时，该 patch 提供异常证据。
 因此，本文估计的是 patch 的正常性接收状态，而不是它与 abnormal prompt 的相对相似度。
 这一设定保留 \clip{} 的开放词表优势，同时避免把开放异常压缩成一个固定异常词义。
 
-\subsection{双曲正常性接收域}
+\subsection{双曲语义可接收锥}
 
 首先将归一化后的视觉特征和文本特征映射到曲率为 $c$ 的 Poincare ball $\mathbb{B}_{c}^{d}$：
 \begin{equation}
@@ -183,15 +187,17 @@ AnomalyCLIP 的文本编码器和 prompt learner 产生 $M$ 个 learned normal p
 \begin{equation}
     C_{ij}^{\mathrm{dist}} = d_{\mathbb{B}_{c}}(z_i, u_j).
 \end{equation}
+该基线仍然把 $u_j$ 当作点式原型，只衡量 $z_i$ 与 $u_j$ 的邻近性。
+对于正常性接收，关键关系不是邻近，而是 $z_i$ 是否沿着 $u_j$ 诱导的可接收方向成为 normal concept 的合法特化。
 
 \method{} 的主代价为双曲锥违背代价：
 \begin{equation}
     C_{ij}^{\mathrm{cone}} =
     V\!\left(z_i, \operatorname{Cone}(u_j)\right).
 \end{equation}
-$\operatorname{Cone}(u_j)$ 表示由 normal anchor $u_j$ 诱导的接收锥，$V(\cdot)$ 度量 patch 相对于锥轴和锥孔径的偏离。
-当 $z_i$ 落在锥内时，$p_i$ 满足该 normal anchor 的接收约束；当 $z_i$ 偏离锥体时，接收代价升高。
-因此，normal prompt 在 \method{} 中不是单个最近邻原型，而是带有方向约束的正常性接收区域。
+$\operatorname{Cone}(u_j)$ 表示由 normal anchor $u_j$ 诱导的语义可接收锥，$V(\cdot)$ 度量 patch 相对于锥轴和锥孔径的方向性偏离。
+当 $z_i$ 落在锥内时，$p_i$ 被视为该 normal concept 的合法局部特化；当 $z_i$ 偏离锥体时，它不仅远离某个点，而是违背了 normal anchor 对局部证据的可接收方向。
+因此，normal prompt 在 \method{} 中不是单个最近邻原型，而是带有非对称约束的语义可接收性锚点。
 
 \subsection{可拒绝接收推断}
 
@@ -220,7 +226,7 @@ $\operatorname{Cone}(u_j)$ 表示由 normal anchor $u_j$ 诱导的接收锥，$V
 \end{equation}
 其中 $\Omega(\gamma)=\sum_{ij}\gamma_{ij}(\log \gamma_{ij}-1)$。
 $\tau_p$ 和 $\tau_t$ 控制 patch 端和锚点端的质量保持强度，$\epsilon$ 控制熵正则强度。
-较大的 $\tau_p,\tau_t$ 使解接近平衡接收；较强的质量松弛允许无法低代价进入接收域的 patch 保留未接收质量。
+较大的 $\tau_p,\tau_t$ 使解接近平衡接收；较强的质量松弛允许无法低代价满足可接收方向的 patch 保留未接收质量。
 由此，UOT 的边缘松弛在 \method{} 中具有直接语义：它不是数值技巧，而是正常性接收中的拒绝通道。
 
 \subsection{异常证据分解}
@@ -254,7 +260,7 @@ UOT 采用 Sinkhorn 式迭代求解。
 给定 patch 数 $N$、锚点数 $M$ 和迭代步数 $K$，特征提取后的主要计算复杂度为 $O(KNM)$。
 由于主设定仅使用 learned normal prompts，锚点数保持较小，额外开销主要来自轻量的耦合迭代。
 
-\schematicfigure{method}{方法概览。\method{} 从 \clip{} patch 特征和 learned normal prompt 出发，构造双曲正常性接收锥；UOT 在该接收域上估计 patch 的接收质量；未接收比例和条件接收代价共同形成 anomaly map。}
+\schematicfigure{method}{方法概览。\method{} 从 \clip{} patch 特征和 learned normal prompt 出发，构造双曲语义可接收锥；UOT 在该方向性接收关系上估计 patch 的接收质量；未接收比例和条件接收代价共同形成 anomaly map。}
 
 \section{实验}
 
@@ -262,7 +268,7 @@ UOT 采用 Sinkhorn 式迭代求解。
 
 实验部分以正常性接收命题的可观测后果为组织单位。
 第一，可拒绝接收相对于强制接收产生更低 over-match 和更高定位质量。
-第二，双曲锥接收域相对于平坦代价和点式双曲距离产生更清晰的接收边界。
+第二，双曲语义可接收锥相对于平坦代价和点式双曲距离产生更清晰的方向性接收边界。
 第三，未接收比例与条件接收代价捕获不同异常证据，二者组合优于任一单项。
 第四，learned normal prompt 是正常性接收的正确参考，anomaly prompt 或错配 normal anchor 会破坏接收语义。
 
@@ -322,18 +328,18 @@ Partial OT & 86.2 & 0.08 & 0.19 & 15.0 \\
 \end{tabular}
 \end{table}
 
-\subsection{验证二：结构化接收域}
+\subsection{验证二：方向性语义可接收性}
 
 表 \ref{tab:cost} 在相同 UOT 设置下比较不同接收代价。
 余弦和欧氏代价将 normal prompt 视为平坦点原型。
 双曲距离引入曲率，但仍停留在点到点邻近性。
-双曲锥代价显式建模 normal anchor 的接收方向，因此对应本文命题中的结构化接收域。
+双曲锥代价显式建模 normal anchor 对局部证据的可接收方向，因此对应本文命题中的语义合法特化关系。
 结果显示，双曲锥在 Pixel AUPRO、未接收比例 AUC、条件接收代价差异和 normal-image FPR 上均优于其他代价。
-这表明增益来自正常性接收域的结构，而不是单纯的几何重标定。
+这表明增益来自方向性可接收关系，而不是仅来自数值尺度差异。
 
 \begin{table}[t]
 \centering
-\caption{接收域代价消融。所有设置使用相同 UOT 参数和相同锚点。}
+\caption{语义可接收性代价消融。所有设置使用相同 UOT 参数和相同锚点。}
 \label{tab:cost}
 \begin{tabular}{lcccc}
 \toprule
@@ -350,7 +356,7 @@ Hyperbolic distance & 86.0 & 71.6 & 0.08 & 14.2 \\
 \subsection{验证三：两类异常证据}
 
 表 \ref{tab:score} 将最终分数分解为未接收比例和条件接收代价。
-未接收比例对应正常性拒绝，突出无法进入接收域的局部证据。
+未接收比例对应正常性拒绝，突出无法满足 normal anchor 可接收方向的局部证据。
 条件接收代价对应困难接收，突出虽被分配给 normal anchor 但解释成本异常的局部证据。
 两者组合取得更高 Pixel AUROC、Pixel AUPRO 和更低 Normal FPR，说明拒绝证据与困难接收证据并不等价。
 该分解也使 \method{} 的异常图具有可解释来源，而非单一相似度热图。
@@ -375,7 +381,7 @@ Combined score & 92.4 & 87.1 & 76.8 & 11.3 \\
 
 表 \ref{tab:anchors} 检验接收参考的身份。
 多锚点匹配解释会预期 anomaly prompt 或 normal/anomaly 混合锚点提供有效目标。
-正常性接收命题给出相反预期：接收集合由 normal prompt 定义，anomaly anchor 会破坏“被正常性拒绝”的判别语义。
+正常性接收命题给出相反预期：语义可接收性由 normal prompt 定义，anomaly anchor 会破坏“被正常性拒绝”的判别语义。
 结果显示，将 learned normal prompt 替换为 learned anomaly prompt 显著降低 AUPRO 并提高误报。
 同时使用 normal/anomaly prompts 也弱于仅使用 normal prompt，说明 anomaly anchor 会稀释正常性拒绝信号。
 打乱 normal feature 后性能下降，进一步确认 \method{} 依赖正确的正常性参考，而不是任意锚点集合。
@@ -391,7 +397,7 @@ Combined score & 92.4 & 87.1 & 76.8 & 11.3 \\
 \midrule
 \textbf{Learned normal prompt} & \textbf{87.1} & \textbf{76.8} & \textbf{11.3} & 主设定 \\
 Learned anomaly prompt & 80.2 & 58.4 & 22.7 & 缺少正常性接收参考 \\
-Normal + anomaly prompts & 86.4 & 72.9 & 13.6 & 接收域被异常锚点稀释 \\
+Normal + anomaly prompts & 86.4 & 72.9 & 13.6 & 可接收性被异常锚点稀释 \\
 Shuffled normal feature & 82.1 & 61.7 & 20.4 & 正常性参考错配 \\
 \bottomrule
 \end{tabular}
@@ -410,29 +416,29 @@ Shuffled normal feature & 82.1 & 61.7 & 20.4 & 正常性参考错配 \\
 计算复杂度由 UOT 耦合迭代决定。
 在 patch 数为 $N$、锚点数为 $M$、迭代步数为 $K$ 时，额外复杂度为 $O(KNM)$。
 由于主方法使用紧凑的 learned normal prompt 集合，主要开销来自小规模耦合矩阵上的 Sinkhorn 迭代。
-敏感性分析围绕 $\epsilon$、$\tau_p$、$\tau_t$、曲率、锚点数量和迭代步数展开，以刻画质量松弛和接收域形状对定位结果的影响。
+敏感性分析围绕 $\epsilon$、$\tau_p$、$\tau_t$、曲率、锚点数量和迭代步数展开，以刻画质量松弛和语义可接收锥形状对定位结果的影响。
 
 \section{讨论}
 
 \method{} 的意义不在于把双曲几何与 UOT 并置，而在于改变 \clip{} 零样本异常定位的判别对象。
 Prompt scoring 试图回答“这个 patch 更像 normal 还是 abnormal”；\method{} 回答“这个 patch 是否仍能被正常性低代价接收”。
 二者的差别决定了方法设计的顺序。
-先有正常性接收命题，才有 normal prompt 的接收域化、双曲锥的方向约束，以及 UOT 的拒绝变量。
+先有正常性接收命题，才有 normal prompt 的语义可接收性锚点化、双曲锥的方向性合法特化关系，以及 UOT 的拒绝变量。
 
 从实验回看，四组机制分析形成了同一条证据链。
 传输模式比较表明，严格质量守恒带来过度接收，而 UOT 的质量松弛产生稳定拒绝信号。
-代价比较表明，双曲锥优于点式距离，说明 normal prompt 的几何角色是接收域而非原型点。
+代价比较表明，双曲锥优于点式距离，说明 normal prompt 的几何角色是语义可接收性锚点而非原型点。
 分数分解表明，未接收比例与条件接收代价覆盖不同缺陷形态。
 锚点分析表明，正确的 learned normal prompt 是接收语义成立的参考。
-这些结果共同说明，异常定位的有效信号来自正常性解释力的局部失效，而不是异常词义本身的可枚举性。
+这些结果共同说明，异常定位的有效信号来自正常概念对局部证据的方向性解释失败，而不是异常词义本身的可枚举性。
 
 \section{结论}
 
 本文提出 \method{}，一种面向 \clip{} 零样本异常定位的可拒绝双曲正常性接收框架。
-本文的核心观点是，异常定位的基本对象不是异常语义类，而是正常性模型的可接收集合。
-\method{} 用 learned normal prompt 定义正常性参考，用双曲锥构造结构化接收域，并用非平衡最优传输实现可拒绝接收。
+本文的核心观点是，异常定位的基本对象不是异常语义类，而是 normal concept 对局部证据的语义可接收性。
+\method{} 用 learned normal prompt 定义语义可接收性锚点，用双曲锥刻画 normal concept 到 patch 的方向性合法特化关系，并用非平衡最优传输实现可拒绝接收。
 由此得到的未接收比例和条件接收代价分别刻画正常性拒绝与高代价接收。
-在 MVTec AD 和 VisA 上，\method{} 提升像素级定位结果；系统验证表明，可拒绝接收、双曲接收域、正常性参考和证据分解共同支撑了这一任务重构。
+在 MVTec AD 和 VisA 上，\method{} 提升像素级定位结果；系统验证表明，可拒绝接收、双曲语义可接收锥、正常性参考和证据分解共同支撑了这一任务重构。
 
 \bibliographystyle{plain}
 \bibliography{references}
