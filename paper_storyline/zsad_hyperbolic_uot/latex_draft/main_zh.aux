@@ -24,8 +24,8 @@
 \citation{HyperbolicVision}
 \citation{HyperbolicCLIP}
 \citation{HyperbolicAnomaly}
-\@writefile{lof}{\contentsline {figure}{\numberline {1}{\ignorespaces 动机示意。平坦 prompt scoring 将 patch 判别压缩为 normal/anomaly 相对相似度；平衡接收会把缺陷 patch 强行解释为正常；可拒绝正常性接收允许正常 patch 被低代价接收，同时将缺陷表现为未接收比例升高或条件接收代价升高。}}{2}{figure.1}\protected@file@percent }
-\newlabel{fig:motivation}{{1}{2}{动机示意。平坦 prompt scoring 将 patch 判别压缩为 normal/anomaly 相对相似度；平衡接收会把缺陷 patch 强行解释为正常；可拒绝正常性接收允许正常 patch 被低代价接收，同时将缺陷表现为未接收比例升高或条件接收代价升高。}{figure.1}{}}
+\@writefile{lof}{\contentsline {figure}{\numberline {1}{\ignorespaces 动机示意。Prompt scoring 将异常定位压缩为 normal/anomaly 相对相似度；平衡接收把所有 patch 强行解释为正常性证据；可拒绝正常性接收以正常性参考定义接收集合，并将缺陷表现为未接收比例升高或条件接收代价升高。}}{2}{figure.1}\protected@file@percent }
+\newlabel{fig:motivation}{{1}{2}{动机示意。Prompt scoring 将异常定位压缩为 normal/anomaly 相对相似度；平衡接收把所有 patch 强行解释为正常性证据；可拒绝正常性接收以正常性参考定义接收集合，并将缺陷表现为未接收比例升高或条件接收代价升高。}{figure.1}{}}
 \@writefile{toc}{\contentsline {section}{\numberline {2}相关工作}{2}{section.2}\protected@file@percent }
 \@writefile{toc}{\contentsline {subsection}{\numberline {2.1}基于视觉语言模型的零样本异常定位}{2}{subsection.2.1}\protected@file@percent }
 \citation{OptimalTransport}
@@ -40,10 +40,10 @@
 \@writefile{toc}{\contentsline {subsection}{\numberline {2.3}最优传输与拒绝式推断}{3}{subsection.2.3}\protected@file@percent }
 \@writefile{toc}{\contentsline {subsection}{\numberline {2.4}一类建模与开放集识别}{3}{subsection.2.4}\protected@file@percent }
 \@writefile{toc}{\contentsline {section}{\numberline {3}方法}{3}{section.3}\protected@file@percent }
-\@writefile{toc}{\contentsline {subsection}{\numberline {3.1}问题设定}{3}{subsection.3.1}\protected@file@percent }
-\@writefile{toc}{\contentsline {subsection}{\numberline {3.2}双曲正常性接收域}{3}{subsection.3.2}\protected@file@percent }
-\@writefile{toc}{\contentsline {subsection}{\numberline {3.3}可拒绝接收}{4}{subsection.3.3}\protected@file@percent }
-\newlabel{eq:uot}{{7}{4}{可拒绝接收}{equation.7}{}}
+\@writefile{toc}{\contentsline {subsection}{\numberline {3.1}从相似度分类到正常性接收}{3}{subsection.3.1}\protected@file@percent }
+\@writefile{toc}{\contentsline {subsection}{\numberline {3.2}双曲正常性接收域}{4}{subsection.3.2}\protected@file@percent }
+\@writefile{toc}{\contentsline {subsection}{\numberline {3.3}可拒绝接收推断}{4}{subsection.3.3}\protected@file@percent }
+\newlabel{eq:uot}{{7}{4}{可拒绝接收推断}{equation.7}{}}
 \@writefile{toc}{\contentsline {subsection}{\numberline {3.4}异常证据分解}{4}{subsection.3.4}\protected@file@percent }
 \citation{MVTecAD}
 \citation{VisA}
@@ -53,27 +53,27 @@
 \newlabel{tab:main}{{1}{5}{零样本异常定位主结果。最佳结果加粗。}{table.1}{}}
 \@writefile{toc}{\contentsline {subsection}{\numberline {3.5}复杂度}{5}{subsection.3.5}\protected@file@percent }
 \@writefile{toc}{\contentsline {section}{\numberline {4}实验}{5}{section.4}\protected@file@percent }
-\@writefile{toc}{\contentsline {subsection}{\numberline {4.1}实验设置}{5}{subsection.4.1}\protected@file@percent }
-\@writefile{toc}{\contentsline {subsection}{\numberline {4.2}主结果}{5}{subsection.4.2}\protected@file@percent }
-\@writefile{toc}{\contentsline {subsection}{\numberline {4.3}可拒绝接收的作用}{5}{subsection.4.3}\protected@file@percent }
+\@writefile{toc}{\contentsline {subsection}{\numberline {4.1}命题验证协议}{5}{subsection.4.1}\protected@file@percent }
+\@writefile{toc}{\contentsline {subsection}{\numberline {4.2}总体定位能力}{5}{subsection.4.2}\protected@file@percent }
 \@writefile{lot}{\contentsline {table}{\numberline {2}{\ignorespaces 传输模式消融。所有设置使用相同 learned normal prompt 和双曲锥代价。}}{6}{table.2}\protected@file@percent }
 \newlabel{tab:transport}{{2}{6}{传输模式消融。所有设置使用相同 learned normal prompt 和双曲锥代价。}{table.2}{}}
 \@writefile{lot}{\contentsline {table}{\numberline {3}{\ignorespaces 接收域代价消融。所有设置使用相同 UOT 参数和相同锚点。}}{6}{table.3}\protected@file@percent }
 \newlabel{tab:cost}{{3}{6}{接收域代价消融。所有设置使用相同 UOT 参数和相同锚点。}{table.3}{}}
-\@writefile{toc}{\contentsline {subsection}{\numberline {4.4}双曲接收域的作用}{6}{subsection.4.4}\protected@file@percent }
-\@writefile{toc}{\contentsline {subsection}{\numberline {4.5}异常证据分解}{6}{subsection.4.5}\protected@file@percent }
-\@writefile{toc}{\contentsline {subsection}{\numberline {4.6}正常性锚点分析}{6}{subsection.4.6}\protected@file@percent }
-\@writefile{toc}{\contentsline {subsection}{\numberline {4.7}机制可视化与效率}{6}{subsection.4.7}\protected@file@percent }
-\bibstyle{plain}
-\bibdata{references}
+\@writefile{toc}{\contentsline {subsection}{\numberline {4.3}验证一：可拒绝接收}{6}{subsection.4.3}\protected@file@percent }
+\@writefile{toc}{\contentsline {subsection}{\numberline {4.4}验证二：结构化接收域}{6}{subsection.4.4}\protected@file@percent }
+\@writefile{toc}{\contentsline {subsection}{\numberline {4.5}验证三：两类异常证据}{6}{subsection.4.5}\protected@file@percent }
+\@writefile{toc}{\contentsline {subsection}{\numberline {4.6}验证四：正常性参考}{6}{subsection.4.6}\protected@file@percent }
 \@writefile{lot}{\contentsline {table}{\numberline {4}{\ignorespaces 异常证据分解。}}{7}{table.4}\protected@file@percent }
 \newlabel{tab:score}{{4}{7}{异常证据分解。}{table.4}{}}
 \@writefile{lot}{\contentsline {table}{\numberline {5}{\ignorespaces Learned prompt 锚点分析。所有设置保持相同 UOT 参数和后处理。}}{7}{table.5}\protected@file@percent }
 \newlabel{tab:anchors}{{5}{7}{Learned prompt 锚点分析。所有设置保持相同 UOT 参数和后处理。}{table.5}{}}
+\@writefile{toc}{\contentsline {subsection}{\numberline {4.7}机制可视化与效率}{7}{subsection.4.7}\protected@file@percent }
 \@writefile{toc}{\contentsline {section}{\numberline {5}讨论}{7}{section.5}\protected@file@percent }
-\@writefile{toc}{\contentsline {section}{\numberline {6}结论}{7}{section.6}\protected@file@percent }
+\bibstyle{plain}
+\bibdata{references}
 \@writefile{lof}{\contentsline {figure}{\numberline {3}{\ignorespaces 机制可视化。每列展示原图、GT mask、接收质量、未接收比例、条件接收代价和最终 anomaly map，用于说明 R-HNA{} 如何把异常区域分解为拒绝证据和高代价接收证据。}}{8}{figure.3}\protected@file@percent }
 \newlabel{fig:mechanism}{{3}{8}{机制可视化。每列展示原图、GT mask、接收质量、未接收比例、条件接收代价和最终 anomaly map，用于说明 \method {} 如何把异常区域分解为拒绝证据和高代价接收证据。}{figure.3}{}}
 \@writefile{lof}{\contentsline {figure}{\numberline {4}{\ignorespaces 复杂正常结构分析。与 cosine scoring、无 UOT 双曲锥打分和 balanced OT 相比，R-HNA{} 降低正常结构误报，并保留真实缺陷响应。}}{8}{figure.4}\protected@file@percent }
 \newlabel{fig:failure}{{4}{8}{复杂正常结构分析。与 cosine scoring、无 UOT 双曲锥打分和 balanced OT 相比，\method {} 降低正常结构误报，并保留真实缺陷响应。}{figure.4}{}}
+\@writefile{toc}{\contentsline {section}{\numberline {6}结论}{8}{section.6}\protected@file@percent }
 \gdef \@abspage@last{8}
