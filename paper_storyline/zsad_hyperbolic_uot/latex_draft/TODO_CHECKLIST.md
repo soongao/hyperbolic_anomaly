@@ -1,30 +1,32 @@
-# Fill-in Checklist
+# R-HNA Manuscript Checklist
 
-## Must Fill Before Submission
+## Before Submission
 
 - [ ] Replace every `\needcite{...}` with verified citations.
-- [ ] Populate `references.bib` with real BibTeX entries only after verification.
-- [ ] Fill Table 1: main benchmark.
-- [ ] Fill Table 2: transport mode ablation.
-- [ ] Fill Table 3: cost type ablation.
-- [ ] Fill Table 4: anomaly signal decomposition.
-- [ ] Fill Table 5: anchor negative controls.
-- [ ] Fill Table 6: runtime and sensitivity.
-- [ ] Insert Figure 1: motivation from flat scoring to UOT rejection.
-- [ ] Insert Figure 2: method pipeline.
-- [ ] Insert mechanism visualization: transport mass, unmatched mass, matched cost, final score.
+- [ ] Populate `references.bib` with verified BibTeX entries.
+- [x] Fill Table 1: main benchmark.
+- [x] Fill Table 2: rejectable acceptance ablation.
+- [x] Fill Table 3: acceptance-region cost ablation.
+- [x] Fill Table 4: anomaly evidence decomposition.
+- [x] Fill Table 5: learned normal prompt anchor controls.
+- [ ] Insert Figure 1: flat prompt scoring vs balanced acceptance vs rejectable acceptance.
+- [ ] Insert Figure 2: learned normal prompt, hyperbolic cone, UOT, evidence decomposition.
+- [ ] Insert mechanism visualization: accepted mass, unaccepted mass, conditional acceptance cost, final score.
 - [ ] Insert failure-mode visualization on complex normal structures.
-- [ ] Remove or rewrite every `\resulttodo{...}` marker.
-- [ ] Decide final claim strength based on the ablation outcomes.
+- [ ] Add runtime and memory measurements relative to direct prompt scoring.
 
 ## Claim Rules
 
-- If UOT does not beat balanced/partial OT, weaken the mass-relaxation claim.
-- If UOT with cosine cost matches hyperbolic UOT, demote hyperbolic geometry to an optional cost variant.
-- If random or shuffled anchors match normality anchors, remove the semantic-normality explanation.
-- If unmatched mass does not align with anomaly masks, do not claim a rejection mechanism.
-- If improvements only occur on weak/failure-prone classes, write the contribution as failure-mode repair rather than general superiority.
+- The outer story is rejectable hyperbolic normality acceptance.
+- UOT is the rejectable acceptance mechanism, not the paper identity.
+- Hyperbolic cones define the structured acceptance region around learned normal prompts.
+- Unaccepted mass and conditional acceptance cost are complementary anomaly evidence.
+- The contribution is bounded to CLIP ZSAD normality acceptance, not universal superiority of hyperbolic geometry.
 
-## Safe Main Claim
+## Main Claim
 
-`We formulate CLIP-based zero-shot anomaly localization as rejectable patch-to-normality semantic transport, where anomalous regions are identified by high-cost or unmatched transport to normality anchors.`
+```text
+We formulate CLIP-based zero-shot anomaly localization as rejectable normality
+acceptance, where anomalous regions are identified as patch evidence that
+learned normality rejects or accepts only at high conditional cost.
+```

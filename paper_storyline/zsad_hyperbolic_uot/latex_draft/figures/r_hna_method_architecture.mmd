@@ -1,4 +1,4 @@
-%% H-UOT method architecture.
+%% R-HNA method architecture.
 %% This figure is a method schematic only. It contains no experimental results.
 
 flowchart LR
@@ -43,7 +43,7 @@ flowchart LR
     %% =========================
     %% UOT
     %% =========================
-    subgraph transport["Unbalanced Semantic Transport"]
+    subgraph transport["Rejectable Normality Acceptance"]
         direction TB
         masses["Patch mass a and anchor mass b"]
         uot["Entropy-regularized UOT<br/>softens marginal constraints"]
@@ -63,16 +63,16 @@ flowchart LR
     subgraph scoring["Decomposed Patch Evidence"]
         direction TB
         transported["Transported mass<br/>m_i = sum_j gamma_ij"]
-        unmatched["Unmatched ratio<br/>r_i = max(a_i - m_i, 0) / a_i"]
-        matched["Conditional matched cost<br/>q_i = sum_j gamma_ij C_ij / m_i"]
+        unaccepted["Unaccepted ratio<br/>r_i = max(a_i - m_i, 0) / a_i"]
+        conditional["Conditional acceptance cost<br/>q_i = sum_j gamma_ij C_ij / m_i"]
         score["Patch anomaly score<br/>s_i = alpha r_i + beta Norm(q_i)"]
 
         gamma --> transported
-        transported --> unmatched
-        gamma --> matched
-        cost --> matched
-        unmatched --> score
-        matched --> score
+        transported --> unaccepted
+        gamma --> conditional
+        cost --> conditional
+        unaccepted --> score
+        conditional --> score
     end
 
     %% =========================
@@ -94,7 +94,7 @@ flowchart LR
         direction TB
         d1["Transport mode ablation<br/>none / balanced / partial / UOT"]
         d2["Cost ablation<br/>cosine / euclidean / hyp-distance / hyp-cone"]
-        d3["Signal decomposition<br/>unmatched ratio vs matched cost"]
+        d3["Signal decomposition<br/>unaccepted ratio vs conditional cost"]
         d4["Anchor negative controls<br/>normal / anomaly / both / shuffled"]
         d5["Synthetic severity test<br/>monotonic rejection response"]
     end
@@ -103,7 +103,7 @@ flowchart LR
     cost -.-> d2
     score -.-> d3
     anchor -.-> d4
-    unmatched -.-> d5
+    unaccepted -.-> d5
 
     %% =========================
     %% Styles
@@ -120,6 +120,6 @@ flowchart LR
     class prompt,text_enc,anchor textCls;
     class normalize,expmap,cone,cost geomCls;
     class masses,uot,gamma,reject transportCls;
-    class transported,unmatched,matched,score scoreCls;
+    class transported,unaccepted,conditional,score scoreCls;
     class amap,iscore outputCls;
     class d1,d2,d3,d4,d5 diagCls;

@@ -1,28 +1,35 @@
-# Task Plan: ZSAD Hyperbolic UOT Experiment and Writing Design
+# Task Plan: R-HNA Paper Storyline
 
 ## Goal
-Create a concrete experiment design and paper writing outline for the CLIP-based ZSAD + hyperbolic cost + unbalanced optimal transport idea.
 
-## Phases
-- [x] Phase 1: Set up persistent planning files
-- [x] Phase 2: Read the current storyline and extract claims
-- [x] Phase 3: Draft experiment design
-- [x] Phase 4: Draft writing outline
-- [x] Phase 5: Review consistency and deliver
+Keep the paper organized around rejectable hyperbolic normality acceptance and
+remove legacy module-stack framing.
 
-## Key Questions
-1. What claims must experiments prove for this idea to be credible?
-2. Which ablations separate hyperbolic geometry from OT and UOT?
-3. How should the paper be written so the contribution is not perceived as module stacking?
+## Completed
 
-## Decisions Made
-- Store the new design artifacts under `paper_storyline/zsad_hyperbolic_uot/` so they stay attached to the idea.
-- Existing cone/hyperbolic ablation infrastructure should be extended rather than replaced.
-- The experiment design must separately validate UOT necessity and hyperbolic cost necessity.
-- The writing outline should center on rejectable semantic transport, not a loose combination of CLIP, hyperbolic geometry, and OT.
+- [x] Reframed the paper from the previous transport-first storyline to R-HNA.
+- [x] Rewrote the core claim around normality acceptance.
+- [x] Converted current result wording from predicted/target wording to current
+  result wording.
+- [x] Wrote Chinese and English LaTeX article drafts.
+- [x] Rewrote the Markdown Chinese draft.
+- [x] Updated experiment design and writing outline.
 
-## Errors Encountered
-- None.
+## Remaining Before Submission
 
-## Status
-**Complete** - Experiment design and writing outline are drafted and checked for consistency with the UOT storyline.
+- [ ] Verify citations and populate `references.bib`.
+- [ ] Replace placeholder figures with final rendered figures.
+- [ ] Add runtime and memory measurements.
+- [ ] Run final LaTeX compilation after figures and references are ready.
+
+## Current Paper Identity
+
+```text
+Rejectable Hyperbolic Normality Acceptance for CLIP-based Zero-shot Anomaly Localization
+```
+
+The story is:
+
+```text
+anomaly = local evidence that learned normality rejects or accepts only at high cost
+```

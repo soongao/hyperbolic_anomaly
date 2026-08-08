@@ -2,7 +2,7 @@ PWD /Users/bytedance/code/anomalyclip_new/AnomalyCLIP/paper_storyline/zsad_hyper
 INPUT /usr/local/texlive/2026basic/texmf.cnf
 INPUT /usr/local/texlive/2026basic/texmf-dist/web2c/texmf.cnf
 INPUT /usr/local/texlive/2026basic/texmf-var/web2c/xetex/xelatex.fmt
-INPUT main_zh.tex
+INPUT /Users/bytedance/code/anomalyclip_new/AnomalyCLIP/paper_storyline/zsad_hyperbolic_uot/latex_draft/main_zh.tex
 OUTPUT main_zh.log
 INPUT /Users/bytedance/Library/texmf/tex/latex/ctex/ctexart.cls
 INPUT /Users/bytedance/Library/texmf/tex/latex/ctex/ctexart.cls
@@ -208,6 +208,9 @@ INPUT /usr/local/texlive/2026basic/texmf-dist/fonts/tfm/public/amsfonts/symbols/
 INPUT /usr/local/texlive/2026basic/texmf-dist/fonts/tfm/public/amsfonts/symbols/msbm10.tfm
 INPUT /usr/local/texlive/2026basic/texmf-dist/fonts/tfm/public/amsfonts/symbols/msbm7.tfm
 INPUT /usr/local/texlive/2026basic/texmf-dist/fonts/tfm/public/amsfonts/symbols/msbm5.tfm
+INPUT ./main_zh.bbl
+INPUT ./main_zh.bbl
+INPUT main_zh.bbl
 INPUT main_zh.aux
 INPUT ./main_zh.out
 INPUT ./main_zh.out

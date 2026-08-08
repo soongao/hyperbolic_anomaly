@@ -1,7 +1,7 @@
-# Task Plan: Hyperbolic UOT Experiment Code
+# Task Plan: R-HNA Experiment Code
 
 ## Goal
-Implement experimental code for CLIP-based ZSAD with hyperbolic/cosine/euclidean OT and UOT scoring, then commit it on a new feature branch.
+Implement experimental code for CLIP-based ZSAD rejectable normality acceptance with cosine, Euclidean, hyperbolic-distance, and hyperbolic-cone cost controls.
 
 ## Phases
 - [x] Phase 1: Create feature branch and inspect git state

@@ -1,29 +1,44 @@
 # 独立 Codex 审稿意见
 
-> 来源：`codex exec --ephemeral` 只读审稿进程  
+> 来源：只读审稿进程
 > 审稿范围：`README.md`、`experiment_design.md`、`writing_outline.md`、`zh_draft/draft_zh.md`  
-> 文件修改：无，审稿进程只读。
+> 文件修改：无，审稿进程只读。本文档已按 R-HNA 术语统一。
 
-1. **总体 verdict：promising but risky**
+## 总体 Verdict
 
-2. **主要风险，按严重程度排序：**
+`promising but risky`
 
-1. **机制 claim 可能被实验反证。** 如果 `UOT + cosine`、`hyperbolic cone without OT` 或 balanced/partial OT 表现接近最终方法，审稿人会认为“UOT + hyperbolic”不是必要机制，而是复杂打分堆叠。
-2. **双曲代价的必要性最脆弱。** CLIP 特征本身未必具有清晰层级结构，直接 Exp 映射到双曲空间可能只是距离重标定；审稿人会要求证明它不是 cosine/Euclidean 的单调变换或超参效果。
-3. **UOT 容易被视为后处理/阈值化。** 未匹配质量若不能独立对齐 GT mask，并降低正常复杂结构误报，审稿人会说它只是对 anomaly map 做平滑、归一化或置信度校准。
-4. **正常性锚点存在 prompt engineering 风险。** 若 anchor bank 手工设计、数量过多或类别相关，零样本设定会被质疑；若只靠 AnomalyCLIP learned prompts，又难证明“normality semantic transport”而不是继承 baseline prompt 能力。
-5. **“强制每个 patch 分类”的靶子可能过强。** 现代 CLIP ZSAD 方法不一定都显式硬分配 normal/anomaly；审稿人会要求更精确地区分 soft prompt scoring、open-set rejection、一类建模和你们的 UOT formulation。
-6. **异常定位未必适合语义传输。** 很多工业缺陷是低层纹理/几何扰动，CLIP patch-text 语义锚点可能粒度太粗；如果细小划痕、污染、边界缺陷无提升，核心动机会受损。
-7. **超参数与计算开销可能削弱实用价值。** `tau_patch/tau_anchor/epsilon/curvature/anchor count` 若需按数据集调参，审稿人会质疑 zero-shot、公平性和可复现性。
-8. **新颖性边界需非常小心。** OT、UOT、partial matching、open-set rejection、hyperbolic anomaly/CLIP 都有相关脉络；若 related work 不严谨，“reformulation”贡献会被认为包装大于实质。
+## 主要风险
 
-3. **最应该收窄或强化的核心 claim：**  
-不要主张“hyperbolic UOT 普遍提升 CLIP ZSAD”。应收窄为：**在 CLIP patch-to-text 异常定位中，UOT 提供一种可检验的 rejectable patch-to-normality matching 机制；只有当 unmatched mass 与异常区域稳定对齐，且 hyperbolic cost 在同等 UOT 设置下优于 flat cost 时，才把双曲正常性代价作为核心贡献。**
+1. **机制 claim 需要被消融链条同时支撑。** 如果 `UOT + cosine`、无拒绝双曲接收或 balanced/partial OT 接近最终方法，审稿人会认为 R-HNA 只是复杂打分组合，而不是必要的正常性接收机制。
+2. **双曲接收域的必要性最脆弱。** CLIP 特征经过指数映射后未必自然具备可利用的层级结构；必须证明 hyperbolic cone 优于 cosine、Euclidean 和 hyperbolic distance，而不是距离重标定或超参效果。
+3. **UOT 容易被视为后处理。** 未接收比例必须独立对齐 GT mask，并降低复杂正常结构误报，否则审稿人会把它看成 anomaly map 的平滑、归一化或置信度校准。
+4. **正常性锚点存在 prompt engineering 风险。** 如果锚点依赖手工文本、数量过多或类别相关，零样本设定会被质疑。当前稿使用 AnomalyCLIP learned normal prompt 是更干净的主设定，但仍需要 anomaly prompt、normal+anomaly、shuffled normal 等负对照。
+5. **对既有 CLIP ZSAD 的批评不能过强。** 现代方法不一定把每个 patch 硬分类到 normal/anomaly；更准确的表述是：它们通常缺少显式的正常性接收状态和软拒绝变量。
+6. **异常定位未必总适合高层语义接收。** 很多工业缺陷是低层纹理或几何扰动；如果细小划痕、污染、边界缺陷无提升，核心动机会受损。
+7. **超参数与计算开销可能削弱实用价值。** 质量松弛强度、熵正则、曲率、锚点数量和 Sinkhorn 迭代次数如果需要按数据集细调，会削弱零样本、公平性和可复现性。
+8. **新颖性边界必须谨慎。** OT、UOT、open-set rejection、hyperbolic anomaly detection 和 CLIP anomaly detection 都有相关脉络；论文应把贡献收窄到正常性接收表述及其 R-HNA 实例化。
 
-4. **必须补的实验和最关键 negative control：**  
-必须补：transport mode 消融 `no OT / balanced OT / partial OT / UOT`；cost 消融 `cosine / Euclidean / hyperbolic distance / hyperbolic cone`；unmatched mass、matched cost、combined score 分解；anchor ablation；MVTec AD + VisA 全量主表；failure-mode 正常图误报分析；`tau/epsilon/curvature/anchor count` 敏感性与 runtime；与 AnomalyCLIP、WinCLIP、PromptAD/VAND/APRIL-GAN 等强 CLIP ZSAD baseline 公平比较。
+## 建议强化的核心 Claim
 
-最关键 negative control：**在完全相同 UOT、超参数和 anchor 数量下，用 random/unrelated/shuffled text anchors 替换正常性 anchors。** 如果随机或错配 anchors 仍接近最终结果，整套“normality semantic transport”解释基本站不住。
+不要主张“hyperbolic UOT 普遍提升 CLIP ZSAD”。更强也更安全的主张是：
 
-5. **一句建议的论文主张写法：**  
-本文将 CLIP 零样本异常定位表述为可拒绝的 patch-to-normality 语义传输，并通过实验证明未匹配质量与高传输代价在特定工业异常场景中比强制 normal/anomaly prompt scoring 更能刻画异常区域。
+```text
+在 CLIP 零样本异常定位中，R-HNA 将 anomaly scoring 改写为可拒绝正常性接收；
+UOT 给出未接收比例这一可检验拒绝变量，双曲锥给出 learned normal prompt 的结构化接收域。
+```
+
+## 必须保留的实验
+
+- transport mode 消融：no transport / balanced OT / partial OT / UOT；
+- cost 消融：cosine / Euclidean / hyperbolic distance / hyperbolic cone；
+- signal 消融：未接收比例 / 条件接收代价 / combined score；
+- anchor 消融：learned normal prompt / learned anomaly prompt / normal+anomaly / shuffled normal；
+- MVTec AD + VisA 主表；
+- 复杂正常结构的 failure-mode 误报分析；
+- 质量松弛、熵正则、曲率、锚点数量和迭代次数敏感性；
+- runtime 和 memory。
+
+## 一句论文主张
+
+本文将 CLIP 零样本异常定位表述为可拒绝正常性接收，并通过双曲接收域与非平衡质量松弛，把异常区域刻画为未被 learned normal prompt 接收或只能高代价接收的局部证据。

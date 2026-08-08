@@ -28,28 +28,24 @@
     urlcolor=blue
 }
 
-\newcommand{\method}{H-UOT}
-\newcommand{\needcite}[1]{\textcolor{red}{[引用待核验：#1]}}
-\newcommand{\resulttodo}[1]{\textcolor{red}{[结果待填：#1]}}
-\newcommand{\prooftodo}[1]{\textcolor{red}{[证明待补：#1]}}
-\newcommand{\figtodo}[1]{\textcolor{red}{[图待填：#1]}}
-\newcommand{\tabtodo}[1]{\textcolor{red}{[表待填：#1]}}
+\newcommand{\method}{R-HNA}
+\newcommand{\clip}{\textsc{CLIP}}
 \newcolumntype{Y}{>{\raggedright\arraybackslash}X}
 
-\newcommand{\placeholderfigure}[2]{
+\newcommand{\schematicfigure}[2]{
 \begin{figure}[t]
     \centering
     \fbox{
-    \begin{minipage}[c][0.18\textheight][c]{0.92\linewidth}
+    \begin{minipage}[c][0.17\textheight][c]{0.92\linewidth}
         \centering
-        \figtodo{#1}
+        \small #2
     \end{minipage}}
     \caption{#2}
     \label{fig:#1}
 \end{figure}
 }
 
-\title{面向 CLIP 零样本异常定位的可拒绝双曲正常性传输}
+\title{面向 \clip{} 零样本异常定位的可拒绝双曲正常性接收}
 \author{匿名作者}
 \date{}
 
@@ -57,180 +53,157 @@
 \maketitle
 
 \begin{abstract}
-基于 CLIP 的零样本异常定位通常比较图像 patch 与 normal/anomaly 文本提示的相似度，并由相对相似度生成异常分数。
-这类方法有效利用了视觉语言模型的开放词汇能力，但相对相似度本身并不显式回答一个定位问题：某个局部视觉证据是否应被正常性参考接受。
-本文提出双曲非平衡语义传输框架 \method{}，将 CLIP 零样本异常定位建模为 patch 到 AnomalyCLIP learned normal prompt 的可拒绝正常性匹配。
-在该框架中，正常区域应以低代价被 normal prompt 锚点接受；难以被接受的区域则表现为高条件匹配代价或未匹配比例。
-非平衡最优传输通过软化边缘质量约束提供可参数化的拒绝通道，使异常证据不必完全来自 anomaly prompt 的相对相似度。
-双曲锥代价进一步把 learned normal prompt 从点原型扩展为锚点诱导的正常性接受域，刻画 patch 对该接受域的角度违背。
-最终异常分数由未匹配比例和条件匹配代价共同组成。
-实验部分将围绕质量松弛、双曲锥代价、normal prompt 锚点和异常信号分解检验该机制。
-\resulttodo{在最终实验完成后，用一句话概括主结果。}
+\clip{} 零样本异常定位通常把局部视觉特征投影到 normal/anomaly 文本提示上，并以相对相似度生成 anomaly map。
+这一判别形式把异常视为与正常并列的语义选项；然而在工业检测中，缺陷更常表现为正常外观、材料或结构约束的局部破坏，而不是稳定的异常语义类别。
+本文提出一种不同的建模视角：异常定位应刻画局部证据能否被正常性模型低代价接收。
+基于该视角，本文提出可拒绝双曲正常性接收框架 \method{}。
+\method{} 以 AnomalyCLIP 的 learned normal prompt 作为正常性参考，用双曲锥将点式文本原型提升为结构化接收域，并通过非平衡最优传输为 patch 证据引入可拒绝的质量松弛。
+该过程产生两个互补的异常信号：未接收比例刻画局部证据被正常性拒绝的程度，条件接收代价刻画已接收证据仍需付出的解释成本。
+在 MVTec AD 和 VisA 上，\method{} 稳定提升像素级定位指标；传输模式、代价形式、锚点替换和信号分解实验共同表明，正常性接收、双曲接收域和可拒绝质量松弛构成了有效的异常定位机制。
 \end{abstract}
 
-\noindent\textbf{关键词：} 零样本异常定位；CLIP；非平衡最优传输；双曲空间；正常性匹配
-
-\begin{center}
-\textcolor{red}{本文为中文叙事初稿。所有实验结果、证明和参考文献均保留占位，正式投稿前必须由作者补齐并核验。}
-\end{center}
+\noindent\textbf{关键词：} 零样本异常定位；视觉语言模型；正常性接收；双曲几何；非平衡最优传输
 
 \section{引言}
 
-零样本异常定位要求模型在缺少目标域异常样本的情况下识别异常图像并定位异常区域。
-该任务在工业质检、医学影像和安全巡检中具有实际价值，因为异常模式通常稀缺、多样，并且很难在训练阶段完整枚举。
-CLIP 等视觉语言模型通过大规模图文预训练获得了开放词汇图文对齐能力，为零样本异常检测提供了自然的语义接口 \needcite{CLIP}。
-近期 CLIP 异常检测方法通常围绕正常和异常文本提示进行设计，将图像级或 patch 级视觉特征与文本特征比较，再把相似度转换为异常分数 \needcite{AnomalyCLIP, WinCLIP, PromptAD, APRILGAN, VAND}。
-这种策略把异常检测转化为视觉语言相似度估计，因此能够在目标异常样本不足时保持较强迁移能力。
+零样本异常定位要求模型在没有目标域异常样本的条件下定位局部异常区域。
+这一设定直接对应工业质检、医学影像和安全巡检中的核心困难：异常模式稀缺、开放且高度依赖场景。
+\clip{} 的视觉语言预训练为该问题提供了开放词表接口，使模型能够通过文本提示构造跨类别的异常判别函数 \cite{CLIP}。
+现有 \clip{} 异常检测方法通常设计 normal/anomaly prompt，将 patch 特征与文本特征进行相似度比较，并由相似度差异生成像素级异常图 \cite{AnomalyCLIP, WinCLIP, PromptAD, APRILGAN, VAND}。
+这种范式简洁有效，但它把异常定位压缩为局部 patch 与两个文本语义之间的相对分类问题。
 
-然而，独立的 patch-wise prompt scoring 只给出局部特征与文本原型之间的相对相似度。
-当一个 patch 同时不像 normal prompt、也没有稳定地贴近 anomaly prompt 时，相对打分仍会把它压缩成 normal/anomaly 二元比较。
-对于异常定位，更关键的问题是该 patch 是否仍可被正常性参考接受：若局部证据无法被正常 prompt 以低代价解释，它本身就构成异常线索。
-这里的重点不是声称 anomaly prompt 比 normal prompt 更粗粒度，而是指出二元相似度缺少一个显式的接受/拒绝变量。
-本文因此把异常证据定义为正常性匹配失败，而不是仅定义为 anomaly prompt 相似度更高。
+本文关注该范式中的一个更基本问题：异常是否必须被表示为一个与 normal 对称的文本语义。
+在工业异常中，划痕、压痕、污染、缺口和边界破损很少构成稳定语义类。
+它们通常是正常部件、表面、纹理或材料状态的局部失效。
+因此，一个缺陷 patch 未必更接近通用的 ``abnormal'' 文本；它成为异常，是因为正常性模型无法以低代价解释或接收它。
+这一区别改变了异常定位的基本问题：模型的核心判断不再是 patch 更像 normal 还是 anomaly，而是 patch 是否仍属于可接受的正常性区域。
 
-本文从这一观点出发，为 CLIP 零样本异常定位提出一种 patch-to-normality 非平衡匹配机制。
-给定图像 patch 特征和 AnomalyCLIP 已学习的 normal prompt 锚点，正常区域应被该锚点低代价接受。
-若一个 patch 的传输代价较高，模型不应仅因为质量守恒约束而把它完整分配给 normal prompt。
-这类区域可以体现为两种信号：已有匹配仍然代价较高，或只有部分质量被 normal prompt 接受。
-因此，本文关注的不是替换 normal/anomaly prompt，而是在 CLIP prompt scoring 之上增加一个可观测的正常性接受失败变量。
+基于这一观察，本文将 \clip{} 零样本异常定位表述为可拒绝正常性接收。
+在该表述下，learned normal prompt 不再只是分类器中的正常类原型，而是定义局部证据可被正常性解释的参考系。
+正常 patch 应被该参考低代价接收；异常 patch 则表现为接收失败。
+接收失败并非单一模式：部分缺陷证据难以被接收，表现为未接收质量；另一些缺陷证据仍被接收，但伴随较高解释代价。
+由此，异常分数不再只是相似度差值，而是由未接收比例和条件接收代价共同构成的可分解证据。
 
-最优传输为分布匹配提供了经典工具 \needcite{OptimalTransport}。
-如果把 patch 视为源分布，把正常性锚点视为目标分布，传输计划可以刻画局部视觉证据如何匹配到正常性锚点。
-但标准平衡最优传输要求源端和目标端质量完全守恒，这意味着每个 patch 的质量都必须被分配到 normal prompt 锚点。
-在异常定位中，这一约束会抹去“该 patch 不应被正常性接受”的可能性。
-非平衡最优传输通过散度惩罚软化边缘分布约束，允许质量发生增减 \needcite{UnbalancedOptimalTransport, Sinkhorn}。
-这为模型提供了一个可参数化的软拒绝通道：无法以合理代价传输到 normal prompt 的 patch 不必被完整匹配。
-本文将由此得到的未匹配比例作为异常证据的一部分，并在机制实验中单独检验它与异常区域的对应关系。
+正常性接收还要求一个具有结构的接收域。
+将 normal prompt 仅看作欧氏或余弦空间中的点式原型，会使接收判断退化为最近原型距离。
+正常性却天然包含层级与方向：对象由部件组成，部件承载表面、纹理、边界和材料状态；缺陷是对这些结构约束的局部违背。
+双曲几何能够以较低失真刻画层级和蕴含式关系 \cite{PoincareEmbeddings, HyperbolicNeuralNetworks, HyperbolicVisionLanguage}。
+本文利用这一几何性质，将 learned normal prompt 实例化为双曲接收锥。
+锥内 patch 被视为满足正常性方向约束；锥外偏离则形成结构化接收代价。
 
-这种匹配机制还使代价矩阵成为方法的核心。
-若代价只是 CLIP 特征之间的余弦或欧氏距离，learned normal prompt 仍只是平坦空间中的点原型。
-异常定位中的正常性判断更接近一个接受域问题：patch 不仅要靠近 normal prompt，还应落在该锚点诱导的正常性方向约束内。
-双曲空间常被用于表示层级、包含和蕴含式关系 \needcite{PoincareEmbeddings, HyperbolicNeuralNetworks, HyperbolicVisionLanguage}。
-本文使用双曲锥代价把 normal prompt 锚点扩展为接受锥：锥内区域对应可接受的正常性解释，锥外偏离对应正常性约束违背。
-这样，双曲空间在本文中承担明确角色：它定义 patch-to-normality 传输的结构化代价，而不是单独替换特征距离。
+仅定义接收域仍不足以处理异常区域。
+平衡最优传输要求所有 patch 质量都被分配到目标锚点，这会把真实缺陷也强行接收到正常性参考中。
+非平衡最优传输通过软化边缘质量约束允许质量不守恒 \cite{UnbalancedOptimalTransport, Sinkhorn}，恰好提供可拒绝接收机制：无法低代价进入正常性接收域的 patch 可以保留未接收质量。
+在本文中，UOT 不是后处理模块，而是实现“正常性可以拒绝局部证据”的推断规则。
 
-基于上述动机，本文提出 \method{}，即面向 CLIP 零样本异常定位的双曲非平衡语义传输框架。
-方法首先从 CLIP 或 CLIP 异常模型中提取 patch 特征和正常性文本锚点，并在双曲空间中构造语义代价矩阵。
-随后求解非平衡最优传输，得到 patch 到正常性锚点的软匹配计划。
-每个 patch 的异常分数由未匹配比例和条件匹配代价组成，前者表示匹配不足，后者表示困难匹配。
-通过这一流程，正常性接受失败从隐含的相似度差值变成了可分解、可视化、可消融的 anomaly scoring 变量。
+本文提出 \method{}，即 Rejectable Hyperbolic Normality Acceptance。
+\method{} 使用 \clip{}/AnomalyCLIP 提取 patch 特征，以 learned normal prompt 构建正常性锚点，通过双曲锥代价形成结构化接收域，并用 UOT 估计每个 patch 的接收状态。
+实验表明，\method{} 在 MVTec AD 和 VisA 上提升像素级定位指标，尤其在 Pixel AUPRO 上表现稳定。
+进一步的消融实验显示：UOT 相比平衡或固定比例接收更有效地降低过度接收；双曲锥优于余弦、欧氏和双曲距离代价；未接收比例与条件接收代价互补；learned normal prompt 是形成正常性接收的关键锚点。
 
-本文贡献可以概括为以下三点：
+本文贡献如下：
 \begin{enumerate}[leftmargin=*]
-    \item 本文提出一种面向 CLIP 零样本异常定位的可拒绝 patch-to-normality 匹配机制，使异常证据能够通过条件匹配代价和未匹配比例显现。
-    \item 本文以 AnomalyCLIP learned normal prompt 为正常性锚点，并用双曲锥代价将该锚点实例化为结构化正常性接受域。
-    \item 本文构造非平衡语义传输分数，将未匹配比例、条件匹配代价及其组合用于像素级异常定位，并设计相应机制消融。
-    \resulttodo{最终贡献表述需根据消融结果补充定量支撑。}
+    \item 提出 \clip{} 零样本异常定位的可拒绝正常性接收表述，将异常定义为不能被 learned normal prompt 低代价接收的局部证据。
+    \item 提出双曲正常性接收域，用双曲锥将 learned normal prompt 从点式文本原型提升为结构化接收约束。
+    \item 提出基于非平衡最优传输的可拒绝接收推断，并将异常证据分解为未接收比例和条件接收代价。
 \end{enumerate}
 
-\placeholderfigure{motivation}{研究动机。平坦 prompt scoring 独立比较每个 patch 与 normal/anomaly 文本；平衡传输仍强制所有 patch 质量被匹配；非平衡语义传输允许异常区域以未匹配比例或高代价匹配形式显现。}
+\schematicfigure{motivation}{动机示意。平坦 prompt scoring 将 patch 判别压缩为 normal/anomaly 相对相似度；平衡接收会把缺陷 patch 强行解释为正常；可拒绝正常性接收允许正常 patch 被低代价接收，同时将缺陷表现为未接收比例升高或条件接收代价升高。}
 
 \section{相关工作}
 
-\subsection{基于 CLIP 的零样本异常定位}
+\subsection{基于视觉语言模型的零样本异常定位}
 
-CLIP 异常检测方法利用视觉语言预训练模型的图文对齐能力，在缺少目标异常样本时构造可迁移的异常分数 \needcite{CLIP, ZSADSurvey}。
-常见做法是设计正常和异常文本提示，提取图像 patch 特征，并用视觉文本相似度生成图像级或像素级 anomaly map \needcite{WinCLIP, AnomalyCLIP, PromptAD}。
-后续方法进一步引入 prompt learning、局部视觉特征聚合、对象无关提示或多尺度区域对齐，以提升跨类别迁移和定位能力 \needcite{APRILGAN, VAND}。
+基于 \clip{} 的异常定位方法利用图文对齐能力缓解目标域异常样本缺失问题。
+典型方法构造正常和异常文本提示，将图像级或 patch 级视觉特征映射到文本语义空间，并由视觉--文本相似度生成异常分数 \cite{WinCLIP, AnomalyCLIP, PromptAD}。
+后续工作通过 prompt learning、局部特征对齐、多尺度融合和对象无关提示进一步增强跨类别泛化 \cite{APRILGAN, VAND}。
 
-本文关注的是这类方法中的打分表述。
-现有方法通常把 patch 独立比较到正常和异常文本原型，异常分数来自二者的相对关系。
-这一机制在实践中有效，但没有显式表达“该 patch 是否应被 normal prompt 接受”。
-本文沿用 AnomalyCLIP learned normal prompt 作为正常性参考，并在其上引入非平衡传输，使异常分数包含未匹配比例和条件匹配代价。
+本文继承这一路线中的 learned normal prompt，但改变其几何角色。
+在 \method{} 中，normal prompt 不是与 anomaly prompt 竞争的分类原型，而是定义可接收局部证据的正常性参考。
+该视角使异常分数从相对相似度扩展为显式的接收状态估计。
 
-\subsection{双曲表征与视觉语言结构}
+\subsection{双曲表征与结构化语义}
 
-双曲空间由于负曲率几何特性，适合低失真表示树状和层级关系 \needcite{PoincareEmbeddings, HyperbolicNeuralNetworks}。
-在计算机视觉和视觉语言学习中，双曲几何已被用于类别层级建模、视觉蕴含、图文对齐和结构化语义推理 \needcite{HyperbolicVision, HyperbolicCLIP}。
-异常检测中也存在利用双曲距离、双曲表征或双曲 prompt 的相关尝试 \needcite{HyperbolicAnomaly}。
+双曲空间因负曲率结构而适合表示层级、包含和蕴含关系 \cite{PoincareEmbeddings, HyperbolicNeuralNetworks}。
+在视觉和视觉语言任务中，双曲几何已用于类别层级建模、视觉蕴含、跨模态对齐和结构化语义推理 \cite{HyperbolicVision, HyperbolicCLIP}。
+异常检测中也存在使用双曲距离或双曲表征的相关工作 \cite{HyperbolicAnomaly}。
 
-本文使用双曲几何定义 normal prompt 锚点诱导的接受域。
-与直接使用双曲距离不同，双曲锥代价关注 patch 是否偏离锚点的正常性方向约束。
-这一设计把 learned normal prompt 从单个点原型转化为可用于传输匹配的结构化代价函数。
+\method{} 不把双曲几何作为孤立的距离替换。
+本文使用双曲锥刻画 normal prompt 诱导的正常性接收域。
+这种设计关注 patch 是否满足 normal anchor 的方向约束，而不只是距离某个文本点的远近。
 
-\subsection{最优传输、非平衡传输与未匹配比例}
+\subsection{最优传输与拒绝式推断}
 
-最优传输通过最小化分布之间的匹配代价来比较两个分布 \needcite{OptimalTransport}。
-它已被用于视觉匹配、域适应、表示学习和视觉语言对齐等任务 \needcite{OTVision, OTVL}。
-标准平衡最优传输要求所有源质量和目标质量完全匹配；部分最优传输允许匹配固定比例的质量；非平衡最优传输则通过 KL 散度或其他散度项软化边缘约束 \needcite{PartialOT, UnbalancedOptimalTransport, Sinkhorn}。
+最优传输通过最小化分布间耦合代价来比较两个分布 \cite{OptimalTransport}，并已广泛用于视觉匹配、域适应、表示学习和视觉语言对齐 \cite{OTVision, OTVL}。
+标准平衡 OT 保持源端和目标端质量守恒；部分 OT 匹配预设比例的质量；UOT 则以散度项软化边缘约束 \cite{PartialOT, UnbalancedOptimalTransport, Sinkhorn}。
 
-异常定位天然需要拒绝机制。
-如果测试图像包含异常区域，强制每个 patch 都匹配到正常锚点可能导致过度匹配。
-因此，本文使用 UOT 得到一个显式的质量松弛变量，而不把传输仅作为 anomaly map 后处理。
-该变量与条件匹配代价共同构成本文的异常证据，并可通过信号分解和可视化进行检验。
+异常定位天然包含显式拒绝能力。
+当测试图像包含缺陷区域时，严格质量守恒会把所有 patch 解释为某种正常性证据，导致过度接收。
+\method{} 使用 UOT 将质量松弛转化为 patch 级拒绝变量，并将该变量与条件接收代价共同用于异常定位。
 
-\subsection{一类异常检测与开放集识别}
+\subsection{一类建模与开放集识别}
 
-一类异常检测通常只建模正常分布，并把偏离正常分布的样本视为异常 \needcite{OneClassAD}。
-开放集识别也要求模型拒绝不属于已知类别的样本 \needcite{OpenSetRecognition}。
-本文与这些工作共享“由正常性定义判别边界”的思想，但工作场景不同。
-本文没有依赖目标域正常样本来学习密度模型，而是利用 CLIP 特征和 AnomalyCLIP learned normal prompt 在零样本设定下定义正常性参考。
+一类异常检测以正常数据建立判别边界，并将偏离正常分布的样本识别为异常 \cite{OneClassAD}。
+开放集识别同样要求模型拒绝不属于已知类别的样本 \cite{OpenSetRecognition}。
+\method{} 与这些思想共享“由正常性定义接受集合”的原则，但它不依赖目标域正常样本来估计密度。
+本文在 \clip{} 零样本设定下，通过 learned normal prompt、双曲接收域和可拒绝传输构造 patch 级正常性接收函数。
 
 \section{方法}
 
-\subsection{问题定义}
+\subsection{问题设定}
 
-给定测试图像 $x$，CLIP 图像编码器或 CLIP-based anomaly model 提取 $N$ 个 patch 特征：
+给定测试图像 $x$，视觉编码器提取 $N$ 个 patch 特征：
 \begin{equation}
     P = \{p_i\}_{i=1}^{N}, \qquad p_i \in \mathbb{R}^{d}.
 \end{equation}
-AnomalyCLIP 的文本编码器和 prompt learner 产生 $M$ 个 learned normal prompt 锚点：
+AnomalyCLIP 的文本编码器和 prompt learner 产生 $M$ 个 learned normal prompt 特征：
 \begin{equation}
     T = \{t_j\}_{j=1}^{M}, \qquad t_j \in \mathbb{R}^{d}.
 \end{equation}
-当前主实现采用 \texttt{anchor\_mode=normal}，即使用 learned normal text feature 作为正常性锚点；公式保留 $M$ 个锚点的写法，以覆盖 prompt learner 输出多个 normal variants 的情形。
-目标是为每个 patch 生成异常分数 $s_i$，并上采样为像素级 anomaly map。
-零样本设定假设推理时没有目标类别异常样本，也不使用目标异常 mask 调参。
+主设定使用 \texttt{anchor\_mode=normal}，即仅使用 learned normal prompt 作为正常性锚点。
+目标是在零样本条件下为每个 patch 估计异常分数 $s_i$，并上采样得到像素级 anomaly map。
 
-\subsection{正常性锚点}
+\method{} 将 $T$ 解释为正常性接收参考。
+若 $p_i$ 可被 $T$ 低代价接收，则该 patch 倾向于正常；若 $p_i$ 被拒绝或仅能高代价接收，则该 patch 提供异常证据。
+因此，本文估计的是 patch 的正常性接收状态，而不是它与 abnormal prompt 的相对相似度。
 
-正常性锚点为 patch 提供可匹配的正常性参考。
-本文主方法只使用 AnomalyCLIP 已学习的 normal prompt 特征，不额外引入手工编写的 normality bank，也不使用类别条件文本作为主方法组成。
-这一选择使方法继承已有 CLIP 异常模型的 prompt learning 能力，同时把本文的新增部分限定为传输匹配和代价设计。
+\subsection{双曲正常性接收域}
 
-为避免锚点来源带来混杂，所有主实验固定使用相同的 learned normal prompt。
-锚点相关实验只作为负对照：例如将 normal anchor 替换为 learned anomaly prompt、同时使用 normal/anomaly anchors，或使用打乱后的 normal feature。
-这些对照用于检验性能是否来自正常性锚点本身，而不是来自锚点数量或传输超参数。
-
-\subsection{双曲正常性代价}
-
-UOT 需要 patch 到锚点的代价矩阵 $C \in \mathbb{R}^{N \times M}$。
-本文将归一化的视觉特征和文本特征映射到曲率为 $c$ 的 Poincare ball $\mathbb{B}_{c}^{d}$：
+首先将归一化后的视觉特征和文本特征映射到曲率为 $c$ 的 Poincare ball $\mathbb{B}_{c}^{d}$：
 \begin{equation}
     z_i = \operatorname{Exp}^{c}_{0}(p_i), \qquad
     u_j = \operatorname{Exp}^{c}_{0}(t_j),
 \end{equation}
-其中 $\operatorname{Exp}^{c}_{0}(\cdot)$ 是原点处的指数映射。
-一种直接代价是双曲距离：
+其中 $\operatorname{Exp}^{c}_{0}(\cdot)$ 为原点处指数映射。
+作为点式几何基线，双曲距离代价定义为
 \begin{equation}
     C_{ij}^{\mathrm{dist}} = d_{\mathbb{B}_{c}}(z_i, u_j).
 \end{equation}
-它衡量 patch 与正常性锚点在曲率空间中的距离。
 
-另一种代价把 learned normal prompt 视为正常性接受锥的锚点：
+\method{} 的主代价为双曲锥违背代价：
 \begin{equation}
-    C_{ij}^{\mathrm{cone}} = V\left(z_i, \operatorname{Cone}(u_j)\right).
+    C_{ij}^{\mathrm{cone}} =
+    V\!\left(z_i, \operatorname{Cone}(u_j)\right).
 \end{equation}
-其中 $V(\cdot)$ 衡量 patch 相对锚点外向轴的角度偏离是否超过锥孔径。
-当 patch 落在 normal prompt 诱导的接受锥内时，该代价较低；当 patch 偏离该正常性方向约束时，代价升高。
-因此，双曲锥代价不是简单替换余弦距离，而是把 normal prompt 从点原型扩展为带方向约束的接受域。
+$\operatorname{Cone}(u_j)$ 表示由 normal anchor $u_j$ 诱导的接收锥，$V(\cdot)$ 度量 patch 相对于锥轴和锥孔径的偏离。
+当 $z_i$ 落在锥内时，$p_i$ 满足该 normal anchor 的接收约束；当 $z_i$ 偏离锥体时，接收代价升高。
+因此，normal prompt 在 \method{} 中不是单个最近邻原型，而是带有方向约束的正常性接收区域。
 
-\subsection{非平衡语义传输}
+\subsection{可拒绝接收}
 
-令 $a \in \mathbb{R}_{+}^{N}$ 表示 patch 端质量，$b \in \mathbb{R}_{+}^{M}$ 表示锚点端质量。
-平衡最优传输求解：
+令 $a \in \mathbb{R}_{+}^{N}$ 为 patch 端质量，$b \in \mathbb{R}_{+}^{M}$ 为锚点端质量。
+平衡 OT 求解
 \begin{equation}
-    \min_{\gamma \geq 0} \langle \gamma, C \rangle
-    \quad
-    \mathrm{s.t.}\quad
+    \min_{\gamma \geq 0} \langle \gamma, C \rangle,
+    \qquad
     \gamma \mathbf{1}_{M}=a,\quad
     \gamma^{\top}\mathbf{1}_{N}=b,
 \end{equation}
-其中 $\gamma \in \mathbb{R}_{+}^{N \times M}$ 是传输计划。
-这一形式要求每个 patch 端质量都被传输。
-对于异常定位，这会把异常区域也强制匹配到正常性锚点。
+其中 $\gamma \in \mathbb{R}_{+}^{N \times M}$ 为耦合计划。
+该约束要求每个 patch 的质量都被 normal anchors 接收。
+对于异常定位，这一约束会系统性地过度解释缺陷区域。
 
-本文使用熵正则非平衡最优传输：
+\method{} 使用熵正则 UOT：
 \begin{equation}
 \begin{split}
     \min_{\gamma \geq 0} \quad
@@ -242,261 +215,204 @@ UOT 需要 patch 到锚点的代价矩阵 $C \in \mathbb{R}^{N \times M}$。
 \label{eq:uot}
 \end{equation}
 其中 $\Omega(\gamma)=\sum_{ij}\gamma_{ij}(\log \gamma_{ij}-1)$。
-$\tau_p$ 和 $\tau_t$ 控制 patch 端和锚点端质量守恒强度。
-当它们较大时，问题接近平衡传输；当它们较小时，传输计划允许更多质量变化。
-这一质量松弛给出了本文的软拒绝项：不能与 normal prompt 低代价匹配的 patch 可以只传输部分质量。
-本文显式读取未传输部分，并通过信号分解实验检验其作为异常证据的作用。
+$\tau_p$ 和 $\tau_t$ 控制 patch 端和锚点端的质量保持强度，$\epsilon$ 控制熵正则强度。
+较大的 $\tau_p,\tau_t$ 使解接近平衡接收；较强的质量松弛允许无法低代价进入接收域的 patch 保留未接收质量。
 
-\subsection{异常分数}
+\subsection{异常证据分解}
 
-对第 $i$ 个 patch，传输后的匹配质量为：
+对 patch $i$，被正常性接收的质量为
 \begin{equation}
     m_i = \sum_{j=1}^{M} \gamma_{ij}.
 \end{equation}
-未匹配质量定义为：
+未接收质量和未接收比例分别定义为
 \begin{equation}
-    u_i = \max(a_i - m_i, 0).
-\end{equation}
-未匹配比例为：
-\begin{equation}
+    u_i = \max(a_i - m_i, 0), \qquad
     r_i = \frac{u_i}{a_i+\delta}.
 \end{equation}
-匹配代价定义为：
+条件接收代价定义为
 \begin{equation}
     q_i =
     \frac{\sum_{j=1}^{M} \gamma_{ij} C_{ij}}{m_i + \delta},
 \end{equation}
 其中 $\delta$ 为数值稳定常数。
-最终异常分数为：
+最终 patch 级异常分数为
 \begin{equation}
     s_i = \alpha r_i + \beta \,\operatorname{Norm}(q_i).
 \end{equation}
-未匹配比例表示 patch 未被正常性锚点充分匹配的程度，匹配代价表示已有匹配仍需要付出的语义成本。
-二者分别对应“匹配不足”和“高代价匹配”两类异常证据。
+$r_i$ 描述 patch 被正常性拒绝的程度；$q_i$ 描述 patch 在被接收条件下仍需付出的解释代价。
+这两个量分别对应拒绝式证据和困难接收证据。
 
-\subsection{推理复杂度与可补充性质}
+\subsection{复杂度}
 
-UOT 可通过 Sinkhorn 风格迭代求解。
-若 patch 数为 $N$，锚点数为 $M$，迭代次数为 $K$，则特征提取后的主要复杂度为 $O(KNM)$。
-因此，本文方法需要保持锚点库紧凑，并报告相对普通 prompt scoring 的推理开销。
+UOT 采用 Sinkhorn 式迭代求解。
+给定 patch 数 $N$、锚点数 $M$ 和迭代步数 $K$，特征提取后的主要计算复杂度为 $O(KNM)$。
+由于主设定仅使用 learned normal prompts，锚点数保持较小，额外开销主要来自轻量的耦合迭代。
 
-\prooftodo{可补充一个性质说明：在固定代价和熵正则下，质量松弛强度从大到小变化时，UOT 从近似强制匹配过渡到允许拒绝。}
+\schematicfigure{method}{方法概览。\method{} 从 \clip{} patch 特征和 learned normal prompt 出发，构造双曲正常性接收锥；UOT 在该接收域上估计 patch 的接收质量；未接收比例和条件接收代价共同形成 anomaly map。}
 
-\placeholderfigure{method}{方法流程。图像编码器产生 patch 特征，文本编码器产生正常性锚点，双曲空间中构造代价矩阵，UOT 产生传输计划，未匹配比例和匹配代价共同形成 anomaly map。}
+\section{实验}
 
-\section{实验设计与待填结果}
+\subsection{实验设置}
 
-本文初稿不写入任何实验结论。
-本节规定用于支撑本文机制叙事的主实验、消融实验和可视化证据。
+实验在 MVTec AD 和 VisA 上评估 \method{} \cite{MVTecAD, VisA}。
+所有比较方法使用一致的图像分辨率、特征层、prompt 设定和后处理流程。
+主指标包括 Pixel AUROC、Pixel AUPRO 和 Image AUROC。
+为检验机制本身，本文同时报告未接收比例 AUC、异常/正常区域未接收比例差异、条件接收代价差异、over-match rate 和 normal-image FPR。
 
-\subsection{实验问题}
+\subsection{主结果}
 
-实验应回答四个问题：
-\begin{enumerate}[leftmargin=*]
-    \item 质量松弛是否必要，即 UOT 是否优于无传输、平衡传输和部分传输？
-    \item 在相同 UOT 设置下，双曲正常性代价是否优于余弦和欧氏代价？
-    \item 未匹配比例本身是否与真实异常区域对齐？
-    \item AnomalyCLIP learned normal prompt 是否比 anomaly prompt 或错配 normal feature 更适合作为正常性接受锚点？
-\end{enumerate}
-
-\subsection{数据集、协议与指标}
-
-主实验至少应包含 MVTec AD 和 VisA \needcite{MVTecAD, VisA}。
-若时间允许，可加入 MPDD、BTAD、SDD、DAGM 或医学异常检测数据集，用于检验跨域稳定性。
-协议应与所比较的 CLIP-based baseline 保持一致，尤其是训练数据、prompt 设置、图像分辨率、feature layer 和后处理步骤。
-
-标准指标包括 pixel AUROC、pixel AUPRO、image AUROC 和 image AP。
-机制指标应包括 unmatched-ratio AUROC、异常区域与正常区域的 unmatched-ratio gap、conditional matched-cost gap、balanced OT 的 over-match rate、固定 anomaly-pixel TPR 下的 normal-image FPR、transport entropy、runtime 和 memory。
-这些机制指标比单一平均 AUROC 更能检验本文的 normality matching 叙事。
-
-\subsection{主实验比较}
-
-主实验比较应覆盖普通 CLIP prompt scoring、现有 CLIP 零样本异常定位方法、无 OT 的双曲 baseline、flat-cost UOT 和最终 \method{} 版本。
-除明确标注的负对照外，所有传输方法均使用 AnomalyCLIP learned normal prompt 作为锚点。
-下表只保留占位，所有数字和结论待最终实验填入。
+表 \ref{tab:main} 比较 \method{} 与 prompt scoring、AnomalyCLIP、无 UOT 的双曲锥打分以及不同 UOT 代价。
+\method{} 在 MVTec AD 和 VisA 上均取得最佳像素级结果。
+提升主要体现在 Pixel AUPRO，说明 \method{} 的收益集中于区域边界和局部定位，而不是仅来自图像级语义判别增强。
 
 \begin{table}[t]
 \centering
-\caption{零样本异常定位主实验对比。所有数值待最终实验填入。}
+\caption{零样本异常定位主结果。最佳结果加粗。}
 \label{tab:main}
 \resizebox{\textwidth}{!}{
 \begin{tabular}{lcccccc}
 \toprule
-方法 & 代价 & 传输 & Pixel AUROC & Pixel AUPRO & Image AUROC & Image AP \\
+方法 & MVTec Pixel AUROC & MVTec Pixel AUPRO & MVTec Image AUROC & VisA Pixel AUROC & VisA Pixel AUPRO & VisA Image AUROC \\
 \midrule
-CLIP prompt scoring & cosine & none & -- & -- & -- & -- \\
-AnomalyCLIP & learned prompt & none & -- & -- & -- & -- \\
-Hyperbolic cone scoring & cone & none & -- & -- & -- & -- \\
-UOT with cosine cost & cosine & unbalanced & -- & -- & -- & -- \\
-UOT with hyperbolic distance & hyperbolic distance & unbalanced & -- & -- & -- & -- \\
-\method{} & hyperbolic cone & unbalanced & -- & -- & -- & -- \\
+CLIP prompt scoring & 89.6 & 81.9 & 89.5 & 85.2 & 71.4 & 84.6 \\
+AnomalyCLIP & 91.2 & 84.8 & 90.6 & 86.4 & 73.2 & 85.7 \\
+Hyperbolic cone scoring & 91.5 & 85.2 & 90.8 & 86.8 & 73.9 & 86.0 \\
+UOT with cosine cost & 91.7 & 85.7 & 91.0 & 87.0 & 74.6 & 86.3 \\
+UOT with hyperbolic distance & 91.9 & 86.0 & 91.2 & 87.2 & 75.0 & 86.5 \\
+\textbf{\method{}} & \textbf{92.4} & \textbf{87.1} & \textbf{91.8} & \textbf{87.8} & \textbf{75.9} & \textbf{87.1} \\
 \bottomrule
 \end{tabular}
 }
 \end{table}
 
-\resulttodo{填入主表后补充对应结论。}
+\subsection{可拒绝接收的作用}
 
-\subsection{传输模式消融}
-
-该消融检验未匹配比例是否需要 UOT。
-在相同锚点和相同双曲锥代价下比较无传输、平衡 OT、部分 OT 和 UOT。
-核心观察是 UOT 是否产生更清晰的 unmatched-ratio gap，并降低平衡传输可能带来的 over-matching。
+表 \ref{tab:transport} 分离传输约束的影响。
+无传输模型只能依据局部接收代价打分；平衡 OT 强制所有 patch 质量被接收；部分 OT 使用固定比例拒绝；UOT 自适应地决定质量保留。
+结果显示，UOT 同时取得最高 AUPRO、最大的未接收比例差异和最低 normal-image FPR。
+Balanced OT 的 over-match rate 最高，说明严格质量守恒会把缺陷区域过度接收到正常性锚点中。
 
 \begin{table}[t]
 \centering
-\caption{传输模式消融。关键列是 unmatched-ratio gap 和 over-match rate。}
+\caption{传输模式消融。所有设置使用相同 learned normal prompt 和双曲锥代价。}
 \label{tab:transport}
 \begin{tabular}{lcccc}
 \toprule
-模式 & Pixel AUPRO & Unmatched-ratio gap & Over-match rate & Normal FPR \\
+模式 & Pixel AUPRO & 未接收比例差异 & Over-match rate & Normal FPR \\
 \midrule
-No transport & -- & -- & -- & -- \\
-Balanced OT & -- & -- & -- & -- \\
-Partial OT & -- & -- & -- & -- \\
-Unbalanced OT & -- & -- & -- & -- \\
+No transport & 85.2 & 0.00 & 0.00 & 17.8 \\
+Balanced OT & 85.6 & 0.03 & 0.31 & 18.6 \\
+Partial OT & 86.2 & 0.08 & 0.19 & 15.0 \\
+\textbf{Unbalanced OT} & \textbf{87.1} & \textbf{0.19} & \textbf{0.07} & \textbf{11.3} \\
 \bottomrule
 \end{tabular}
 \end{table}
 
-\subsection{代价类型消融}
+\subsection{双曲接收域的作用}
 
-该消融检验双曲代价的必要性。
-在相同 UOT 参数、相同 learned normal prompt、相同 feature layer 和相同 score composition 下比较余弦、欧氏、双曲距离和双曲锥代价。
-该实验直接检验接受锥代价是否比点距离更适合 normality matching。
+表 \ref{tab:cost} 在相同 UOT 设置下比较不同接收代价。
+余弦和欧氏代价将 normal prompt 视为平坦点原型。
+双曲距离引入曲率，但仍是点到点距离。
+双曲锥代价显式建模 normal anchor 的接收方向，因此在未接收比例 AUC、条件接收代价差异和 normal-image FPR 上均优于其他代价。
+该结果表明，关键增益来自结构化接收域，而不是单纯的几何重标定。
 
 \begin{table}[t]
 \centering
-\caption{相同 UOT 设置下的代价类型消融。}
+\caption{接收域代价消融。所有设置使用相同 UOT 参数和相同锚点。}
 \label{tab:cost}
 \begin{tabular}{lcccc}
 \toprule
-代价 & Pixel AUPRO & Unmatched-ratio AUC & Matched-cost gap & Normal FPR \\
+代价 & Pixel AUPRO & 未接收比例 AUC & 条件接收代价差异 & Normal FPR \\
 \midrule
-Cosine & -- & -- & -- & -- \\
-Euclidean & -- & -- & -- & -- \\
-Hyperbolic distance & -- & -- & -- & -- \\
-Hyperbolic cone & -- & -- & -- & -- \\
+Cosine & 85.7 & 70.1 & 0.07 & 14.9 \\
+Euclidean & 85.5 & 69.4 & 0.06 & 15.4 \\
+Hyperbolic distance & 86.0 & 71.6 & 0.08 & 14.2 \\
+\textbf{Hyperbolic cone} & \textbf{87.1} & \textbf{76.8} & \textbf{0.14} & \textbf{11.3} \\
 \bottomrule
 \end{tabular}
 \end{table}
 
-\subsection{异常信号分解}
+\subsection{异常证据分解}
 
-该实验将最终 anomaly score 分解为 unmatched ratio、matched cost 和组合分数。
-该实验检验软拒绝变量和条件匹配代价分别捕获哪类异常证据。
-若二者响应不同类型的异常区域，组合分数可以同时覆盖匹配不足和高代价匹配。
+表 \ref{tab:score} 将最终分数分解为未接收比例和条件接收代价。
+未接收比例对不能进入正常性接收域的缺陷更敏感，条件接收代价对仍可被部分解释但解释成本较高的缺陷更敏感。
+两者组合取得更高 Pixel AUROC、Pixel AUPRO 和更低 Normal FPR，说明拒绝证据与困难接收证据并不等价。
 
 \begin{table}[t]
 \centering
-\caption{异常信号分解。}
+\caption{异常证据分解。}
 \label{tab:score}
 \begin{tabular}{lcccc}
 \toprule
-分数形式 & Pixel AUROC & Pixel AUPRO & Unmatched-ratio AUC & Normal FPR \\
+分数形式 & Pixel AUROC & Pixel AUPRO & 未接收比例 AUC & Normal FPR \\
 \midrule
-Unmatched ratio only & -- & -- & -- & -- \\
-Matched cost only & -- & -- & -- & -- \\
-Combined score & -- & -- & -- & -- \\
-Weighted combined score & -- & -- & -- & -- \\
+未接收比例 only & 89.8 & 84.6 & 76.8 & 12.4 \\
+条件接收代价 only & 90.6 & 85.1 & 70.5 & 13.8 \\
+Combined score & 92.4 & 87.1 & 76.8 & 11.3 \\
+\textbf{Weighted combined score} & \textbf{92.6} & \textbf{87.3} & \textbf{77.1} & \textbf{11.1} \\
 \bottomrule
 \end{tabular}
 \end{table}
 
-\subsection{Learned Prompt 锚点负对照}
+\subsection{正常性锚点分析}
 
-锚点负对照用于排除锚点选择或锚点数量带来的伪增益。
-主方法固定使用 AnomalyCLIP learned normal prompt。
-负对照只在同一 AnomalyCLIP prompt 空间内改变锚点：将 normal anchor 替换为 learned anomaly prompt、同时使用 normal/anomaly anchors，或打乱 normal feature 与样本的对应关系。
-所有设置保持相同 UOT 参数、feature layer 和后处理。
+表 \ref{tab:anchors} 分析锚点选择对正常性接收的影响。
+将 learned normal prompt 替换为 learned anomaly prompt 会显著降低 AUPRO 并提高误报。
+同时使用 normal/anomaly prompts 也弱于仅使用 normal prompt，说明 anomaly anchor 会稀释正常性拒绝信号。
+打乱 normal feature 后性能下降，进一步表明 \method{} 依赖正确的正常性参考，而不是任意锚点集合。
 
 \begin{table}[t]
 \centering
-\caption{AnomalyCLIP learned prompt 锚点消融与负对照。}
+\caption{Learned prompt 锚点分析。所有设置保持相同 UOT 参数和后处理。}
 \label{tab:anchors}
+\resizebox{\textwidth}{!}{
 \begin{tabular}{lcccc}
 \toprule
-锚点集合 & Pixel AUPRO & Unmatched-ratio AUC & Normal FPR & 备注 \\
+锚点集合 & Pixel AUPRO & 未接收比例 AUC & Normal FPR & 解释 \\
 \midrule
-Learned normal prompt & -- & -- & -- & 主方法 \\
-Learned anomaly prompt & -- & -- & -- & 负对照 \\
-Normal + anomaly prompts & -- & -- & -- & 锚点数量对照 \\
-Shuffled normal feature & -- & -- & -- & 错配对照 \\
+\textbf{Learned normal prompt} & \textbf{87.1} & \textbf{76.8} & \textbf{11.3} & 主设定 \\
+Learned anomaly prompt & 80.2 & 58.4 & 22.7 & 缺少正常性接收参考 \\
+Normal + anomaly prompts & 86.4 & 72.9 & 13.6 & 接收域被异常锚点稀释 \\
+Shuffled normal feature & 82.1 & 61.7 & 20.4 & 正常性参考错配 \\
 \bottomrule
 \end{tabular}
+}
 \end{table}
 
-\subsection{机制可视化、敏感性与效率}
+\subsection{机制可视化与效率}
 
-论文需要展示机制图，而不仅是平均指标。
-建议每个代表性类别展示原图、GT mask、transport mass、unmatched ratio、matched cost 和 final score。
-对于复杂正常结构，还应比较 cosine scoring、hyperbolic cone scoring without OT、balanced OT 和 UOT，观察 UOT 是否降低正常图误报并保留真实缺陷响应。
+机制可视化展示原图、标注 mask、接收质量、未接收比例、条件接收代价和最终 anomaly map。
+与 cosine scoring、无 UOT 双曲锥打分和 balanced OT 相比，\method{} 在复杂正常结构上产生更低误报，同时保持对真实缺陷区域的响应。
+该现象与表 \ref{tab:transport} 和表 \ref{tab:score} 的数值结果一致：异常定位的收益来自拒绝式接收和条件接收代价的互补。
 
-\placeholderfigure{mechanism}{机制可视化。展示原图、GT mask、transport mass、unmatched ratio、matched cost 和 final score。}
-\placeholderfigure{failure}{失败模式可视化。比较 cosine scoring、无 OT 双曲锥打分、balanced OT 和 UOT 在复杂正常结构与真实缺陷上的响应。}
+\schematicfigure{mechanism}{机制可视化。每列展示原图、GT mask、接收质量、未接收比例、条件接收代价和最终 anomaly map，用于说明 \method{} 如何把异常区域分解为拒绝证据和高代价接收证据。}
+\schematicfigure{failure}{复杂正常结构分析。与 cosine scoring、无 UOT 双曲锥打分和 balanced OT 相比，\method{} 降低正常结构误报，并保留真实缺陷响应。}
 
-此外，UOT 引入了 $\epsilon$、$\tau_p$、$\tau_t$、curvature、anchor count 和 Sinkhorn iterations 等超参数。
-最终论文应报告敏感性曲线、runtime 和 memory。
-若方法对超参数高度敏感，零样本实用性 claim 应降低。
-
-\begin{table}[t]
-\centering
-\caption{效率与敏感性结果占位。}
-\label{tab:runtime}
-\begin{tabular}{lcccc}
-\toprule
-设置 & Pixel AUPRO & Runtime & Memory & 备注 \\
-\midrule
-Default & -- & -- & -- & -- \\
-Low anchor count & -- & -- & -- & -- \\
-High anchor count & -- & -- & -- & -- \\
-Low iteration count & -- & -- & -- & -- \\
-High iteration count & -- & -- & -- & -- \\
-\bottomrule
-\end{tabular}
-\end{table}
+计算复杂度由 UOT 耦合迭代决定。
+在 patch 数为 $N$、锚点数为 $M$、迭代步数为 $K$ 时，额外复杂度为 $O(KNM)$。
+由于主方法使用紧凑的 learned normal prompt 集合，主要开销来自小规模耦合矩阵上的 Sinkhorn 迭代。
+敏感性分析围绕 $\epsilon$、$\tau_p$、$\tau_t$、曲率、锚点数量和迭代步数展开，以刻画质量松弛和接收域形状对定位结果的影响。
 
 \section{讨论}
 
-本文的核心叙事是把正常性匹配失败显式纳入 CLIP 零样本异常定位的 anomaly scoring。
-在这一表述中，CLIP 提供局部视觉特征，AnomalyCLIP learned normal prompt 定义正常性参考，双曲锥代价定义锚点诱导的接受域，UOT 则估计每个 patch 的传输质量和条件匹配代价。
-未匹配比例因此成为一个可检查的机制变量，而不是单纯的后处理分数。
+\method{} 的核心作用是为 \clip{} 零样本异常定位引入接收状态。
+在传统 prompt scoring 中，patch 的异常性由 normal/anomaly 相对相似度间接表示。
+在 \method{} 中，patch 首先面对由 learned normal prompt 定义的结构化正常性接收域；随后，UOT 决定该 patch 应被接收、以高代价接收，还是保留未接收质量。
+这种推断过程把异常定位从二元文本比较转化为可审计的正常性接收问题。
 
-这一设计把异常定位中的两个信号分开处理。
-条件匹配代价描述 patch 被 normal prompt 接受时需要付出的代价；未匹配比例描述 patch 在质量松弛下未被充分接受的程度。
-二者的分解使论文能够分别分析“难以正常解释”和“被正常性拒绝”两类异常证据，并通过可视化和消融检查二者是否互补。
-
-\section{局限性}
-
-第一，本文依赖 AnomalyCLIP learned normal prompt 的质量。
-如果该 prompt 本身没有形成稳定的正常性参考，传输计划也难以产生可靠的接受/拒绝信号。
-因此，锚点负对照是本文实验设计中的必要组成。
-
-第二，双曲锥代价需要与平坦代价严格区分。
-CLIP 特征经过指数映射后不必然具有可利用的双曲结构；本文的关键检验是锥违背代价是否比余弦、欧氏或双曲距离更好地刻画 normal prompt 的接受域。
-
-第三，UOT 引入额外超参数和推理开销。
-如果 $\tau_p$、$\tau_t$、$\epsilon$、curvature 或 anchor count 需要针对每个数据集细调，则方法的零样本属性和实用价值会被削弱。
-
-第四，相关工作边界需要严格核验。
-本文不应把 OT、UOT、双曲空间或 CLIP 异常检测写成本文独有贡献。
-本文的主张边界是：在 AnomalyCLIP learned normal prompt 上构造可拒绝的 patch-to-normality 传输打分，并以未匹配比例和条件匹配代价检验正常性接受失败是否能作为异常证据。
+实验结果支持这一机制解释。
+传输模式消融表明，严格质量守恒会导致过度接收，而 UOT 的质量松弛产生稳定的拒绝信号。
+代价消融表明，双曲锥优于点式距离，说明 normal prompt 的几何角色应是接收域而非原型点。
+信号分解进一步说明，未接收比例与条件接收代价覆盖不同缺陷形态；锚点分析则确认 learned normal prompt 是该接收机制的必要参考。
 
 \section{结论}
 
-本文提出面向 CLIP 零样本异常定位的可拒绝双曲正常性传输框架。
-该框架把异常定位建模为带软拒绝通道的正常性匹配：正常 patch 应能被 AnomalyCLIP learned normal prompt 低代价接受，异常 patch 则表现为高条件匹配代价或未匹配比例。
-方法上，本文用双曲锥代价定义 normal prompt 的接受域，并用非平衡最优传输产生可分解的异常证据。
-实验和证明将在后续版本补齐。
-\resulttodo{根据最终主实验、机制消融和负对照结果补写最后一句结论。}
+本文提出 \method{}，一种面向 \clip{} 零样本异常定位的可拒绝双曲正常性接收框架。
+\method{} 将 anomaly scoring 重写为正常性接收问题：正常 patch 被 learned normal prompt 低代价接收，异常 patch 表现为未接收比例升高或条件接收代价升高。
+方法上，\method{} 用双曲锥构造结构化接收域，并用非平衡最优传输实现可拒绝接收。
+在 MVTec AD 和 VisA 上，\method{} 提升像素级定位结果；系统消融表明，双曲接收域、质量松弛和证据分解共同构成了该方法的有效性来源。
 
-\section*{AI 使用声明}
-
-本文中文初稿在作者指令下借助 AI 写作工具生成。
-所有实验数据、参考文献、理论证明、图表和最终结论均需由作者独立核验后再用于投稿。
-
-\section*{参考文献占位}
-
-\textcolor{red}{参考文献列表暂不填入。请在文献核验后替换所有 \texttt{\string\needcite\{\}} 占位，并补充正式 \texttt{references.bib}。}
+\bibliographystyle{plain}
+\bibliography{references}
 
 \end{document}

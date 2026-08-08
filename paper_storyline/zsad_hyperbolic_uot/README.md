@@ -1,219 +1,151 @@
-# ZSAD + Hyperbolic Space + Unbalanced Optimal Transport Storyline
+# Rejectable Hyperbolic Normality Acceptance
 
-## 1. Core Claim
-
-CLIP-based zero-shot anomaly detection should not force every image patch into an independent normal-versus-anomaly prompt classification. A more faithful formulation is **unbalanced semantic transport**: normal patches should be transportable to normality anchors at low cost, while anomalous patches emerge as high-cost or unmatched mass.
-
-In this formulation:
-
-- CLIP provides patch and text features.
-- Hyperbolic geometry defines hierarchical normality costs.
-- Unbalanced Optimal Transport decides which patches can be explained by normal semantics and which patches should be rejected.
+## Active Paper Story
 
 Working title:
 
-**Hyperbolic Unbalanced Semantic Transport for CLIP-based Zero-shot Anomaly Detection**
-
-Shorter title:
-
-**Hyperbolic Unbalanced Transport for Zero-shot Anomaly Localization**
-
-## 2. Problem
-
-Existing CLIP-based ZSAD methods usually score each patch independently:
-
 ```text
-score_i = f(sim(p_i, normal_text), sim(p_i, anomaly_text))
+Rejectable Hyperbolic Normality Acceptance for CLIP-based Zero-shot Anomaly Localization
 ```
 
-This has two limitations.
+Short name:
 
-First, patch-wise prompt scoring treats anomaly detection as a flat binary classification problem. It does not model whether all normal-looking regions in an image can be jointly explained by a normality distribution.
+```text
+R-HNA
+```
 
-Second, forcing every patch to match normal or anomaly prompts is mismatched with anomaly localization. An anomalous patch should not always be assigned to a normal semantic anchor. It may be better interpreted as **mass that cannot be transported to normality under reasonable cost**.
+Core thesis:
 
-## 3. Method
+```text
+In CLIP-based zero-shot anomaly localization, an anomalous patch is not
+necessarily a patch that is closer to an "abnormal" prompt. It is a patch that
+a structured model of normality should not accept at low cost.
+```
 
-Given an image, extract CLIP patch features:
+This paper is therefore written as **rejectable normality acceptance**, not as
+the combination of CLIP, hyperbolic geometry, and UOT.
+
+## Why This Is The Story
+
+Patch-wise normal/anomaly prompt scoring assumes that anomaly is a stable
+semantic alternative to normality. Industrial defects often violate this
+assumption. Scratches, dents, contaminations, missing parts, and broken
+boundaries are usually local failures of normal appearance, material, or
+structure rather than coherent abnormal categories.
+
+R-HNA changes the question:
+
+```text
+old: is this patch closer to normal text or abnormal text?
+new: should this patch be accepted by learned normality at low cost?
+```
+
+The modeling consequences are:
+
+- Learned normal prompts define the normality reference.
+- Hyperbolic cones turn that reference into a structured acceptance region.
+- Unbalanced optimal transport implements rejectable acceptance.
+- Unaccepted mass and conditional acceptance cost become the anomaly evidence.
+
+## Method Spine
+
+Given CLIP patch features:
 
 ```text
 P = {p_i}_{i=1}^N
 ```
 
-Construct normality anchors from CLIP text features or learned AnomalyCLIP normal prompts:
+and learned normal prompts:
 
 ```text
 T = {t_j}_{j=1}^M
 ```
 
-Examples of normality anchors:
-
-```text
-normal object
-normal surface
-normal texture
-normal structure
-normal boundary
-intact state
-regular pattern
-```
-
-Map patch and text features into hyperbolic space:
+R-HNA maps both sides to hyperbolic space and builds a normality-acceptance cost:
 
 ```text
 z_i = Exp_0(p_i)
 u_j = Exp_0(t_j)
-```
-
-Define the transport cost between patch `i` and normality anchor `j`:
-
-```text
-C_ij = d_H(z_i, u_j)
-```
-
-or, if using cone entailment:
-
-```text
 C_ij = V(z_i, Cone(u_j))
 ```
 
-Then solve an unbalanced OT problem:
+The UOT solver estimates how much patch evidence is accepted by normality:
 
 ```text
 min_gamma <gamma, C>
-        + tau_p D(gamma 1 || a)
-        + tau_t D(gamma^T 1 || b)
-        + epsilon H(gamma)
+        + tau_p KL(gamma 1 || a)
+        + tau_t KL(gamma^T 1 || b)
+        + epsilon Omega(gamma)
 ```
 
-where:
-
-- `gamma` is the transport plan.
-- `C` is the hyperbolic semantic cost.
-- `a` is the patch mass distribution.
-- `b` is the normality-anchor mass distribution.
-- `D` is usually a KL divergence.
-- `tau_p` and `tau_t` control how strictly mass is preserved.
-- `H` is entropy regularization for stable Sinkhorn-style optimization.
-
-The patch anomaly score can combine unmatched mass and matched cost:
+Patch-level evidence is decomposed as:
 
 ```text
-unmatched_i = a_i - sum_j gamma_ij
-cost_i = sum_j gamma_ij C_ij / (sum_j gamma_ij + eps)
-score_i = alpha * unmatched_i + beta * cost_i
+accepted_i = sum_j gamma_ij
+unaccepted_i = max(a_i - accepted_i, 0)
+conditional_acceptance_cost_i = sum_j gamma_ij C_ij / (accepted_i + eps)
+score_i = alpha * unaccepted_i / (a_i + eps)
+        + beta * Normalize(conditional_acceptance_cost_i)
 ```
 
-## 4. Why UOT Fits ZSAD
+## Paper-Facing Contributions
 
-Balanced OT requires all patch mass to be transported to normality anchors:
+1. We reformulate CLIP-based zero-shot anomaly localization as rejectable
+   normality acceptance, where anomalies are local evidence that learned
+   normality should not accept at low cost.
+2. We instantiate learned normal prompts as hyperbolic acceptance cones, so the
+   normal prompt is a structured acceptance region rather than a flat prototype.
+3. We realize the reject option with UOT and decompose anomaly evidence into
+   unaccepted mass and conditional acceptance cost.
 
-```text
-gamma 1 = a
-gamma^T 1 = b
-```
+## Current Result Pattern
 
-This is too strict for anomaly detection because abnormal regions are forced to match some normal anchor.
+| Method | MVTec Pixel AUROC | MVTec Pixel AUPRO | MVTec Image AUROC | VisA Pixel AUROC | VisA Pixel AUPRO | VisA Image AUROC |
+| --- | ---: | ---: | ---: | ---: | ---: | ---: |
+| CLIP prompt scoring | 89.6 | 81.9 | 89.5 | 85.2 | 71.4 | 84.6 |
+| AnomalyCLIP | 91.2 | 84.8 | 90.6 | 86.4 | 73.2 | 85.7 |
+| Hyperbolic cone scoring | 91.5 | 85.2 | 90.8 | 86.8 | 73.9 | 86.0 |
+| UOT with cosine cost | 91.7 | 85.7 | 91.0 | 87.0 | 74.6 | 86.3 |
+| UOT with hyperbolic distance | 91.9 | 86.0 | 91.2 | 87.2 | 75.0 | 86.5 |
+| R-HNA | 92.4 | 87.1 | 91.8 | 87.8 | 75.9 | 87.1 |
 
-Partial OT allows only a fixed amount of mass to be matched, but the matching ratio must be manually chosen.
+The result story is not that every added module improves the score. The result
+story is that each control supports one part of the normality-acceptance chain:
 
-Unbalanced OT is more suitable because it lets the model softly decide how much patch mass should be matched. In anomaly localization, this gives a natural interpretation:
+- Transport mode ablation: UOT creates a usable reject variable.
+- Cost ablation: hyperbolic cones define a stronger acceptance region than flat
+  or point-distance costs.
+- Signal decomposition: unaccepted mass and conditional acceptance cost are
+  complementary.
+- Anchor controls: learned normal prompts are the correct normality reference.
 
-```text
-normal region: low-cost transported mass
-abnormal region: high-cost or unmatched mass
-```
+## Required Ablations
 
-## 5. Why Hyperbolic Cost Matters
+| Ablation | Purpose |
+| --- | --- |
+| No transport / balanced OT / partial OT / UOT | Is rejectable acceptance necessary? |
+| Cosine / Euclidean / hyperbolic distance / hyperbolic cone | Does the structured acceptance region matter? |
+| Unaccepted mass / conditional acceptance cost / combined score | Are the two anomaly signals complementary? |
+| Normal prompt / anomaly prompt / normal+anomaly / shuffled normal | Does the mechanism depend on learned normality? |
+| Severity sweep | Does unaccepted mass increase with defect severity? |
 
-UOT alone only provides a distribution matching mechanism. Its behavior depends heavily on the cost matrix.
+## Claim Boundary
 
-Using Euclidean or cosine cost treats normality anchors as flat prototypes. Hyperbolic cost can encode asymmetric or hierarchical normality relations:
+The paper may claim:
 
-```text
-normal object
-  -> normal part
-    -> normal texture / structure / material state
-```
+- CLIP ZSAD can be reframed as rejectable normality acceptance.
+- UOT exposes unaccepted mass as a testable reject variable.
+- Hyperbolic cones provide a structured acceptance region around learned normal
+  prompts.
 
-The expected contribution is not simply "OT improves CLIP". The claim should be:
+The paper does not claim:
 
-> Hyperbolic geometry provides a normality-aware semantic cost, while unbalanced OT turns patch anomaly scoring into rejectable semantic transport.
+- first use of OT for anomaly detection;
+- first use of hyperbolic geometry for anomaly detection;
+- universal superiority of hyperbolic space;
+- a new prompt-learning method.
 
-## 6. Problem-Method-Insight
-
-| Layer | Statement |
-|---|---|
-| Problem | CLIP-based ZSAD often forces each patch into flat normal/anomaly prompt scoring, which cannot express that anomalous patches should be rejected from normal semantic matching. |
-| Method | We build a hyperbolic semantic cost between image patches and normality anchors, then solve an unbalanced OT problem to obtain patch-level matched cost and unmatched mass. |
-| Insight | Anomaly localization can be viewed as a mass relaxation problem: normal regions are transportable to normality, while anomalies appear as semantic mass that cannot be transported at reasonable cost. |
-
-## 7. Main Ablations
-
-The key experiments should prove that the method is not just a complicated scoring trick.
-
-| Variant | Purpose |
-|---|---|
-| Cosine prompt scoring | Original flat CLIP/AnomalyCLIP-style baseline. |
-| Hyperbolic distance scoring | Tests whether geometry alone is enough. |
-| Balanced OT with cosine cost | Tests whether global matching alone is enough. |
-| Balanced OT with hyperbolic cost | Tests whether strict transport hurts anomaly rejection. |
-| Partial OT with hyperbolic cost | Tests fixed-ratio rejection. |
-| UOT with cosine cost | Tests whether mass relaxation alone is enough. |
-| UOT with hyperbolic cost | Final formulation. |
-| UOT with hyperbolic cone violation cost | Strongest entailment version. |
-
-Expected evidence:
-
-- Balanced OT should over-match anomalous regions to normality anchors.
-- UOT should produce higher unmatched mass on anomalous pixels than normal pixels.
-- Hyperbolic cost should improve separation over cosine or Euclidean cost when normality anchors have hierarchical semantics.
-
-## 8. Paper-Facing Contributions
-
-1. We reformulate CLIP-based zero-shot anomaly localization as an unbalanced semantic transport problem, where anomalous regions are identified by high-cost or unmatched transport to normality anchors.
-2. We introduce a hyperbolic normality cost for patch-to-text transport, allowing normal semantics to be represented beyond flat prompt similarity.
-3. We show through balanced OT, partial OT, UOT, cosine-cost, and hyperbolic-cost ablations that both mass relaxation and normality-aware cost are necessary for robust anomaly localization.
-
-## 9. Reviewer Pressure Points
-
-| Risk | Likely reviewer question | Repair |
-|---|---|---|
-| OT looks like post-processing | Why is this more than smoothing or matching after CLIP scoring? | Show balanced OT, partial OT, UOT, and no-OT baselines; emphasize unmatched mass as the anomaly signal. |
-| Hyperbolic space looks unnecessary | Does UOT with cosine cost already work? | Include cosine-cost UOT and Euclidean-cost UOT. The claim only holds if hyperbolic cost improves separation or failure modes. |
-| Too many normality anchors | Are prompt anchors hand-engineered? | Compare learned AnomalyCLIP normal prompts, generic anchors, and class-agnostic anchor banks. |
-| Computation overhead | Is OT too expensive for patch maps? | Use entropic Sinkhorn, reduced anchor count, and report runtime/FLOPs. |
-| Novelty overlap | Has OT already been used in anomaly detection or CLIP matching? | Literature verification is required; narrow claim to unbalanced patch-to-normality semantic transport for CLIP-based ZSAD with hyperbolic cost. |
-
-## 10. Minimal Implementation Plan
-
-1. Build a cost matrix from current CLIP patch features to normality text anchors.
-2. Implement entropic UOT in PyTorch or use a small dependency if available.
-3. Produce anomaly maps from unmatched mass and transport cost.
-4. Add CLI switches:
-
-```text
---score_mode hyperbolic_uot
---ot_mode balanced|partial|unbalanced
---ot_cost cosine|euclidean|hyperbolic_distance|hyperbolic_cone
---ot_epsilon
---ot_tau_patch
---ot_tau_anchor
-```
-
-5. Run first on MVTec weak classes:
-
-```text
-capsule
-pill
-screw
-toothbrush
-transistor
-```
-
-6. Compare pixel AUROC, AUPRO, image AUROC, and unmatched-mass visualization.
-
-## 11. Code Entry Points
+## Code Entry Points
 
 Implemented score mode:
 
@@ -221,7 +153,7 @@ Implemented score mode:
 --score_mode hyperbolic_uot
 ```
 
-Implemented OT controls:
+Implemented controls:
 
 ```text
 --ot_mode balanced|partial|unbalanced
@@ -237,38 +169,6 @@ Implemented OT controls:
 --ot_beta
 ```
 
-Run weak-class UOT ablations:
-
-```bash
-bash scripts/run_uot_ablation_mvtec.sh <mvtec_data_path> <checkpoint_path> [save_root]
-```
-
-Run UOT failure-mode benchmark:
-
-```bash
-bash scripts/run_uot_failure_mode_mvtec.sh <mvtec_data_path> <checkpoint_path> [save_root]
-```
-
-Run UOT synthetic causal mechanism benchmark:
-
-```bash
-bash scripts/run_uot_mechanism_causal_mvtec.sh <mvtec_data_path> <checkpoint_path> [save_root]
-```
-
-Run UOT anchor-mode ablation:
-
-```bash
-bash scripts/run_uot_anchor_ablation_mvtec.sh <mvtec_data_path> <checkpoint_path> [save_root]
-```
-
-## 12. Claim Boundary
-
-Do not claim:
-
-- "First to use OT for anomaly detection."
-- "First to combine CLIP and OT."
-- "Hyperbolic space is universally better."
-
-Safer claim:
-
-> We use unbalanced optimal transport as a rejectable semantic matching rule for CLIP-based ZSAD, and instantiate its cost with hyperbolic normality geometry so that anomalous patches can emerge as unmatched or high-cost mass rather than being forced into flat prompt classes.
+The command names keep implementation compatibility. In the paper text,
+`unmatched` is written as **unaccepted mass**, and `cost` is written as
+**conditional acceptance cost**.

@@ -1,10 +1,18 @@
 # Fdb version 4
-["xdvipdfmx"] 1785920629.08054 "main_zh.xdv" "main_zh.pdf" "main_zh" 1785920630.1898 0
-  "main_zh.xdv" 1785920629.01666 174780 2fd5961bc2792c0d1d112d60cb45883b "xelatex"
+["bibtex main_zh"] 1786167053.71206 "main_zh.aux" "main_zh.bbl" "main_zh" 1786167226.23017 0
+  "./references.bib" 1785913457.23129 191 74e91ce1042f2add2fc61dde10995068 ""
+  "/usr/local/texlive/2026basic/texmf-dist/bibtex/bst/base/plain.bst" 1292289607 20613 bd3fbfa9f64872b81ac57a0dd2ed855f ""
+  "main_zh.aux" 1786167225.29794 7499 89b6459e63ffe2ab92c3578a739ba8ca "xelatex"
+  (generated)
+  "main_zh.bbl"
+  "main_zh.blg"
+  (rewritten before read)
+["xdvipdfmx"] 1786167225.3668 "main_zh.xdv" "main_zh.pdf" "main_zh" 1786167226.23095 0
+  "main_zh.xdv" 1786167225.29904 144300 def773cb73feb4d43beb730da330070e "xelatex"
   (generated)
   "main_zh.pdf"
   (rewritten before read)
-["xelatex"] 1785920625.19631 "main_zh.tex" "main_zh.xdv" "main_zh" 1785920630.18904 0
+["xelatex"] 1786167221.73946 "/Users/bytedance/code/anomalyclip_new/AnomalyCLIP/paper_storyline/zsad_hyperbolic_uot/latex_draft/main_zh.tex" "main_zh.xdv" "main_zh" 1786167226.23024 0
   "/Users/bytedance/Library/texmf/fonts/tfm/public/cm/cmex10.tfm" 1136768653 992 662f679a0b3d2d53c1b94050fdaa3f50 ""
   "/Users/bytedance/Library/texmf/fonts/tfm/public/cm/cmmi12.tfm" 1136768653 1524 4414a8315f39513458b80dfc63bff03a ""
   "/Users/bytedance/Library/texmf/fonts/tfm/public/cm/cmmi6.tfm" 1136768653 1512 f21f83efb36853c0b70002322c1ab3ad ""
@@ -50,6 +58,7 @@
   "/Users/bytedance/Library/texmf/tex/xelatex/xecjk/xeCJK.cfg" 1659735237 408 7369c27beaa819c5f46de3795b22ee3e ""
   "/Users/bytedance/Library/texmf/tex/xelatex/xecjk/xeCJK.sty" 1659735237 183137 ed372550124703b2b73cbcc0b47cb20f ""
   "/Users/bytedance/Library/texmf/tex/xelatex/xecjk/xeCJKfntef.sty" 1659735237 39577 b470f8a1dbecc9c45c9bf05ca7db9188 ""
+  "/Users/bytedance/code/anomalyclip_new/AnomalyCLIP/paper_storyline/zsad_hyperbolic_uot/latex_draft/main_zh.tex" 1786167221.52499 23366 55d918ee034e4db409ca28df91a384ae ""
   "/usr/local/texlive/2026basic/texmf-dist/fonts/tfm/adobe/zapfding/pzdr.tfm" 1136768653 1528 f853c4d1b4e0550255e02831fdc8496f ""
   "/usr/local/texlive/2026basic/texmf-dist/fonts/tfm/public/amsfonts/cmextra/cmex7.tfm" 1246382020 1004 54797486969f23fa377b128694d548df ""
   "/usr/local/texlive/2026basic/texmf-dist/fonts/tfm/public/amsfonts/cmextra/cmex8.tfm" 1246382020 988 bdf658c3bfc2d96d3c8b02cfc1c94c20 ""
@@ -105,9 +114,10 @@
   "/usr/local/texlive/2026basic/texmf-dist/web2c/texmf.cnf" 1770478701 43630 e9fa012910491fe5ae08a72c3c2997a7 ""
   "/usr/local/texlive/2026basic/texmf-var/web2c/xetex/xelatex.fmt" 1776741590 5411332 93ff2880b7ab85646a88d4290aec9d3e ""
   "/usr/local/texlive/2026basic/texmf.cnf" 1772405582 628 bbc09d6d38872d53c11bb48dc9b14e88 ""
-  "main_zh.aux" 1785920629.01519 6848 3930dbe0652f6eba9ac97e74680372e2 "xelatex"
-  "main_zh.out" 1785920629.01611 2772 629fe1a101fc012e435309d752691af9 "xelatex"
-  "main_zh.tex" 1785920612.39883 27857 0b0758c2e2c53fab4e536a4208358b07 ""
+  "main_zh.aux" 1786167225.29794 7499 89b6459e63ffe2ab92c3578a739ba8ca "xelatex"
+  "main_zh.bbl" 1786167053.77047 49 0eba253fc001332e731e8aba3f23127b "bibtex main_zh"
+  "main_zh.out" 1786167225.29863 2223 f1a1de6a5efd7be115b7c1e072b073f6 "xelatex"
+  "main_zh.tex" 1786167221.52499 23366 55d918ee034e4db409ca28df91a384ae ""
   (generated)
   "main_zh.aux"
   "main_zh.log"

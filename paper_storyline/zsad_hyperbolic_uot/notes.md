@@ -1,63 +1,58 @@
-# Notes: ZSAD Hyperbolic UOT Experiment and Writing Design
+# Notes: R-HNA Experiment And Writing Design
 
-## Source: Current UOT Storyline
+## Active Storyline
 
-- File: `paper_storyline/zsad_hyperbolic_uot/README.md`
-- Core claim: CLIP-based ZSAD should be formulated as rejectable semantic transport rather than independent normal/anomaly prompt classification.
-- Mechanism:
-  - CLIP extracts patch and text features.
-  - Hyperbolic geometry defines the patch-to-normality cost.
-  - UOT produces matched cost and unmatched mass.
-- Main claim boundary:
-  - Do not claim first use of OT, CLIP+OT, or hyperbolic anomaly detection.
-  - Claim unbalanced patch-to-normality semantic transport for CLIP-based ZSAD with hyperbolic cost.
+R-HNA frames CLIP-based zero-shot anomaly localization as rejectable normality
+acceptance.
 
-## Source: Existing Code and Experiment Infrastructure
+Mechanism:
 
-- `test.py` supports:
-  - `--score_mode cosine`
-  - `--score_mode euclidean_energy`
-  - `--score_mode hyperbolic_distance`
-  - `--score_mode normality_entailment`
-  - `--entailment_mode normal_only|anomaly_only|contrastive`
-- `experiments/normality_experiment_utils.py` already defines variants for:
-  - cosine
-  - euclidean_contrastive
-  - hyperbolic_distance_contrastive
-  - cone_normal_only
-  - cone_anomaly_only
-  - cone_contrastive
-- `scripts/run_gap_ablation_mvtec.sh` runs weak-class ablations on:
-  - capsule
-  - pill
-  - transistor
-  - screw
-  - toothbrush
-- `scripts/run_failure_mode_mvtec.sh` and `scripts/run_mechanism_causal_mvtec.sh` already provide top-conference-style failure-mode and synthetic-causal protocols for current cone scoring variants.
+- CLIP extracts patch features.
+- AnomalyCLIP learned normal prompts define the normality reference.
+- Hyperbolic cones define structured acceptance regions.
+- UOT estimates rejectable acceptance.
+- The anomaly score combines unaccepted mass and conditional acceptance cost.
 
-## Design Implications
+## Current Code Context
 
-- The UOT experiment design should not replace the existing hyperbolic/cone ablations. It should extend them.
-- The minimal new variants should isolate three factors:
-  - transport: no OT vs balanced OT vs partial OT vs UOT
-  - cost: cosine vs Euclidean vs hyperbolic distance vs hyperbolic cone violation
-  - anomaly signal: matched cost vs unmatched mass vs combined score
-- The key mechanism evidence should show:
-  - balanced OT over-matches anomalous pixels;
-  - UOT gives anomalous pixels higher unmatched mass;
-  - hyperbolic/cone cost improves transport quality over cosine cost;
-  - unmatched mass is not just a noisy saliency map.
+Implemented score mode:
 
-## Required Paper Evidence
+```text
+--score_mode hyperbolic_uot
+```
 
-- Main table: MVTec, VisA, and if possible medical datasets from AnomalyCLIP.
-- Mechanism table: balanced/partial/UOT with cost variants.
-- Failure-mode figure: normal images where balanced or cosine scoring over-activates normal structures, while UOT reduces false positives.
-- Transport visualization:
-  - transport mass map;
-  - unmatched mass map;
-  - matched cost map;
-  - final anomaly map.
-- Distribution figure:
-  - normal pixels vs anomaly pixels for unmatched mass and matched cost.
+Implemented controls:
 
+```text
+--ot_mode balanced|partial|unbalanced
+--ot_cost cosine|euclidean|hyperbolic_distance|hyperbolic_cone
+--ot_anchor_mode normal|anomaly|both|normal_anomaly
+--ot_score unmatched|cost|combined
+```
+
+The CLI names remain implementation-compatible. Paper-facing text maps them to:
+
+- `unmatched` -> unaccepted mass
+- `cost` -> conditional acceptance cost
+- `hyperbolic_cone` -> hyperbolic normality acceptance cone
+
+## Evidence Needed In The Paper
+
+- Main table on MVTec AD and VisA.
+- Rejectable acceptance ablation: no transport, balanced OT, partial OT, UOT.
+- Acceptance-region cost ablation: cosine, Euclidean, hyperbolic distance,
+  hyperbolic cone.
+- Evidence decomposition: unaccepted mass, conditional acceptance cost, combined
+  score.
+- Anchor controls: learned normal prompt, learned anomaly prompt,
+  normal+anomaly prompts, shuffled normal feature.
+- Mechanism visualization: accepted mass, unaccepted mass, conditional
+  acceptance cost, final score.
+
+## Claim Boundary
+
+Do not claim first use of OT, UOT, hyperbolic geometry, or CLIP for anomaly
+detection.
+
+Do claim that R-HNA turns CLIP ZSAD into a normality-acceptance problem with a
+testable reject variable.

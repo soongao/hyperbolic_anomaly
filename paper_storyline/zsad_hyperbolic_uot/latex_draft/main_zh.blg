@@ -1,0 +1,69 @@
+This is BibTeX, Version 0.99e (TeX Live 2026)
+Capacity: max_strings=200000, hash_size=200000, hash_prime=170003
+The top-level auxiliary file: main_zh.aux
+The style file: plain.bst
+Database file #1: references.bib
+Warning--I didn't find a database entry for "CLIP"
+Warning--I didn't find a database entry for "AnomalyCLIP"
+Warning--I didn't find a database entry for "WinCLIP"
+Warning--I didn't find a database entry for "PromptAD"
+Warning--I didn't find a database entry for "APRILGAN"
+Warning--I didn't find a database entry for "VAND"
+Warning--I didn't find a database entry for "PoincareEmbeddings"
+Warning--I didn't find a database entry for "HyperbolicNeuralNetworks"
+Warning--I didn't find a database entry for "HyperbolicVisionLanguage"
+Warning--I didn't find a database entry for "UnbalancedOptimalTransport"
+Warning--I didn't find a database entry for "Sinkhorn"
+Warning--I didn't find a database entry for "HyperbolicVision"
+Warning--I didn't find a database entry for "HyperbolicCLIP"
+Warning--I didn't find a database entry for "HyperbolicAnomaly"
+Warning--I didn't find a database entry for "OptimalTransport"
+Warning--I didn't find a database entry for "OTVision"
+Warning--I didn't find a database entry for "OTVL"
+Warning--I didn't find a database entry for "PartialOT"
+Warning--I didn't find a database entry for "OneClassAD"
+Warning--I didn't find a database entry for "OpenSetRecognition"
+Warning--I didn't find a database entry for "MVTecAD"
+Warning--I didn't find a database entry for "VisA"
+You've used 0 entries,
+            2118 wiz_defined-function locations,
+            541 strings with 4527 characters,
+and the built_in function-call counts, 18 in all, are:
+= -- 0
+> -- 0
+< -- 0
++ -- 0
+- -- 0
+* -- 2
+:= -- 7
+add.period$ -- 0
+call.type$ -- 0
+change.case$ -- 0
+chr.to.int$ -- 0
+cite$ -- 0
+duplicate$ -- 0
+empty$ -- 1
+format.name$ -- 0
+if$ -- 1
+int.to.chr$ -- 0
+int.to.str$ -- 0
+missing$ -- 0
+newline$ -- 3
+num.names$ -- 0
+pop$ -- 0
+preamble$ -- 1
+purify$ -- 0
+quote$ -- 0
+skip$ -- 1
+stack$ -- 0
+substring$ -- 0
+swap$ -- 0
+text.length$ -- 0
+text.prefix$ -- 0
+top$ -- 0
+type$ -- 0
+warning$ -- 0
+while$ -- 0
+width$ -- 0
+write$ -- 2
+(There were 22 warnings)
