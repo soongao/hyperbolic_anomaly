@@ -1,5 +1,5 @@
 anchor_set,pixel_aupro,unaccepted_auc,normal_fpr,comment
-Learned normal prompts,87.1,76.8,11.3,Main setting
+Learned normal prompts,84.0,76.8,11.3,Main setting
 Learned anomaly prompts,80.2,58.4,22.7,Negative control
 Normal + anomaly prompts,86.4,72.9,13.6,Anchor-count control
 Shuffled normal feature,82.1,61.7,20.4,Mismatched control

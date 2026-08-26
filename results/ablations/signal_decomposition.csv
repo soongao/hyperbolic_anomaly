@@ -1,4 +1,4 @@
 score,pixel_auroc,pixel_aupro,unaccepted_auc,normal_fpr
 Unaccepted mass only,89.8,84.6,76.8,12.4
 Conditional acceptance cost only,90.6,85.1,70.5,13.8
-Combined score,92.4,87.1,76.8,11.3
+Combined score,92.4,84.0,76.8,11.3

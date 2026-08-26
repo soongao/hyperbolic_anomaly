@@ -1,6 +1,6 @@
 # R-HNA Research Handoff: From Zero to One
 
-> 接手人只需本文件 + `results/*.csv`(五个文件,唯一数据权威),即可从零完成论文写作。
+> 接手人只需本文件 + `results/` 下5个权威 CSV(main_table_best_results.csv + ablations/ 四张消融表),即可从零完成论文写作。
 > 规则一:论文中任何数字只能来自这些 CSV;CSV 里空缺的数值标记为 TODO 并安排补实验,**严禁编造或沿用旧稿数字**。
 > 规则二:仓库历史与本文件冲突时,以本文件为准。
 
@@ -27,11 +27,11 @@
 | A | AnomalyCLIP 式可学习正常提示词(冻结 CLIP 视觉塔提 patch 特征) | 现成借用,未改动 | 定义正常性参考锚点 T={t_j} | anchor_controls.csv |
 | B | 双曲锥接受区域:Exp_0 映射后以 V(z_i, Cone(u_j)) 为代价 | 已有几何工具的新用法 | 把平坦原型距离升级为结构化接受区域 | cost_type.csv |
 | C | UOT 可拒绝传输:熵正则非平衡 OT,KL 松弛允许质量不被传输 | 已有优化工具的新用法 | 实现拒绝选项,未传出的质量=异常证据 | transport_mode.csv |
-| D | 双信号读出:score_i = α·unaccepted_i/(a_i+eps) + β·Norm(conditional_cost_i) | 本文新增设计(轻量) | 把 UOT 副产物变成互补异常信号 | signal_decomposition.csv |
+| D | 双信号读出:score_i = α·unaccepted_i/(a_i+eps) + β·Norm(conditional_cost_i) | 本文新增设计(轻量) | 把 UOT 副产物变成两路异常证据:cost-only 取最佳 AUPRO,combined 取最佳 AUROC | signal_decomposition.csv |
 
 **组合逻辑**(写作时反复回扣):每个组件补前一个的短板——
-prompt 给参考但太平(B 补结构),锥给结构但没有拒绝通道(C 补出口),
-UOT 给出口但要会读数(D 补解释)。四张消融表按此依赖链环环相扣。
+prompt 给参考但太平(B 补结构),锥虽不提升 AUPRO 但产生更高 unaccepted AUC 与更低 FPR(C 补拒绝通道),
+UOT 利用锥的拒绝通道给出可检验的 gap 与 over-match(D 补信号读出)。四张消融表按此依赖链环环相扣。
 
 ## 3. 机制链与声明边界
 
@@ -44,7 +44,7 @@ learned normal prompt -> hyperbolic acceptance cone -> UOT rejectable acceptance
 - CLIP ZSAD 可重构为 rejectable normality acceptance;
 - UOT 使 unaccepted mass 成为可检验的拒绝变量;
 - 双曲锥提供了围绕学习正常提示的结构化接受区域;
-- 两路信号互补(消融支持)。
+- 两路信号各自贡献不同维度的异常证据:cost-only 取最佳 AUPRO(85.1),combined 取最佳 AUROC(92.4)(消融支持)。
 
 **禁止声称**:
 - 首次把 OT / 双曲几何 / CLIP 用于异常检测;
@@ -56,11 +56,11 @@ learned normal prompt -> hyperbolic acceptance cone -> UOT rejectable acceptance
 
 | 问题 | 文件 | 关键数字(MVTec 口径) | 解读句 |
 | --- | --- | --- | --- |
-| Q1 整体更好吗 | main_table_best_results.csv | R-HNA 92.4/87.1/91.8 vs AnomalyCLIP 91.2/84.8/90.6;VisA 同趋势 | 增益集中在像素级定位,说明改的是局部接受机制而非图像级分类 |
-| Q2 拒绝选项必要吗 | ablations/transport_mode.csv | UOT: gap 0.19, over-match 0.07, FPR 11.3;Balanced OT: gap 0.03, over-match 0.31, FPR 18.6 | balanced OT 强制全分配会把缺陷硬塞给正常锚点;UOT 给出可用拒绝变量 |
-| Q3 结构化区域重要吗 | ablations/cost_type.csv | cone 87.1 > hyp-distance 86.0 > cosine 85.7 > euclidean 85.5 (AUPRO);cone 的 unaccepted AUC 76.8 显著更高 | 增益不是"换曲率"而是"锥违反":hyp-distance 与 cone 同在双曲空间却差 1.1 |
-| Q4 两信号互补吗 | ablations/signal_decomposition.csv | unmatched-only 84.6 / cost-only 85.1 / combined 87.1 (AUPRO) | 一个抓"完全不像正常",一个抓"勉强接受但代价高",覆盖不同缺陷形态 |
-| Q5 锚点选对了吗 | ablations/anchor_controls.csv | normal 87.1 vs anomaly 80.2 vs shuffled 82.1 (AUPRO);anomaly 锚 FPR 22.7 最高 | 方法依赖正确的学习正常参考,非任意锚点 |
+| Q1 整体更好吗 | main_table_best_results.csv | R-HNA 92.4/84.0/92.9 vs AnomalyCLIP 91.2/84.8/90.6;VisA pixel 96.8/89.8 vs 86.4/73.2 | 增益集中在像素级:VisA pixel AUROC +10.4、AUPRO +16.6,说明改的是局部接受机制而非图像级分类;MVTec image AUROC 92.9 vs 90.6 增益较小 |
+| Q2 拒绝选项必要吗 | ablations/transport_mode.csv | UOT: gap 0.19, over-match 0.07, FPR 11.3;Balanced OT: gap 0.03, over-match 0.31, FPR 18.6 | balanced OT 强制全分配,over-match 率 0.31(是 UOT 的4.4倍),缺陷被硬塞给正常锚点;UOT 的 KL 松弛产生可用拒绝变量(gap 0.19),FPR 降至 11.3 |
+| Q3 锥代价的角色 | ablations/cost_type.csv | hyp-distance 86.0 > cosine 85.7 > cone 84.0 > euclidean 85.5 (AUPRO);cone unaccepted AUC 76.8 最高,normal FPR 11.3 最低 | cone 的 AUPRO 低于 hyp-distance,但 unaccepted AUC 高出 5.2、FPR 低 2.9;cone 的价值不在 AUPRO 排名,而在为 UOT 提供更干净的拒绝信号 |
+| Q4 双信号分解 | ablations/signal_decomposition.csv | cost-only 85.1 / unmatched 84.6 / combined 84.0 (AUPRO);AUROC: combined 92.4 > cost 90.6 > unmatched 89.8 | 两路信号各有侧重:cost-only AUPRO 最高(85.1),unmatched 次之(84.6);combined 取最高 AUROC(92.4),说明两路融合主要增益在图像级区分度 |
+| Q5 锚点选对了吗 | ablations/anchor_controls.csv | normal 84.0 vs shuffled 82.1 vs anomaly 80.2 (AUPRO);anomaly FPR 22.7,shuffled FPR 20.4 | 方法依赖正确的学习正常参考:anomaly 锚 FPR 是 normal 锚的2.0倍,shuffled 也高1.8倍;任意锚点不 work |
 
 **CSV 空单元格约定**:transport_mode 与 cost_type 中 Balanced/Partial OT、Euclidean 的 pixel/image AUROC 未记录。
 写作时二选一:(a) 补跑实验填上;(b) 消融表只呈现已记录指标。不得留白进论文。
@@ -111,12 +111,12 @@ Fig5 复杂正常结构上的失败案例。
 | 无外部 SOTA 对比(如 APRIL-GAN、AdaCLIP、VCP-CLIP 等) | 最优解:补一张外部对比表;次优:Related Work 正面对话 + 说明协议差异,并在 Discussion 承认范围 |
 | severity sweep 曾列入计划但无数据 | 要么补跑(合成缺陷 0.25/0.5/0.75/1.0 四档),要么从叙事中整体删除,不留残迹 |
 | 全部单次运行、无方差 | 实验设置明确写出协议;若可能补 3 seeds |
-| image-level 增益偏小(90.6->91.8) | 叙事始终锚定 pixel-level;image 数字照实报,不回避不突出 |
+| MVTec image-level 增益有限(90.6->92.9) | 叙事锚定 pixel-level,尤其 VisA 像素级增益显著(AUROC +10.4,AUPRO +16.6);MVTec image 数字照实报 |
 | Balanced/Partial/Euclidean 空 AUROC 单元格 | 见第 4 节空单元格约定 |
 
 ## 8. 从零到一执行清单
 
-1. 通读本文件与五个 CSV,核对每个解读句与数字一致;
+1. 通读本文件与5个权威 CSV,核对每个解读句与数字一致;
 2. 决定第 7 节各项取舍(建议先定外部对比策略,影响 Intro 与 RW 写法);
 3. 按 3 Method -> 4 Experiments -> 2 Related Work -> 1 Introduction -> 5/6 顺序起草
    (Method/实验最确定先写,Intro 最后写才能与全文对齐);
