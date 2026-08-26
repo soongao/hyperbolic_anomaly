@@ -1,5 +1,0 @@
-mode,pixel_auroc,pixel_aupro,image_auroc,unaccepted_gap,over_match_rate,normal_fpr
-No transport (hyperbolic cone scoring),91.5,85.2,90.8,0.00,0.00,17.8
-Balanced OT,,85.6,,0.03,0.31,18.6
-Partial OT,,86.2,,0.08,0.19,15.0
-Unbalanced OT (R-HNA),92.4,84.0,92.9,0.19,0.07,11.3
